@@ -389,11 +389,11 @@ func readRow(r *bytes.Reader) *PlainBufferRow {
 	row := new(PlainBufferRow)
 	row.primaryKey = readRowPk(r)
 	tag := readTag(r)
+
 	if tag == TAG_ROW_DATA {
 		row.cells = readRowData(r)
+		tag = readTag(r)
 	}
-
-	tag = readTag(r)
 
 	if tag == TAG_DELETE_ROW_MARKER {
 		tag = readTag(r)

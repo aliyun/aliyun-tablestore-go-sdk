@@ -12,4 +12,5 @@ type OtsApi interface {
 	UpdateRow(request *UpdateRowRequest) (*UpdateRowResponse, error)
 	BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse,error)
         BatchWriteRow(request *BatchWriteRowRequest) (*BatchWriteRowResponse,error)
+	GetRange(request *GetRangeRequest) (*GetRangeResponse,error)
 }

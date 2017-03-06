@@ -297,15 +297,12 @@ func NewPrimaryKeyColumnAuto_Increment(name []byte) *PrimaryKeyColumnInner {
 	v.Name = name
 	v.Type = 0
 	v.Value = "AUTO_INCRMENT"
-
 	return v
 }
 
 func NewPrimaryKeyColumn(name []byte, value interface{}, option PrimaryKeyOption) *PrimaryKeyColumnInner {
 
-	if option == AUTO_INCREMENT {
-		return NewPrimaryKeyColumnAuto_Increment(name)
-	} else {
+	if option == NONE {
 		v := &PrimaryKeyColumnInner{}
 		v.Name = name
 
@@ -324,6 +321,12 @@ func NewPrimaryKeyColumn(name []byte, value interface{}, option PrimaryKeyOption
 		v.Value = value
 
 		return v
+	} else if option == AUTO_INCREMENT {
+		return NewPrimaryKeyColumnAuto_Increment(name)
+	} else if option == MIN {
+		return NewPrimaryKeyColumnINF_MIN(name)
+	} else {
+		return NewPrimaryKeyColumnINF_MAX(name)
 	}
 }
 
@@ -422,7 +425,7 @@ func (pk *PrimaryKey) Build(isDelete bool) []byte {
 	var cellChecksum byte
 
 	for _, column := range (pk.PrimaryKeys) {
-		primaryKeyColumn := NewPrimaryKeyColumn([]byte(column.ColumnName), column.Value , column.PrimaryKeyOption)
+		primaryKeyColumn := NewPrimaryKeyColumn([]byte(column.ColumnName), column.Value, column.PrimaryKeyOption)
 
 		cellChecksum = crc8Bytes(byte(0x0), []byte(primaryKeyColumn.Name))
 		cellChecksum = primaryKeyColumn.getCheckSum(cellChecksum)
@@ -569,13 +572,13 @@ func NewPaginationFilter(filter *PaginationFilter) *tsprotocol.ColumnPaginationF
 	return pageFilter
 }
 
-func getTsDefaultConfig() *TSConfig {
+func getTableStoreDefaultConfig() *TSConfig {
 	httpTimeout := &HTTPTimeout{ConnectionTimeout:time.Second * 15, RequestTimeout :time.Second * 30  }
 	config := &TSConfig{RetryTimes: 3, HTTPTimeout: *httpTimeout}
 	return config
 }
 
-func (otsClient *TSClient) postReq(req *http.Request, url string) (body []byte, err error) {
+func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body []byte, err error) {
 	resp, err := otsClient.httpClient.Do(req)
 	if err != nil {
 		return nil, err
@@ -653,7 +656,7 @@ func (condition *RowCondition) buildCondition() *tsprotocol.RowExistenceExpectat
 // build primary key for create table, put row, delete row and update row
 func buildPrimaryKey(primaryKeyName string, value interface{}) *PrimaryKeyColumn {
 	// Todo: validate the input
-	return &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: None}
+	return &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: NONE}
 }
 
 // Todo: consider block user pass any type
@@ -669,6 +672,15 @@ func (pk *PrimaryKey) AddPrimaryKeyColumn(primaryKeyName string, value interface
 
 func (pk *PrimaryKey) AddPrimaryKeyColumnWithAutoIncrement(primaryKeyName string) {
 	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: AUTO_INCREMENT })
+}
+
+func (pk *PrimaryKey) AddPrimaryKeyColumnWithMinValue(primaryKeyName string) {
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MIN })
+}
+
+// Only used for range query
+func (pk *PrimaryKey) AddPrimaryKeyColumnWithMaxValue(primaryKeyName string) {
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MAX })
 }
 
 func (rowchange *PutRowChange) SetCondition(rowExistenceExpectation RowExistenceExpectation) {
@@ -747,7 +759,7 @@ func (rowchange *UpdateRowChange) Serialize() []byte {
 	return row.Build()
 }
 
-func (rowchange *DeleteRowChange) GetTableName () string {
+func (rowchange *DeleteRowChange) GetTableName() string {
 	return rowchange.TableName
 }
 
@@ -759,53 +771,53 @@ func (rowchange *UpdateRowChange) GetTableName() string {
 	return rowchange.TableName
 }
 
-func (rowchange *DeleteRowChange) getOperationType () tsprotocol.OperationType {
+func (rowchange *DeleteRowChange) getOperationType() tsprotocol.OperationType {
 	return tsprotocol.OperationType_DELETE
 }
 
-func (rowchange *PutRowChange) getOperationType () tsprotocol.OperationType {
+func (rowchange *PutRowChange) getOperationType() tsprotocol.OperationType {
 	return tsprotocol.OperationType_PUT
 }
 
-func (rowchange *UpdateRowChange) getOperationType () tsprotocol.OperationType {
+func (rowchange *UpdateRowChange) getOperationType() tsprotocol.OperationType {
 	return tsprotocol.OperationType_UPDATE
 }
 
-func (rowchange *DeleteRowChange) getCondition () *tsprotocol.Condition {
+func (rowchange *DeleteRowChange) getCondition() *tsprotocol.Condition {
 	condition := new(tsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
-	if rowchange.Condition.ColumnCondition !=nil {
+	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
 	}
 	return condition
 }
 
-func (rowchange *UpdateRowChange) getCondition () *tsprotocol.Condition {
+func (rowchange *UpdateRowChange) getCondition() *tsprotocol.Condition {
 	condition := new(tsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
-	if rowchange.Condition.ColumnCondition !=nil {
+	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
 	}
 	return condition
 }
 
-func (rowchange *PutRowChange) getCondition () *tsprotocol.Condition {
+func (rowchange *PutRowChange) getCondition() *tsprotocol.Condition {
 	condition := new(tsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
-	if rowchange.Condition.ColumnCondition !=nil {
+	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
 	}
 	return condition
 }
 
-func (request *BatchWriteRowRequest) AddRowChange(change RowChange){
+func (request *BatchWriteRowRequest) AddRowChange(change RowChange) {
 	if request.RowChangesGroupByTable == nil {
 		request.RowChangesGroupByTable = make(map[string][]RowChange)
 	}
 	request.RowChangesGroupByTable[change.GetTableName()] = append(request.RowChangesGroupByTable[change.GetTableName()], change)
 }
 
-func (direction Direction) ToDirection() tsprotocol.Direction{
+func (direction Direction) ToDirection() tsprotocol.Direction {
 	if direction == FORWARD {
 		return tsprotocol.Direction_FORWARD
 	} else {

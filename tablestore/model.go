@@ -14,7 +14,7 @@ import (
 // OTSClient的功能包括连接OTS服务进行验证、创建/列出/删除表或表组、插入/获取/
 // 删除/更新行数据
 type (
-	TSClient struct {
+	TableStoreClient struct {
 		endPoint        string
 		instanceName    string
 		accessKeyId     string
@@ -23,7 +23,7 @@ type (
 		httpClient      *http.Client
 		config          *TSConfig
 	}
-	ClientOption func(*TSClient)
+	ClientOption func(*TableStoreClient)
 )
 
 type HTTPTimeout struct {
@@ -130,8 +130,10 @@ const (
 type PrimaryKeyOption int32
 
 const (
-	None           PrimaryKeyOption = 0
+	NONE           PrimaryKeyOption = 0
 	AUTO_INCREMENT PrimaryKeyOption = 1
+	MIN            PrimaryKeyOption = 2
+	MAX            PrimaryKeyOption = 3
 )
 
 type PrimaryKeyColumn struct {
@@ -289,7 +291,7 @@ type SingleRowQueryCriteria struct {
 	ColumnsToGet []string
 	TableName    string
 	PrimaryKey   *PrimaryKey
-	MaxVersion   int
+	MaxVersion   int32
 	Filter       ColumnFilter
 }
 
@@ -387,15 +389,23 @@ type RangeRowQueryCriteria struct{
 	StartPrimaryKey *PrimaryKey
 	EndPrimaryKey *PrimaryKey
 	ColumnsToGet []string
-	MaxVersion   int
+	MaxVersion   int32
 	Filter       ColumnFilter
 	Direction    Direction
+	Limit        int32
 }
 
 type GetRangeRequest struct {
 	RangeRowQueryCriteria *RangeRowQueryCriteria
 }
 
-type GetRangeResponse struct {
+type Row struct{
+	PrimaryKey           *PrimaryKey
+	Columns              []*DataColumn
+}
 
+type GetRangeResponse struct {
+	Rows []*Row
+	ConsumedCapacityUnit *ConsumedCapacityUnit
+	NextStartPrimaryKey *PrimaryKey
 }

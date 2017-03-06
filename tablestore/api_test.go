@@ -15,18 +15,18 @@ func Test(t *testing.T) {
 	TestingT(t)
 }
 
-type TsSuite struct{}
+type TableStoreSuite struct{}
 
 var tableNamePrefix string
 
-var _ = Suite(&TsSuite{})
+var _ = Suite(&TableStoreSuite{})
 
 var defaultTableName = "defaulttable"
 
 // Todo: use config
 var client OtsApi
 
-func (s *TsSuite) SetUpSuite(c *C) {
+func (s *TableStoreSuite) SetUpSuite(c *C) {
 
 	endpoint := os.Getenv("TS_TEST_ENDPOINT")
 	instanceName := os.Getenv("TS_TEST_INSTANCENAME")
@@ -57,7 +57,7 @@ func PrepareTable(tableName string) error {
 	return error
 }
 
-func (s *TsSuite) TestCreateTable(c *C) {
+func (s *TableStoreSuite) TestCreateTable(c *C) {
 	tableName := tableNamePrefix + "testcreatetable1"
 
 	deleteReq := new(DeleteTableRequest)
@@ -87,7 +87,7 @@ func (s *TsSuite) TestCreateTable(c *C) {
 	c.Check(error, Equals, nil)
 }
 
-func (s *TsSuite) TestListTable(c *C) {
+func (s *TableStoreSuite) TestListTable(c *C) {
 	listtables, error := client.ListTable()
 	c.Check(error, Equals, nil)
 	defaultTableExist := false
@@ -102,7 +102,7 @@ func (s *TsSuite) TestListTable(c *C) {
 	c.Check(defaultTableExist, Equals, true)
 }
 
-func (s *TsSuite) TestUpdateAndDescribeTable(c *C) {
+func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	fmt.Println("TestUpdateAndDescribeTable started")
 	updateTableReq := new(UpdateTableRequest)
 	updateTableReq.TableName = defaultTableName
@@ -127,7 +127,7 @@ func (s *TsSuite) TestUpdateAndDescribeTable(c *C) {
 	fmt.Println("TestUpdateAndDescribeTable finished")
 }
 
-func (s *TsSuite) TestTableWithKeyAutoIncrement(c *C) {
+func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 	tableName := "incrementtable"
 	createtableRequest := new(CreateTableRequest)
 
@@ -167,7 +167,7 @@ func (s *TsSuite) TestTableWithKeyAutoIncrement(c *C) {
 	}
 }
 
-func (s *TsSuite) TestPutGetRow(c *C) {
+func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	fmt.Println("TestPutGetRow started")
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
@@ -214,7 +214,7 @@ func (s *TsSuite) TestPutGetRow(c *C) {
 	fmt.Println("TestPutGetRow finished")
 }
 
-func (s *TsSuite) TestPutGetRowWithFilter(c *C) {
+func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	fmt.Println("TestPutGetRowWithFilter started")
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
@@ -271,7 +271,7 @@ func (s *TsSuite) TestPutGetRowWithFilter(c *C) {
 	fmt.Println("TestPutGetRowWithFilter finished")
 }
 
-func (s *TsSuite) TestPutUpdateDeleteRow(c *C) {
+func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	fmt.Println("TestPutUpdateDeleteRow started")
 	keyToUpdate := "pk1toupdate"
 	putRowRequest := new(PutRowRequest)
@@ -335,7 +335,7 @@ func (s *TsSuite) TestPutUpdateDeleteRow(c *C) {
 	fmt.Println("TestPutUpdateDeleteRow finished")
 }
 
-func (s *TsSuite) TestBatchGetRow(c *C) {
+func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	fmt.Println("TestBatchGetRow started")
 	rowCount := 100
 	for i := 0; i < rowCount; i++ {
@@ -373,7 +373,7 @@ func (s *TsSuite) TestBatchGetRow(c *C) {
 	fmt.Println("TestBatchGetRow started")
 }
 
-func (s *TsSuite) TestBatchWriteRow(c *C) {
+func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	fmt.Println("TestBatchWriteRow started")
 
 	PrepareDataInDefaultTable("updateinbatchkey1", "updateinput1")
@@ -413,6 +413,103 @@ func (s *TsSuite) TestBatchWriteRow(c *C) {
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 	}
 	fmt.Println("TestBatchWriteRow finished")
+}
+
+func (s *TableStoreSuite) TestGetRange(c *C) {
+	fmt.Println("TestGetRange started")
+	rowCount := 9
+	for i := 0; i < rowCount; i++ {
+		key := "getrange" + strconv.Itoa(i)
+		value := "value" + strconv.Itoa(i)
+		PrepareDataInDefaultTable(key, value)
+	}
+
+	getRangeRequest := &GetRangeRequest{}
+	rangeRowQueryCriteria := &RangeRowQueryCriteria{}
+	rangeRowQueryCriteria.TableName = defaultTableName
+	start := 1
+	end := 8
+	startPK := new(PrimaryKey)
+	startPK.AddPrimaryKeyColumn("pk1", "getrange" + strconv.Itoa(start))
+	endPK := new(PrimaryKey)
+	endPK.AddPrimaryKeyColumn("pk1", "getrange" + strconv.Itoa(end))
+	rangeRowQueryCriteria.StartPrimaryKey = startPK
+	rangeRowQueryCriteria.EndPrimaryKey = endPK
+	rangeRowQueryCriteria.Direction = FORWARD
+	rangeRowQueryCriteria.MaxVersion = 1
+	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
+
+	getRangeResp, error := client.GetRange(getRangeRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getRangeResp.Rows, NotNil)
+	count := end - start
+	c.Check(len(getRangeResp.Rows), Equals, count)
+	c.Check(getRangeResp.NextStartPrimaryKey, IsNil)
+}
+
+func (s *TableStoreSuite) TestGetRangeWithPagination(c *C) {
+	fmt.Println("TestGetRangeWithPagination started")
+	rowCount := 9
+	for i := 0; i < rowCount; i++ {
+		key := "testrangequery" + strconv.Itoa(i)
+		value := "value" + strconv.Itoa(i)
+		PrepareDataInDefaultTable(key, value)
+	}
+
+	getRangeRequest := &GetRangeRequest{}
+	rangeRowQueryCriteria := &RangeRowQueryCriteria{}
+	rangeRowQueryCriteria.TableName = defaultTableName
+	start := 1
+	end := 8
+	var limit int32 = 3
+	startPK := new(PrimaryKey)
+	startPK.AddPrimaryKeyColumn("pk1", "testrangequery" + strconv.Itoa(start))
+	endPK := new(PrimaryKey)
+	endPK.AddPrimaryKeyColumn("pk1", "testrangequery" + strconv.Itoa(end))
+	rangeRowQueryCriteria.StartPrimaryKey = startPK
+	rangeRowQueryCriteria.EndPrimaryKey = endPK
+	rangeRowQueryCriteria.Direction = FORWARD
+	rangeRowQueryCriteria.MaxVersion = 1
+	rangeRowQueryCriteria.Limit = limit
+	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
+
+	getRangeResp, error := client.GetRange(getRangeRequest)
+
+	c.Check(error, Equals, nil)
+	c.Check(getRangeResp.Rows, NotNil)
+
+	c.Check(len(getRangeResp.Rows), Equals, int(limit))
+	c.Check(getRangeResp.NextStartPrimaryKey, NotNil)
+	fmt.Println("TestGetRangeWithPagination finished")
+}
+
+func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
+	fmt.Println("TestGetRangeWithMinMaxValue started")
+
+	getRangeRequest := &GetRangeRequest{}
+	rangeRowQueryCriteria := &RangeRowQueryCriteria{}
+	rangeRowQueryCriteria.TableName = defaultTableName
+
+	var limit int32 = 8
+	startPK := new(PrimaryKey)
+	startPK.AddPrimaryKeyColumnWithMinValue("pk1")
+	endPK := new(PrimaryKey)
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk1")
+	rangeRowQueryCriteria.StartPrimaryKey = startPK
+	rangeRowQueryCriteria.EndPrimaryKey = endPK
+	rangeRowQueryCriteria.Direction = FORWARD
+	rangeRowQueryCriteria.MaxVersion = 1
+	rangeRowQueryCriteria.Limit = limit
+	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
+
+	getRangeResp, error := client.GetRange(getRangeRequest)
+
+	c.Check(error, Equals, nil)
+	c.Check(getRangeResp.Rows, NotNil)
+
+	c.Check(len(getRangeResp.Rows), Equals, int(limit))
+	c.Check(getRangeResp.NextStartPrimaryKey, NotNil)
+	fmt.Println("TestGetRangeWithMinMaxValue finished")
 }
 
 func CreatePutRowChange(pkValue, colValue string) *PutRowChange {
