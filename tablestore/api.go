@@ -227,7 +227,7 @@ func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error
 }
 
 // Delete a table and all its views will be deleted.
-// 删除一个表，同时它包含的视图也会被删除。
+// 删除一个表
 //
 // @param tableName The table name. 表名。
 // @return Void. 无返回值。
@@ -386,6 +386,10 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 
 	if request.SingleRowQueryCriteria.MaxVersion != 0 {
 		req.MaxVersions = proto.Int32(int32(request.SingleRowQueryCriteria.MaxVersion))
+	} else if req.TimeRange != nil {
+		req.TimeRange = &tsprotocol.TimeRange{StartTime: req.TimeRange.StartTime, EndTime:req.TimeRange.EndTime, SpecificTime:req.TimeRange.SpecificTime}
+	} else {
+		return nil, errInvalidInput
 	}
 
 	if request.SingleRowQueryCriteria.Filter != nil {
@@ -412,7 +416,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 	}
 
 	for _, cell := range (rows[0].cells) {
-		dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value}
+		dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 		response.Columns = append(response.Columns, dataColumn)
 	}
 
@@ -490,7 +494,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 				}
 
 				for _, cell := range (rows[0].cells) {
-					dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value}
+					dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 					rowResult.Columns = append(rowResult.Columns, dataColumn)
 				}
 
@@ -538,6 +542,8 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	for _, table := range (resp.Tables) {
 		for _, row := range (table.Rows) {
 			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}}
+			rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
+			rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
 			} /*else {
@@ -617,7 +623,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		currentRow.PrimaryKey = currentpk
 
 		for _, cell := range (row.cells) {
-			dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value}
+			dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 

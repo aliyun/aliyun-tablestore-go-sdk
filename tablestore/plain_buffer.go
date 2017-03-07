@@ -341,7 +341,7 @@ func readCell(r *bytes.Reader) *PlainBufferCell {
 	}
 
 	if tag == TAG_CELL_TIMESTAMP {
-		readRawLittleEndian64(r)
+		cell.cellTimestamp = readRawLittleEndian64(r)
 		tag = readTag(r)
 	}
 

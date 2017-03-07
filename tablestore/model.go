@@ -145,6 +145,13 @@ type PrimaryKeyColumn struct {
 type DataColumn struct {
 	ColumnName string
 	Value      interface{}
+	Timestamp    int64
+}
+
+type TimeRange struct {
+	Start    int64
+	End      int64
+	Specific int64
 }
 
 type ColumnToUpdate struct {
@@ -292,6 +299,7 @@ type SingleRowQueryCriteria struct {
 	TableName    string
 	PrimaryKey   *PrimaryKey
 	MaxVersion   int32
+	TimeRange    *TimeRange
 	Filter       ColumnFilter
 }
 

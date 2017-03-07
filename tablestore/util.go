@@ -614,6 +614,10 @@ func buildRowPutChange(primarykey *PrimaryKey, columns []DataColumn) *RowPutChan
 	row.columnsToPut = make([]*Column, len(columns))
 	for i, p := range (columns) {
 		row.columnsToPut[i] = NewColumn([]byte(p.ColumnName), p.Value)
+		if p.Timestamp != 0 {
+			row.columnsToPut[i].HasTimestamp = true
+			row.columnsToPut[i].Timestamp = p.Timestamp
+		}
 	}
 
 	return row
@@ -663,6 +667,13 @@ func buildPrimaryKey(primaryKeyName string, value interface{}) *PrimaryKeyColumn
 func (rowchange *PutRowChange) AddColumn(columnName string, value interface{}) {
 	// Todo: validate the input
 	column := &DataColumn{ColumnName: columnName, Value:value}
+	rowchange.Columns = append(rowchange.Columns, *column)
+}
+
+func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
+	// Todo: validate the input
+	column := &DataColumn{ColumnName: columnName, Value:value}
+	column.Timestamp = timestamp
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 

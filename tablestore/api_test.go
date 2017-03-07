@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"runtime"
+	"time"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -212,6 +213,57 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(getResp.Columns[5].ColumnName, Equals, "col6")
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
 	fmt.Println("TestPutGetRow finished")
+}
+
+func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
+	fmt.Println("TestPutGetRowWithTimestamp started")
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = defaultTableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", "testtskey1")
+	putRowChange.PrimaryKey = putPk
+	timeNow :=time.Now().Unix()
+	putRowChange.AddColumnWithTimestamp("col1", "col1data1", timeNow)
+
+	putRowChange.AddColumn("col2", int64(100))
+	putRowChange.AddColumn("col3", float64(2.1))
+	putRowChange.AddColumn("col4", true)
+	putRowChange.AddColumn("col5", int64(50))
+	putRowChange.AddColumn("col6", int64(60))
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error := client.PutRow(putRowRequest)
+	c.Check(error, Equals, nil)
+
+	getRowRequest := new(GetRowRequest)
+	criteria := new(SingleRowQueryCriteria);
+	criteria.PrimaryKey = putPk
+	getRowRequest.SingleRowQueryCriteria = criteria
+	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow}
+	getResp, error := client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp, NotNil)
+	c.Check(len(getResp.PrimaryKey.PrimaryKeys), Equals, 1)
+	c.Check(getResp.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
+	c.Check(getResp.PrimaryKey.PrimaryKeys[0].Value, Equals, "testtskey1")
+	c.Check(len(getResp.Columns), Equals, 6)
+	c.Check(getResp.Columns[0].ColumnName, Equals, "col1")
+	c.Check(getResp.Columns[0].Value, Equals, "col1data1")
+	c.Check(getResp.Columns[0].Timestamp, Equals, timeNow)
+	c.Check(getResp.Columns[1].ColumnName, Equals, "col2")
+	c.Check(getResp.Columns[1].Value, Equals, int64(100))
+	c.Check(getResp.Columns[2].ColumnName, Equals, "col3")
+	c.Check(getResp.Columns[2].Value, Equals, float64(2.1))
+	c.Check(getResp.Columns[3].ColumnName, Equals, "col4")
+	c.Check(getResp.Columns[3].Value, Equals, true)
+	c.Check(getResp.Columns[4].ColumnName, Equals, "col5")
+	c.Check(getResp.Columns[4].Value, Equals, int64(50))
+	c.Check(getResp.Columns[5].ColumnName, Equals, "col6")
+	c.Check(getResp.Columns[5].Value, Equals, int64(60))
+	fmt.Println("TestPutGetRowWithTimestamp finished")
 }
 
 func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {

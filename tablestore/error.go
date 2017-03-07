@@ -6,32 +6,28 @@ import (
 
 var (
 	errMissMustHeader = func(header string) error {
-		return errors.New("[ots] miss must header: " + header)
+		return errors.New("[tablestore] miss must header: " + header)
 	}
 	errTableNameTooLong = func(name string) error {
-		return errors.New("[ots] table name: \"" + name + "\" too long")
-	}
-	errViewNameToolLong = func(name string) error {
-		return errors.New("[ots] view name:\"" + name + "\" too long")
+		return errors.New("[tablestore] table name: \"" + name + "\" too long")
 	}
 	errPrimaryKeyTooLong = func(key string) error {
-		return errors.New("[ots] primary: \"" + key + "\" too long")
+		return errors.New("[tablestore] primary: \"" + key + "\" too long")
 	}
 	otsErrorInfo = func(code, msg string) error {
-		return errors.New("[ots] error code: \"" + code + "\" message: \"" + msg + "\"")
+		return errors.New("[tablestore] error code: \"" + code + "\" message: \"" + msg + "\"")
 	}
 
-	errInvalidPartitionType = errors.New("[ots] invalid partition key")
-	errMissPrimaryKey = errors.New("[ots] missing primary key")
-	errPrimaryKeyTooMuch = errors.New("[ots] primary key too much")
-	errViewPrimaryKeyTooMuch = errors.New("[ots] view primary key too much")
-	errViewAttributeCloumnTooMuch = errors.New("[ots] view attribute cloumn too much")
-	errMultiDeleteRowsTooMuch = errors.New("[ots] multi delete rows too much")
-	errCreateTableNoPrimaryKey = errors.New("[ots] create table no primary key")
-	errUnexpectIoEnd = errors.New("[ots] unexpect io end")
-	errTag = errors.New("[ots] unexpect tag")
-	errNoChecksum = errors.New("[ots] expect checksum")
-	errChecksum = errors.New("[ots] checksum failed")
+	errInvalidPartitionType = errors.New("[tablestore] invalid partition key")
+	errMissPrimaryKey = errors.New("[tablestore] missing primary key")
+	errPrimaryKeyTooMuch = errors.New("[tablestore] primary key too much")
+	errMultiDeleteRowsTooMuch = errors.New("[tablestore] multi delete rows too much")
+	errCreateTableNoPrimaryKey = errors.New("[tablestore] create table no primary key")
+	errUnexpectIoEnd = errors.New("[tablestore] unexpect io end")
+	errTag = errors.New("[tablestore] unexpect tag")
+	errNoChecksum = errors.New("[tablestore] expect checksum")
+	errChecksum = errors.New("[tablestore] checksum failed")
+	errInvalidInput = errors.New("[tablestore] checksum failed")
 )
 
 type OtsError struct {
