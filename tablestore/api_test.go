@@ -285,9 +285,8 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", "testtskey1")
 	putRowChange.PrimaryKey = putPk
-	timeNow :=time.Now().Unix()
+	timeNow :=time.Now().Unix() * 1000
 	putRowChange.AddColumnWithTimestamp("col1", "col1data1", timeNow)
-
 	putRowChange.AddColumn("col2", int64(100))
 	putRowChange.AddColumn("col3", float64(2.1))
 	putRowChange.AddColumn("col4", true)
