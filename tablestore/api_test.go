@@ -59,6 +59,8 @@ func PrepareTable(tableName string) error {
 }
 
 func (s *TableStoreSuite) TestCreateTable(c *C) {
+	fmt.Println("TestCreateTable finished")
+
 	tableName := tableNamePrefix + "testcreatetable1"
 
 	deleteReq := new(DeleteTableRequest)
@@ -86,6 +88,66 @@ func (s *TableStoreSuite) TestCreateTable(c *C) {
 
 	_, error := client.CreateTable(createtableRequest)
 	c.Check(error, Equals, nil)
+
+	fmt.Println("TestCreateTable finished")
+}
+
+func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
+	fmt.Println("TestReCreateTableAndPutRow started")
+
+	tableName := tableNamePrefix + "testrecreatetable1"
+
+	deleteReq := new(DeleteTableRequest)
+	deleteReq.TableName = tableName
+	client.DeleteTable(deleteReq)
+
+	createtableRequest := new(CreateTableRequest)
+
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+
+	tableOption := new(TableOption)
+
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	_, error := client.CreateTable(createtableRequest)
+	c.Check(error, Equals, nil)
+
+	time.Sleep(500 * time.Millisecond)
+	_, error = client.DeleteTable(deleteReq)
+	c.Check(error, Equals, nil)
+
+	_, error = client.CreateTable(createtableRequest)
+	c.Check(error, Equals, nil)
+
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = tableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", "key1")
+	putRowChange.PrimaryKey = putPk
+	putRowChange.AddColumn("col1", "col1data1")
+	putRowChange.AddColumn("col2", int64(100))
+	putRowChange.AddColumn("col3", float64(2.1))
+	putRowChange.AddColumn("col4", true)
+	putRowChange.AddColumn("col5", int64(50))
+	putRowChange.AddColumn("col6", int64(60))
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error = client.PutRow(putRowRequest)
+	c.Check(error, Equals, nil)
+
+	fmt.Println("TestReCreateTableAndPutRow finished")
 }
 
 func (s *TableStoreSuite) TestListTable(c *C) {

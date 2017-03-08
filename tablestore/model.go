@@ -5,6 +5,7 @@ import (
 	"time"
 	"github.com/golang/protobuf/proto"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	"math/rand"
 )
 
 // @class OTSClient
@@ -22,6 +23,7 @@ type (
 
 		httpClient      *http.Client
 		config          *TSConfig
+		random          *rand.Rand
 	}
 	ClientOption func(*TableStoreClient)
 )
@@ -33,6 +35,7 @@ type HTTPTimeout struct {
 
 type TSConfig struct {
 	RetryTimes  uint
+	MaxRetryTime time.Duration
 	HTTPTimeout HTTPTimeout
 }
 
@@ -125,6 +128,11 @@ const (
 	PrimaryKeyType_INTEGER PrimaryKeyType = 1
 	PrimaryKeyType_STRING PrimaryKeyType = 2
 	PrimaryKeyType_BINARY PrimaryKeyType = 3
+)
+
+const (
+	DefaultRetryInterval = 10
+	MaxRetryInterval = 320
 )
 
 type PrimaryKeyOption int32

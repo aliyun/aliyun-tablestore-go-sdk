@@ -10,6 +10,8 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
 	"net"
+	"math/rand"
+	"strings"
 )
 
 const (
@@ -59,11 +61,14 @@ func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, opti
 		option(tableStoreClient)
 	}
 
+	tableStoreClient.random = rand.New(rand.NewSource(time.Now().Unix()))
+
 	return tableStoreClient
 }
 
 // 请求服务端
-func (tableStoreClient *TableStoreClient) doRequest(uri string, req, resp proto.Message) error {
+func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, resp proto.Message) error {
+	end := time.Now().Add(tableStoreClient.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", tableStoreClient.endPoint, uri)
 	/* request body */
 	var body []byte
@@ -77,13 +82,103 @@ func (tableStoreClient *TableStoreClient) doRequest(uri string, req, resp proto.
 		body = nil;
 	}
 
-	var count uint = 0
+	var value int64
+	var i uint
+	var respBody []byte
+	for i =0; ; i++{
+		var statusCode int
+		respBody, err, statusCode = tableStoreClient.doRequest(url, uri, body, resp)
 
-	retry:
+		if err == nil {
+			break
+		} else {
 
+			if len(respBody) <=0 {
+				return err
+			}
+
+			e := new(tsprotocol.Error)
+			errn := proto.Unmarshal(respBody, e)
+
+			value = tableStoreClient.getNextPause(errn, e, i, end, value, uri, statusCode)
+
+			// fmt.Println("hit retry", uri, err, *e.Code, value)
+			if value <= 0 {
+				if errn != nil {
+					return fmt.Errorf("decode resp failed: %s: %s: %s", errn, err, string(respBody))
+				} else {
+					return fmt.Errorf("%s", *e.Code)
+				}
+			}
+
+			time.Sleep(time.Duration(value) * time.Millisecond)
+		}
+	}
+
+	if respBody == nil || len(respBody) == 0 {
+		return nil
+	}
+
+	err = proto.Unmarshal(respBody, resp)
+	if err != nil {
+		return fmt.Errorf("decode resp failed: %s", err)
+	}
+
+	return nil
+}
+
+func (tableStoreClient *TableStoreClient) getNextPause(err error, serverError *tsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
+	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
+		return 0
+	} else if err == nil && !shouldRetry(*serverError.Code, *serverError.Message, action, statusCode) {
+		return 0
+	} else {
+		value := lastInterval * 2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
+		if value > MaxRetryInterval {
+			return MaxRetryInterval
+		}
+
+		return value
+	}
+}
+
+func shouldRetry(errorCode string, errorMsg string, action string, httpStatus int) bool {
+	if retryNotMatterActions(errorCode, errorMsg) == true {
+		return true;
+	}
+
+	serverError := httpStatus >= 500 && httpStatus <= 599;
+	if (isIdempotent(action) &&
+		(strings.Compare(errorCode, STORAGE_TIMEOUT) == 0 || strings.Compare(errorCode, INTERNAL_SERVER_ERROR)==0 || strings.Compare(errorCode, SERVER_UNAVAILABLE) ==0 || serverError)) {
+		return true;
+	}
+	return false;
+}
+
+func retryNotMatterActions(errorCode string, errorMsg string) bool {
+	if (strings.Compare(errorCode, ROW_OPERATION_CONFLICT) == 0 || strings.Compare(errorCode, NOT_ENOUGH_CAPACITY_UNIT) == 0 ||
+		strings.Compare(errorCode, TABLE_NOT_READY) == 0 || strings.Compare(errorCode, PARTITION_UNAVAILABLE) == 0 ||
+		strings.Compare(errorCode, SERVER_BUSY) == 0 || (strings.Compare(errorCode, QUOTA_EXHAUSTED) == 0 && strings.Compare(errorMsg, "Too frequent table operations.") == 0)) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+func isIdempotent(action string) bool {
+	if (strings.Compare(action, batchGetRowUri) == 0  || strings.Compare(action, describeTableUri) == 0 ||
+		strings.Compare(action, getRangeUri) == 0 || strings.Compare(action, getRowUri) == 0  ||
+		strings.Compare(action, listTableUri) == 0 ) {
+		return true;
+	} else {
+		return false;
+	}
+}
+
+func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, int) {
 	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return err
+		return nil, err, 0
 	}
 	/* set headers */
 	hreq.Header.Set("User-Agent", "skyeye")
@@ -109,51 +204,12 @@ func (tableStoreClient *TableStoreClient) doRequest(uri string, req, resp proto.
 
 	if err != nil {
 		// fmt.Println("failed to signature")
-		return err
+		return nil, err, 0
 	}
 	hreq.Header.Set(xOtsSignature, sign)
 
 	/* end set headers */
-	body, err = tableStoreClient.postReq(hreq, url)
-	if err != nil {
-		if len(body) > 0 {
-			e := new(tsprotocol.Error)
-			errn := proto.Unmarshal(body, e)
-
-			if errn != nil {
-				count++
-				if count <= tableStoreClient.config.RetryTimes {
-					goto retry
-				}
-				return fmt.Errorf("decode resp failed: %s: %s: %s", errn, err, string(body))
-			} else {
-				switch *e.Code {
-				case "OTSServerBusy":
-					fallthrough
-				case "OTSTimeout":
-					time.Sleep(time.Millisecond * 10)
-					count++
-					if count <= tableStoreClient.config.RetryTimes {
-						goto retry
-					}
-				}
-				return fmt.Errorf("%s", *e.Code)
-			}
-		}
-
-		return err
-	}
-
-	if len(body) == 0 {
-		return nil
-	}
-
-	err = proto.Unmarshal(body, resp)
-	if err != nil {
-		return fmt.Errorf("decode resp failed: %s", err)
-	}
-
-	return nil
+	return tableStoreClient.postReq(hreq, url)
 }
 
 // table API
@@ -203,7 +259,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 
 	resp := new(tsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
-	if err := tableStoreClient.doRequest(createTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -218,7 +274,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error) {
 	resp := new(tsprotocol.ListTableResponse)
 
-	if err := tableStoreClient.doRequest(listTableUri, nil, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp); err != nil {
 		return &ListTableResponse{}, nil
 	}
 
@@ -236,7 +292,7 @@ func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableReques
 	req.TableName = proto.String(request.TableName)
 
 	response := &DeleteTableResponse{}
-	if err := tableStoreClient.doRequest(deleteTableUri, req, nil); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteTableUri, req, nil); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -251,7 +307,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 
 	resp := new(tsprotocol.DescribeTableResponse)
 
-	if err := tableStoreClient.doRequest(describeTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp); err != nil {
 		return &DescribeTableResponse{}, err
 	}
 
@@ -297,7 +353,7 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 
 	resp := new(tsprotocol.UpdateTableResponse)
 
-	if err := tableStoreClient.doRequest(updateTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp); err != nil {
 		return &UpdateTableResponse{}, err
 	}
 
@@ -337,7 +393,7 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 
 	resp := new(tsprotocol.PutRowResponse)
 
-	if err := tableStoreClient.doRequest(putRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -356,7 +412,7 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 	req.PrimaryKey = request.DeleteRowChange.PrimaryKey.Build(true)
 	resp := new(tsprotocol.DeleteRowResponse)
 
-	if err := tableStoreClient.doRequest(deleteRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -396,7 +452,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		req.Filter = request.SingleRowQueryCriteria.Filter.Serialize()
 	}
 
-	if err := tableStoreClient.doRequest(getRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(getRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -435,7 +491,7 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	req.Condition = request.UpdateRowChange.getCondition()
 	req.RowChange = request.UpdateRowChange.Serialize()
 
-	if err := tableStoreClient.doRequest(updateRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -471,7 +527,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	req.Tables = tablesInBatch
 	resp := new(tsprotocol.BatchGetRowResponse)
 
-	if err := tableStoreClient.doRequest(batchGetRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(batchGetRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -533,7 +589,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 
 	resp := new(tsprotocol.BatchWriteRowResponse)
 
-	if err := tableStoreClient.doRequest(batchWriteRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(batchWriteRowUri, req, resp); err != nil {
 		return nil, err
 	}
 
@@ -598,7 +654,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	resp := new(tsprotocol.GetRangeResponse)
 
-	if err := tableStoreClient.doRequest(getRangeUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp); err != nil {
 		return nil, err
 	}
 

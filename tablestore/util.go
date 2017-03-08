@@ -574,34 +574,27 @@ func NewPaginationFilter(filter *PaginationFilter) *tsprotocol.ColumnPaginationF
 
 func getTableStoreDefaultConfig() *TSConfig {
 	httpTimeout := &HTTPTimeout{ConnectionTimeout:time.Second * 15, RequestTimeout :time.Second * 30  }
-	config := &TSConfig{RetryTimes: 3, HTTPTimeout: *httpTimeout}
+	config := &TSConfig{RetryTimes: 10, HTTPTimeout: *httpTimeout, MaxRetryTime: time.Second * 5 }
 	return config
 }
 
-func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body []byte, err error) {
+func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body []byte, err error, statusCode int) {
 	resp, err := otsClient.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, err, resp.StatusCode
 	}
 	defer resp.Body.Close()
 
-	// todo remove
-	/*fmt.Println("print header")
-	for key, value := range resp.Header {
-		fmt.Println(key)
-		fmt.Println(value)
-	}*/
-
 	body, err = ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, err, resp.StatusCode
 	}
 
 	if (resp.StatusCode >= 200 && resp.StatusCode < 300) == false {
-		return body, fmt.Errorf("get %s response status is %d", url, resp.StatusCode)
+		return body, fmt.Errorf("get %s response status is %d", url, resp.StatusCode), resp.StatusCode
 	}
 
-	return body, nil
+	return body, nil, resp.StatusCode
 }
 
 func buildRowPutChange(primarykey *PrimaryKey, columns []DataColumn) *RowPutChange {
