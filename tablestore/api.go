@@ -11,7 +11,6 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
 	"net"
 	"math/rand"
-	"strings"
 )
 
 const (
@@ -149,16 +148,16 @@ func shouldRetry(errorCode string, errorMsg string, action string, httpStatus in
 
 	serverError := httpStatus >= 500 && httpStatus <= 599;
 	if (isIdempotent(action) &&
-		(strings.Compare(errorCode, STORAGE_TIMEOUT) == 0 || strings.Compare(errorCode, INTERNAL_SERVER_ERROR)==0 || strings.Compare(errorCode, SERVER_UNAVAILABLE) ==0 || serverError)) {
+		( errorCode == STORAGE_TIMEOUT || errorCode == INTERNAL_SERVER_ERROR || errorCode == SERVER_UNAVAILABLE || serverError)) {
 		return true;
 	}
 	return false;
 }
 
 func retryNotMatterActions(errorCode string, errorMsg string) bool {
-	if (strings.Compare(errorCode, ROW_OPERATION_CONFLICT) == 0 || strings.Compare(errorCode, NOT_ENOUGH_CAPACITY_UNIT) == 0 ||
-		strings.Compare(errorCode, TABLE_NOT_READY) == 0 || strings.Compare(errorCode, PARTITION_UNAVAILABLE) == 0 ||
-		strings.Compare(errorCode, SERVER_BUSY) == 0 || (strings.Compare(errorCode, QUOTA_EXHAUSTED) == 0 && strings.Compare(errorMsg, "Too frequent table operations.") == 0)) {
+	if (errorCode == ROW_OPERATION_CONFLICT || errorCode == NOT_ENOUGH_CAPACITY_UNIT ||
+		errorCode == TABLE_NOT_READY || errorCode == PARTITION_UNAVAILABLE ||
+		errorCode == SERVER_BUSY || (errorCode == QUOTA_EXHAUSTED && errorMsg == "Too frequent table operations.")) {
 		return true;
 	} else {
 		return false;
@@ -166,9 +165,9 @@ func retryNotMatterActions(errorCode string, errorMsg string) bool {
 }
 
 func isIdempotent(action string) bool {
-	if (strings.Compare(action, batchGetRowUri) == 0  || strings.Compare(action, describeTableUri) == 0 ||
-		strings.Compare(action, getRangeUri) == 0 || strings.Compare(action, getRowUri) == 0  ||
-		strings.Compare(action, listTableUri) == 0 ) {
+	if (action == batchGetRowUri || action == describeTableUri ||
+		action == getRangeUri || action == getRowUri ||
+		action == listTableUri) {
 		return true;
 	} else {
 		return false;

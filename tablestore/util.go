@@ -581,7 +581,10 @@ func getTableStoreDefaultConfig() *TSConfig {
 func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body []byte, err error, statusCode int) {
 	resp, err := otsClient.httpClient.Do(req)
 	if err != nil {
-		return nil, err, resp.StatusCode
+		if resp != nil {
+			return nil, err, resp.StatusCode
+		}
+		return nil, err, 0
 	}
 	defer resp.Body.Close()
 
