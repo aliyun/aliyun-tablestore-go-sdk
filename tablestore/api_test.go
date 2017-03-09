@@ -625,6 +625,56 @@ func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
 	fmt.Println("TestGetRangeWithMinMaxValue finished")
 }
 
+func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
+	fmt.Println("TestPutRowsWorkload started")
+
+	start:= time.Now().UnixNano()
+
+	isFinished := make(chan bool)
+	totalCount := 100
+	for i := 0; i < totalCount; i++ {
+		value := i * 10000
+		go func(index int) {
+			for j := 0; j < 100; j++ {
+				currentIndex := index + j
+				rowToPut1 := CreatePutRowChange("workloadtestkey" + strconv.Itoa(currentIndex), "perfdata1")
+				putRowRequest := new(PutRowRequest)
+				putRowRequest.PutRowChange = rowToPut1
+				_, error := client.PutRow(putRowRequest)
+				if error !=nil {
+					fmt.Println("put row error", error)
+				}
+				c.Check(error, IsNil)
+			}
+
+			isFinished <- true
+		}(value)
+	}
+
+	/*go func(){
+		time.Sleep(time.Millisecond * 1000 * 10)
+		close(isFinished)
+	}()*/
+
+	count := 0
+	for _ = range isFinished {
+		count++
+		fmt.Println("catched count is:", count)
+		if count >=totalCount {
+			close(isFinished)
+		}
+	}
+	c.Check(count, Equals, totalCount)
+	end := time.Now().UnixNano()
+
+	totalCost := (end - start) / 1000000
+	fmt.Println("total cost:", totalCost)
+	c.Check(totalCost < 10 * 1000, Equals, true)
+
+	time.Sleep(time.Millisecond * 20)
+	fmt.Println("TestPutRowsWorkload finished")
+}
+
 func CreatePutRowChange(pkValue, colValue string) *PutRowChange {
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
