@@ -150,7 +150,7 @@ type PrimaryKeyColumn struct {
 	PrimaryKeyOption PrimaryKeyOption
 }
 
-type DataColumn struct {
+type AttributeColumn struct {
 	ColumnName string
 	Value      interface{}
 	Timestamp    int64
@@ -284,7 +284,7 @@ type RowCondition struct {
 type PutRowChange struct {
 	TableName  string
 	PrimaryKey *PrimaryKey
-	Columns    []DataColumn
+	Columns    []AttributeColumn
 	Condition  *RowCondition
 }
 
@@ -355,13 +355,13 @@ type BatchGetRowRequest struct {
 }
 
 type ColumnMap struct {
-	Columns map[string][]*DataColumn
+	Columns map[string][]*AttributeColumn
 	columnsKey []string
 }
 
 type GetRowResponse struct {
 	PrimaryKey           PrimaryKey
-	Columns              []*DataColumn
+	Columns              []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	columnMap            *ColumnMap
 }
@@ -376,7 +376,7 @@ type RowResult struct {
 	IsSucceed bool
 	Error Error
 	PrimaryKey PrimaryKey
-	Columns    []*DataColumn
+	Columns    []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 }
 
@@ -423,7 +423,7 @@ type GetRangeRequest struct {
 
 type Row struct{
 	PrimaryKey           *PrimaryKey
-	Columns              []*DataColumn
+	Columns              []*AttributeColumn
 }
 
 type GetRangeResponse struct {

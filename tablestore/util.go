@@ -601,7 +601,7 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body 
 	return body, nil, resp.StatusCode
 }
 
-func buildRowPutChange(primarykey *PrimaryKey, columns []DataColumn) *RowPutChange {
+func buildRowPutChange(primarykey *PrimaryKey, columns []AttributeColumn) *RowPutChange {
 	row := new(RowPutChange)
 	row.primaryKey = make([]*PrimaryKeyColumnInner, len(primarykey.PrimaryKeys))
 	for i, p := range (primarykey.PrimaryKeys) {
@@ -663,13 +663,13 @@ func buildPrimaryKey(primaryKeyName string, value interface{}) *PrimaryKeyColumn
 // Todo: consider block user pass any type
 func (rowchange *PutRowChange) AddColumn(columnName string, value interface{}) {
 	// Todo: validate the input
-	column := &DataColumn{ColumnName: columnName, Value:value}
+	column := &AttributeColumn{ColumnName: columnName, Value:value}
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 
 func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
 	// Todo: validate the input
-	column := &DataColumn{ColumnName: columnName, Value:value}
+	column := &AttributeColumn{ColumnName: columnName, Value:value}
 	column.Timestamp = timestamp
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
@@ -833,8 +833,8 @@ func (direction Direction) ToDirection() tsprotocol.Direction {
 	}
 }
 
-func (columnMap *ColumnMap) GetRange(start int, count int) ([]*DataColumn, error) {
-	columns := []*DataColumn{}
+func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, error) {
+	columns := []*AttributeColumn{}
 
 	end := start + count
 	if (len(columnMap.columnsKey) <= end) {
@@ -856,7 +856,7 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 		return response.columnMap
 	} else {
 		response.columnMap = &ColumnMap{}
-		response.columnMap.Columns = make(map[string][]*DataColumn)
+		response.columnMap.Columns = make(map[string][]*AttributeColumn)
 
 		if (len(response.Columns) == 0){
 			return response.columnMap
@@ -866,7 +866,7 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 					val = append(val, column)
 				} else {
 					response.columnMap.columnsKey = append(response.columnMap.columnsKey, column.ColumnName)
-					value :=[]*DataColumn{}
+					value :=[]*AttributeColumn{}
 					value = append(value, column)
 					response.columnMap.Columns[column.ColumnName] = value
 				}

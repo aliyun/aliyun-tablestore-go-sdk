@@ -471,7 +471,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 	}
 
 	for _, cell := range (rows[0].cells) {
-		dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+		dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 		response.Columns = append(response.Columns, dataColumn)
 	}
 
@@ -549,7 +549,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 				}
 
 				for _, cell := range (rows[0].cells) {
-					dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+					dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 					rowResult.Columns = append(rowResult.Columns, dataColumn)
 				}
 
@@ -678,7 +678,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		currentRow.PrimaryKey = currentpk
 
 		for _, cell := range (row.cells) {
-			dataColumn := &DataColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+			dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 
