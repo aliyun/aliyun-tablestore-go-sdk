@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"fmt"
 	"io/ioutil"
+	"sort"
 )
 
 const (
@@ -830,4 +831,50 @@ func (direction Direction) ToDirection() tsprotocol.Direction {
 	} else {
 		return tsprotocol.Direction_BACKWARD
 	}
+}
+
+func (columnMap *ColumnMap) GetRange(start int, count int) ([]*DataColumn, error) {
+	columns := []*DataColumn{}
+
+	end := start + count
+	if (len(columnMap.columnsKey) <= end) {
+		return nil, fmt.Errorf("invalid arugment")
+	}
+
+	for i:= start;i< end;i++{
+		subColumns := columnMap.Columns[columnMap.columnsKey[i]]
+		for _, column := range subColumns{
+			columns = append(columns, column)
+		}
+	}
+
+	return columns, nil
+}
+
+func (response *GetRowResponse) GetColumnMap() *ColumnMap {
+	if response.columnMap != nil{
+		return response.columnMap
+	} else {
+		response.columnMap = &ColumnMap{}
+		response.columnMap.Columns = make(map[string][]*DataColumn)
+
+		if (len(response.Columns) == 0){
+			return response.columnMap
+		} else{
+			for _, column := range response.Columns {
+				if val, ok := response.columnMap.Columns[column.ColumnName]; ok{
+					val = append(val, column)
+				} else {
+					response.columnMap.columnsKey = append(response.columnMap.columnsKey, column.ColumnName)
+					value :=[]*DataColumn{}
+					value = append(value, column)
+					response.columnMap.Columns[column.ColumnName] = value
+				}
+			}
+
+			sort.Strings(response.columnMap.columnsKey)
+			return response.columnMap
+		}
+	}
+
 }

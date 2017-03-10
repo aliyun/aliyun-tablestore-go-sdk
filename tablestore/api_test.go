@@ -274,6 +274,20 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(getResp.Columns[4].Value, Equals, int64(50))
 	c.Check(getResp.Columns[5].ColumnName, Equals, "col6")
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
+
+	mapData := getResp.GetColumnMap()
+	c.Check(mapData.Columns["col1"][0].Value, Equals, "col1data1")
+	c.Check(mapData.Columns["col2"][0].Value, Equals, int64(100))
+	c.Check(mapData.Columns["col3"][0].Value, Equals, float64(2.1))
+	c.Check(mapData.Columns["col4"][0].Value, Equals, true)
+	c.Check(mapData.Columns["col5"][0].Value, Equals, int64(50))
+	c.Check(mapData.Columns["col6"][0].Value, Equals, int64(60))
+
+	sortedColumn, error := mapData.GetRange(2,2)
+	c.Check(error, Equals, nil)
+	c.Check(len(sortedColumn), Equals, 2)
+	c.Check(sortedColumn[0], Equals, mapData.Columns["col3"][0])
+	c.Check(sortedColumn[1], Equals, mapData.Columns["col4"][0])
 	fmt.Println("TestPutGetRow finished")
 }
 

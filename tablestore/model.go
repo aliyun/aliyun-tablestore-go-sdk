@@ -354,10 +354,16 @@ type BatchGetRowRequest struct {
 	MultiRowQueryCriteria []*MultiRowQueryCriteria
 }
 
+type ColumnMap struct {
+	Columns map[string][]*DataColumn
+	columnsKey []string
+}
+
 type GetRowResponse struct {
 	PrimaryKey           PrimaryKey
 	Columns              []*DataColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+	columnMap            *ColumnMap
 }
 
 type Error struct {
