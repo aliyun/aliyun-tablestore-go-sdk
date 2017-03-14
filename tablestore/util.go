@@ -89,50 +89,6 @@ func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	}
 }
 
-func (cv *ColumnValue) writeCellValueTobytes() []byte {
-	var b bytes.Buffer
-	w := &b
-
-	writeTag(w, TAG_CELL_VALUE)
-
-	switch cv.Type {
-	case ColumnType_STRING:
-		v := cv.Value.(string)
-
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE + 1 + len(v))) // length + type + value
-		writeRawByte(w, VT_STRING)
-		writeRawLittleEndian32(w, int32(len(v)))
-		writeBytes(w, []byte(v))
-
-	case ColumnType_INTEGER:
-		v := cv.Value.(int64)
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_64_SIZE + 1))
-		writeRawByte(w, VT_INTEGER)
-		writeRawLittleEndian64(w, v)
-	case ColumnType_BOOLEAN:
-		v := cv.Value.(bool)
-		writeRawLittleEndian32(w, 2)
-		writeRawByte(w, VT_BOOLEAN)
-		writeBoolean(w, v)
-
-	case ColumnType_DOUBLE:
-		v := cv.Value.(float64)
-
-		writeRawLittleEndian32(w, LITTLE_ENDIAN_64_SIZE + 1)
-		writeRawByte(w, VT_DOUBLE)
-		writeDouble(w, v)
-
-	case ColumnType_BINARY:
-		v := cv.Value.([]byte)
-
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE + 1 + len(v))) // length + type + value
-		writeRawByte(w, VT_BLOB)
-		writeRawLittleEndian32(w, int32(len(v)))
-		writeBytes(w, v)
-	}
-	return b.Bytes()
-}
-
 func (cv *ColumnValue) writeCellValueWithoutLengthPrefix() []byte {
 	var b bytes.Buffer
 	w := &b
@@ -238,7 +194,10 @@ func NewColumn(name []byte, value interface{}) *Column {
 		case reflect.Float64:
 			v.Value.Type = ColumnType_DOUBLE
 
+		case reflect.Slice:
+			v.Value.Type = ColumnType_BINARY
 		default:
+			fmt.Println("null", name, value, t.Kind())
 			return nil
 		}
 
@@ -547,7 +506,7 @@ func NewSingleColumnValueFilter(condition *SingleColumnCondition) *tsprotocol.Si
 	filter.Comparator = &comparatorType
 	filter.ColumnName = condition.ColumnName
 	col := NewColumn([]byte(*condition.ColumnName), condition.ColumnValue)
-	filter.ColumnValue = col.toPlainBufferCell(false).cellValue.writeCellValueWithoutLengthPrefix() //writeCellValueTobytes()  //
+	filter.ColumnValue = col.toPlainBufferCell(false).cellValue.writeCellValueWithoutLengthPrefix()
 	filter.FilterIfMissing = proto.Bool(condition.FilterIfMissing)
 	filter.LatestVersionOnly = proto.Bool(condition.LatestVersionOnly)
 
@@ -573,9 +532,9 @@ func NewPaginationFilter(filter *PaginationFilter) *tsprotocol.ColumnPaginationF
 	return pageFilter
 }
 
-func getTableStoreDefaultConfig() *TSConfig {
+func getTableStoreDefaultConfig() *TableStoreConfig {
 	httpTimeout := &HTTPTimeout{ConnectionTimeout:time.Second * 15, RequestTimeout :time.Second * 30  }
-	config := &TSConfig{RetryTimes: 10, HTTPTimeout: *httpTimeout, MaxRetryTime: time.Second * 5 }
+	config := &TableStoreConfig{RetryTimes: 10, HTTPTimeout: *httpTimeout, MaxRetryTime: time.Second * 5 }
 	return config
 }
 

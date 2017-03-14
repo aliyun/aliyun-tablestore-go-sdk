@@ -37,12 +37,29 @@ const (
 // @param accessKey The Access Key. 用于签名和验证的密钥。
 // @param options set client config
 func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, options ...ClientOption) *TableStoreClient {
+	client := NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret, "", nil)
+	// client options parse
+	for _, option := range options {
+		option(client)
+	}
+
+	return client
+}
+
+// Constructor: to create the client of OTS service. 传入config
+// 构造函数：创建OTS服务的客户端。
+func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig) *TableStoreClient {
 	tableStoreClient := new(TableStoreClient)
 	tableStoreClient.endPoint = endPoint
 	tableStoreClient.instanceName = instanceName
 	tableStoreClient.accessKeyId = accessKeyId
 	tableStoreClient.accessKeySecret = accessKeySecret
-	tableStoreClient.config = getTableStoreDefaultConfig()
+	tableStoreClient.securityToken = securityToken
+	if config != nil {
+		tableStoreClient.config = config
+	} else {
+		tableStoreClient.config = getTableStoreDefaultConfig()
+	}
 	tableStoreTransportProxy := &http.Transport{
 		MaxIdleConnsPerHost:   2000,
 		Dial: (&net.Dialer{
@@ -53,11 +70,6 @@ func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, opti
 	tableStoreClient.httpClient = &http.Client{
 		Transport:tableStoreTransportProxy,
 		Timeout: tableStoreClient.config.HTTPTimeout.RequestTimeout,
-	}
-
-	// client options parse
-	for _, option := range options {
-		option(tableStoreClient)
 	}
 
 	tableStoreClient.random = rand.New(rand.NewSource(time.Now().Unix()))
@@ -197,6 +209,10 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	otshead.set(xOtsDate, date)
 	otshead.set(xOtsApiversion, ApiVersion)
 	otshead.set(xOtsAccesskeyid, tableStoreClient.accessKeyId)
+	if tableStoreClient.securityToken != ""{
+		hreq.Header.Set(xOtsHeaderStsToken, tableStoreClient.securityToken)
+		otshead.set(xOtsHeaderStsToken, tableStoreClient.securityToken)
+	}
 	otshead.set(xOtsContentmd5, md5Base64)
 	otshead.set(xOtsInstanceName, tableStoreClient.instanceName)
 	sign, err := otshead.signature(uri, "POST", tableStoreClient.accessKeySecret)
@@ -213,10 +229,8 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 
 // table API
 // Create a table with the CreateTableRequest, in which the table name and
-// primary keys are required. Views and table group name are optional, but
-// they must be assigned at this call if they are needed.
-// 根据CreateTableRequest创建一个表，其中表名和主健列是必选项，表组名是
-// 可选项（只能此时创建，建表之后无法更改）。
+// primary keys are required.
+// 根据CreateTableRequest创建一个表，其中表名和主健列是必选项
 //
 // @param request of CreateTableRequest.
 // @return Void. 无返回值。
@@ -422,11 +436,9 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 }
 
 // row API
-// Get the data of a row or some columns. The transactionId is optional.
-// 获取一行数据或部分列数据。事务ID是可选项。
+// Get the data of a row or some columns.
 //
-// @param builder The builder for getting a single row. 查询单行的Builder。
-// @return The iterator of returned row. 查询到的Row智能指针。
+// @param getrowrequest
 func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRowResponse, error) {
 	req := new(tsprotocol.GetRowRequest)
 	resp := new(tsprotocol.GetRowResponse)
@@ -500,6 +512,8 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	return response, nil
 }
 
+// Batch Get Row
+// @param BatchGetRowRequest
 func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse, error) {
 	req := new(tsprotocol.BatchGetRowRequest)
 
@@ -533,8 +547,10 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	response := &BatchGetRowResponse{TableToRowsResult:make(map[string][]RowResult) }
 
 	for _, table := range (resp.Tables) {
+		index := int32(0)
 		for _, row := range (table.Rows) {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}}
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}, Index: index}
+			index++
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
 			} else {
@@ -564,6 +580,8 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	return response, nil
 }
 
+// Batch Write Row
+// @param BatchWriteRowRequest
 func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRequest) (*BatchWriteRowResponse, error) {
 	req := new(tsprotocol.BatchWriteRowRequest)
 
@@ -595,8 +613,10 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	response := &BatchWriteRowResponse{TableToRowsResult:make(map[string][]RowResult) }
 
 	for _, table := range (resp.Tables) {
+		index := int32(0)
 		for _, row := range (table.Rows) {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}}
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}, Index: index}
+			index++
 			rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
 			rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			if *row.IsOk == false {
@@ -627,6 +647,8 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	return response, nil
 }
 
+// Get Range
+// @param GetRangeRequest
 func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*GetRangeResponse, error) {
 	req := new(tsprotocol.GetRangeRequest)
 	req.TableName = proto.String(request.RangeRowQueryCriteria.TableName)

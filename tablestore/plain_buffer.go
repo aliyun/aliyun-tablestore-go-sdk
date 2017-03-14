@@ -321,6 +321,9 @@ func readCellValue(r *bytes.Reader) *ColumnValue {
 	case VT_STRING:
 		value.Type = ColumnType_STRING
 		value.Value = string(readBytes(r, readRawLittleEndian32(r)))
+	case VT_BLOB:
+		value.Type = ColumnType_BINARY
+		value.Value = []byte(readBytes(r, readRawLittleEndian32(r)))
 	}
 	return value
 }

@@ -244,6 +244,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	putRowChange.AddColumn("col4", true)
 	putRowChange.AddColumn("col5", int64(50))
 	putRowChange.AddColumn("col6", int64(60))
+	putRowChange.AddColumn("col7", []byte("testbytes"))
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
 	_, error := client.PutRow(putRowRequest)
@@ -261,7 +262,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(len(getResp.PrimaryKey.PrimaryKeys), Equals, 1)
 	c.Check(getResp.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
 	c.Check(getResp.PrimaryKey.PrimaryKeys[0].Value, Equals, "Key6")
-	c.Check(len(getResp.Columns), Equals, 6)
+	c.Check(len(getResp.Columns), Equals, 7)
 	c.Check(getResp.Columns[0].ColumnName, Equals, "col1")
 	c.Check(getResp.Columns[0].Value, Equals, "col1data1")
 	c.Check(getResp.Columns[1].ColumnName, Equals, "col2")
@@ -274,7 +275,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(getResp.Columns[4].Value, Equals, int64(50))
 	c.Check(getResp.Columns[5].ColumnName, Equals, "col6")
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
-
+	c.Check(getResp.Columns[6].ColumnName, Equals, "col7")
 	mapData := getResp.GetColumnMap()
 	c.Check(mapData.Columns["col1"][0].Value, Equals, "col1data1")
 	c.Check(mapData.Columns["col2"][0].Value, Equals, int64(100))
@@ -355,14 +356,24 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	putRowChange.AddColumn("col4", true)
 	putRowChange.AddColumn("col5", int64(50))
 	putRowChange.AddColumn("col6", int64(60))
+	putRowChange.AddColumn("col7", []byte("testbytes"))
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
-	clCondition1 := NewSingleColumnCondition("col2", CT_EQUAL, int64(100))
-	clCondition2 := NewSingleColumnCondition("col5", CT_EQUAL, int64(50))
+	clCondition1 := NewSingleColumnCondition("col2", CT_GREATER_EQUAL, int64(100))
+	clCondition2 := NewSingleColumnCondition("col5", CT_NOT_EQUAL, int64(20))
 	clCondition3 := NewSingleColumnCondition("col6", CT_LESS_THAN, int64(100))
+	clCondition4 := NewSingleColumnCondition("col4", CT_EQUAL, true)
+	clCondition5 := NewSingleColumnCondition("col1", CT_EQUAL, "col1data1")
+	clCondition6 := NewSingleColumnCondition("col3", CT_LESS_EQUAL, float64(5.1))
+	clCondition7 := NewSingleColumnCondition("col7", CT_EQUAL, []byte("testbytes"))
+
 	cf := NewCompositeColumnCondition(LO_AND)
 	cf.AddFilter(clCondition1)
 	cf.AddFilter(clCondition2)
 	cf.AddFilter(clCondition3)
+	cf.AddFilter(clCondition4)
+	cf.AddFilter(clCondition5)
+	cf.AddFilter(clCondition6)
+	cf.AddFilter(clCondition7)
 	putRowChange.SetColumnCondition(cf)
 
 	putRowRequest.PutRowChange = putRowChange
@@ -382,7 +393,7 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	c.Check(len(getResp.PrimaryKey.PrimaryKeys), Equals, 1)
 	c.Check(getResp.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
 	c.Check(getResp.PrimaryKey.PrimaryKeys[0].Value, Equals, "Key6")
-	c.Check(len(getResp.Columns), Equals, 6)
+	c.Check(len(getResp.Columns), Equals, 7)
 	c.Check(getResp.Columns[0].ColumnName, Equals, "col1")
 	c.Check(getResp.Columns[0].Value, Equals, "col1data1")
 	c.Check(getResp.Columns[1].ColumnName, Equals, "col2")
@@ -490,11 +501,14 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
+	index := int32(0)
 	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
 		c.Check(len(rowToCheck.Columns), Equals, 1)
+		c.Check(rowToCheck.Index, Equals, index)
+		index++
 	}
 
 	fmt.Println("TestBatchGetRow started")
@@ -535,9 +549,13 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
 	c.Check(error, Equals, nil)
 	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
+
+	index := int32(0)
 	for _, rowToCheck := range (batchWriteResponse.TableToRowsResult[defaultTableName]) {
 		c.Check(rowToCheck.TableName, Equals, defaultTableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
+		c.Check(rowToCheck.Index, Equals, index)
+		index++
 	}
 	fmt.Println("TestBatchWriteRow finished")
 }

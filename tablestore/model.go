@@ -20,9 +20,10 @@ type (
 		instanceName    string
 		accessKeyId     string
 		accessKeySecret string
+		securityToken   string
 
 		httpClient      *http.Client
-		config          *TSConfig
+		config          *TableStoreConfig
 		random          *rand.Rand
 	}
 	ClientOption func(*TableStoreClient)
@@ -33,7 +34,7 @@ type HTTPTimeout struct {
 	RequestTimeout    time.Duration
 }
 
-type TSConfig struct {
+type TableStoreConfig struct {
 	RetryTimes  uint
 	MaxRetryTime time.Duration
 	HTTPTimeout HTTPTimeout
@@ -378,6 +379,7 @@ type RowResult struct {
 	PrimaryKey PrimaryKey
 	Columns    []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+	Index int32
 }
 
 type RowChange interface {
