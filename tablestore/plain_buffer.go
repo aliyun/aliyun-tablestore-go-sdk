@@ -100,9 +100,9 @@ func writeRawByte(w io.Writer, value byte) {
 	w.Write([]byte{value})
 }
 
-func writeRawByteInt8(w io.Writer, value int) {
+/*func writeRawByteInt8(w io.Writer, value int) {
 	w.Write([]byte{byte(value)})
-}
+}*/
 
 func writeRawLittleEndian32(w io.Writer, value int32) {
 	w.Write([]byte{byte((value) & 0xFF)})
@@ -400,10 +400,6 @@ func readRow(r *bytes.Reader) *PlainBufferRow {
 
 	if tag == TAG_DELETE_ROW_MARKER {
 		tag = readTag(r)
-	}
-
-	if tag == TAG_EXTENSION {
-		// TODO:
 	}
 
 	if tag == TAG_ROW_CHECKSUM {

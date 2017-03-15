@@ -22,12 +22,30 @@ type (
 		accessKeySecret string
 		securityToken   string
 
-		httpClient      *http.Client
+		httpClient      IHttpClient
 		config          *TableStoreConfig
 		random          *rand.Rand
 	}
 	ClientOption func(*TableStoreClient)
 )
+
+type TableStoreHttpClient struct {
+	httpClient      *http.Client
+}
+
+// use this to mock http.client for testing
+type IHttpClient interface {
+	Do(*http.Request) (*http.Response, error)
+	New(*http.Client)
+}
+
+func (httpClient *TableStoreHttpClient) Do(req *http.Request) (*http.Response, error) {
+	return httpClient.httpClient.Do(req)
+}
+
+func (httpClient *TableStoreHttpClient) New(client *http.Client) {
+	httpClient.httpClient = client
+}
 
 type HTTPTimeout struct {
 	ConnectionTimeout time.Duration

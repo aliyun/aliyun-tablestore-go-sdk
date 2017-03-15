@@ -15,10 +15,9 @@ import (
 )
 
 const (
-	maxTableGroupNameLength = 100
 	maxTableNameLength = 100
 	maxPrimaryKeyLength = 255
-	maxPrimaryKeyNum = 16
+	maxPrimaryKeyNum = 4
 	maxMultiDeleteRows = 100
 )
 
@@ -37,6 +36,7 @@ const (
 	ApiVersion = "2015-12-31"
 	xOtsDateFormat = "2006-01-02T15:04:05.123Z"
 	xOtsInstanceName = "x-ots-instancename"
+	xOtsRequestId = "X-Ots-Requestid"
 )
 
 type ColumnValue struct {
@@ -197,8 +197,7 @@ func NewColumn(name []byte, value interface{}) *Column {
 		case reflect.Slice:
 			v.Value.Type = ColumnType_BINARY
 		default:
-			fmt.Println("null", name, value, t.Kind())
-			return nil
+			panic(errInvalidInput)
 		}
 
 		v.Value.Value = value
@@ -274,8 +273,11 @@ func NewPrimaryKeyColumn(name []byte, value interface{}, option PrimaryKeyOption
 		case reflect.Int64:
 			v.Type = tsprotocol.PrimaryKeyType_INTEGER
 
+		case reflect.Slice:
+			v.Type = tsprotocol.PrimaryKeyType_BINARY
+
 		default:
-			return nil
+			panic(errInvalidInput)
 		}
 
 		v.Value = value
@@ -368,7 +370,6 @@ func (pkc *PrimaryKeyColumnInner) writePrimaryKeyColumn(w io.Writer) {
 		writeRawByte(w, VT_AUTO_INCREMENT)
 		return
 	}
-
 	pkc.toColumnValue().writeCellValue(w)
 }
 
@@ -488,17 +489,6 @@ func (loType *LogicalOperator) ConvertToPbLoType() tsprotocol.LogicalOperator {
 	}
 }
 
-func (ft *FilterType) ConvertFilterType() tsprotocol.FilterType {
-	switch *ft {
-	case FT_SINGLE_COLUMN_VALUE:
-		return tsprotocol.FilterType_FT_SINGLE_COLUMN_VALUE
-	case FT_COMPOSITE_COLUMN_VALUE:
-		return tsprotocol.FilterType_FT_COMPOSITE_COLUMN_VALUE
-	default:
-		return tsprotocol.FilterType_FT_COLUMN_PAGINATION
-	}
-}
-
 func NewSingleColumnValueFilter(condition *SingleColumnCondition) *tsprotocol.SingleColumnValueFilter {
 	filter := new(tsprotocol.SingleColumnValueFilter)
 
@@ -538,26 +528,37 @@ func getTableStoreDefaultConfig() *TableStoreConfig {
 	return config
 }
 
-func (otsClient *TableStoreClient) postReq(req *http.Request, url string) (body []byte, err error, statusCode int) {
+func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byte, error, int, string) {
 	resp, err := otsClient.httpClient.Do(req)
 	if err != nil {
 		if resp != nil {
-			return nil, err, resp.StatusCode
+			return nil, err, resp.StatusCode, getRequestId(resp)
 		}
-		return nil, err, 0
+		return nil, err, 0, getRequestId(resp)
 	}
 	defer resp.Body.Close()
 
-	body, err = ioutil.ReadAll(resp.Body)
+	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err, resp.StatusCode
+		return nil, err, resp.StatusCode, getRequestId(resp)
 	}
 
 	if (resp.StatusCode >= 200 && resp.StatusCode < 300) == false {
-		return body, fmt.Errorf("get %s response status is %d", url, resp.StatusCode), resp.StatusCode
+		return body, fmt.Errorf("get %s response status is %d", url, resp.StatusCode), resp.StatusCode, getRequestId(resp)
 	}
 
-	return body, nil, resp.StatusCode
+	return body, nil, resp.StatusCode, getRequestId(resp)
+}
+
+func getRequestId(response *http.Response) string {
+	if response == nil {
+		return ""
+	}
+	if id, ok := response.Header[xOtsRequestId]; ok {
+		return id[0]
+	} else {
+		return ""
+	}
 }
 
 func buildRowPutChange(primarykey *PrimaryKey, columns []AttributeColumn) *RowPutChange {
@@ -610,7 +611,7 @@ func (condition *RowCondition) buildCondition() *tsprotocol.RowExistenceExpectat
 	}
 
 	// Todo : refine the error
-	panic("Invalid input")
+	panic(errInvalidInput)
 }
 
 // build primary key for create table, put row, delete row and update row
@@ -800,9 +801,9 @@ func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, 
 		return nil, fmt.Errorf("invalid arugment")
 	}
 
-	for i:= start;i< end;i++{
+	for i := start; i < end; i++ {
 		subColumns := columnMap.Columns[columnMap.columnsKey[i]]
-		for _, column := range subColumns{
+		for _, column := range subColumns {
 			columns = append(columns, column)
 		}
 	}
@@ -811,21 +812,22 @@ func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, 
 }
 
 func (response *GetRowResponse) GetColumnMap() *ColumnMap {
-	if response.columnMap != nil{
+	if response.columnMap != nil {
 		return response.columnMap
 	} else {
 		response.columnMap = &ColumnMap{}
 		response.columnMap.Columns = make(map[string][]*AttributeColumn)
 
-		if (len(response.Columns) == 0){
+		if (len(response.Columns) == 0) {
 			return response.columnMap
-		} else{
+		} else {
 			for _, column := range response.Columns {
-				if val, ok := response.columnMap.Columns[column.ColumnName]; ok{
-					val = append(val, column)
+				if _, ok := response.columnMap.Columns[column.ColumnName]; ok {
+					response.columnMap.Columns[column.ColumnName] = append(response.columnMap.Columns[column.ColumnName], column)
 				} else {
+					fmt.Println("new", column.ColumnName)
 					response.columnMap.columnsKey = append(response.columnMap.columnsKey, column.ColumnName)
-					value :=[]*AttributeColumn{}
+					value := []*AttributeColumn{}
 					value = append(value, column)
 					response.columnMap.Columns[column.ColumnName] = value
 				}

@@ -1,6 +1,6 @@
 package tablestore
 
-type OtsApi interface {
+type TableStoreApi interface {
 	CreateTable(request *CreateTableRequest) (*CreateTableResponse, error)
 	ListTable() (*ListTableResponse, error)
 	DeleteTable(request *DeleteTableRequest) (*DeleteTableResponse, error)

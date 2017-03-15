@@ -46,6 +46,12 @@ func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, opti
 	return client
 }
 
+type GetHttpClient func() IHttpClient
+
+var currentGetHttpClientFunc GetHttpClient = func() IHttpClient {
+	return &TableStoreHttpClient{}
+}
+
 // Constructor: to create the client of OTS service. 传入config
 // 构造函数：创建OTS服务的客户端。
 func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig) *TableStoreClient {
@@ -67,10 +73,13 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 		}).Dial,
 	}
 
-	tableStoreClient.httpClient = &http.Client{
+	tableStoreClient.httpClient = currentGetHttpClientFunc()
+
+	httpClient := &http.Client{
 		Transport:tableStoreTransportProxy,
 		Timeout: tableStoreClient.config.HTTPTimeout.RequestTimeout,
 	}
+	tableStoreClient.httpClient.New(httpClient)
 
 	tableStoreClient.random = rand.New(rand.NewSource(time.Now().Unix()))
 
@@ -96,27 +105,27 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	var value int64
 	var i uint
 	var respBody []byte
-	for i =0; ; i++{
+	for i = 0; ; i++ {
 		var statusCode int
-		respBody, err, statusCode = tableStoreClient.doRequest(url, uri, body, resp)
+		var requestId string
+		respBody, err, statusCode, requestId = tableStoreClient.doRequest(url, uri, body, resp)
 
 		if err == nil {
 			break
 		} else {
 
-			if len(respBody) <=0 {
+			if len(respBody) <= 0 {
 				return err
 			}
-
 			e := new(tsprotocol.Error)
 			errn := proto.Unmarshal(respBody, e)
 
-			value = tableStoreClient.getNextPause(errn, e, i, end, value, uri, statusCode)
+			value = getNextPause(tableStoreClient, errn, e, i, end, value, uri, statusCode)
 
 			// fmt.Println("hit retry", uri, err, *e.Code, value)
 			if value <= 0 {
 				if errn != nil {
-					return fmt.Errorf("decode resp failed: %s: %s: %s", errn, err, string(respBody))
+					return fmt.Errorf("decode resp failed: %s: %s: %s %s", errn, err, string(respBody), requestId)
 				} else {
 					return fmt.Errorf("%s", *e.Code)
 				}
@@ -138,13 +147,13 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	return nil
 }
 
-func (tableStoreClient *TableStoreClient) getNextPause(err error, serverError *tsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
+func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *tsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
 	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
 		return 0
 	} else if err == nil && !shouldRetry(*serverError.Code, *serverError.Message, action, statusCode) {
 		return 0
 	} else {
-		value := lastInterval * 2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
+		value := lastInterval * 2 + tableStoreClient.random.Int63n(DefaultRetryInterval - 1) + 1
 		if value > MaxRetryInterval {
 			return MaxRetryInterval
 		}
@@ -186,10 +195,10 @@ func isIdempotent(action string) bool {
 	}
 }
 
-func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, int) {
+func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, int, string) {
 	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, err, 0
+		return nil, err, 0, ""
 	}
 	/* set headers */
 	hreq.Header.Set("User-Agent", "skyeye")
@@ -209,7 +218,7 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	otshead.set(xOtsDate, date)
 	otshead.set(xOtsApiversion, ApiVersion)
 	otshead.set(xOtsAccesskeyid, tableStoreClient.accessKeyId)
-	if tableStoreClient.securityToken != ""{
+	if tableStoreClient.securityToken != "" {
 		hreq.Header.Set(xOtsHeaderStsToken, tableStoreClient.securityToken)
 		otshead.set(xOtsHeaderStsToken, tableStoreClient.securityToken)
 	}
@@ -217,10 +226,7 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	otshead.set(xOtsInstanceName, tableStoreClient.instanceName)
 	sign, err := otshead.signature(uri, "POST", tableStoreClient.accessKeySecret)
 
-	if err != nil {
-		// fmt.Println("failed to signature")
-		return nil, err, 0
-	}
+	if err != nil { return nil, err, 0 , ""}
 	hreq.Header.Set(xOtsSignature, sign)
 
 	/* end set headers */
@@ -288,7 +294,7 @@ func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error
 	resp := new(tsprotocol.ListTableResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp); err != nil {
-		return &ListTableResponse{}, nil
+		return &ListTableResponse{}, err
 	}
 
 	response := &ListTableResponse{resp.TableNames}

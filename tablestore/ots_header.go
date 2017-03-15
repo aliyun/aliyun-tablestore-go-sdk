@@ -74,18 +74,12 @@ func (h *otsHeaders) Less(i, j int) bool {
 	return h.headers[i].name < h.headers[j].name
 }
 
-func (h *otsHeaders) clear() {
-	for _, header := range h.headers {
-		header.value = ""
-	}
-}
-
-func (h *otsHeaders) serach(name string) *otsHeader {
+func (h *otsHeaders) search(name string) *otsHeader {
 	index := sort.Search(len(h.headers) - 1, func(i int) bool {
 		return h.headers[i].name >= name
 	})
 
-	if index == -1 {
+	if index >= len(h.headers) {
 		return nil
 	}
 
@@ -93,7 +87,7 @@ func (h *otsHeaders) serach(name string) *otsHeader {
 }
 
 func (h *otsHeaders) set(name, value string) {
-	header := h.serach(name)
+	header := h.search(name)
 	if header == nil {
 		return
 	}
