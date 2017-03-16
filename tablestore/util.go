@@ -610,23 +610,24 @@ func (condition *RowCondition) buildCondition() *tsprotocol.RowExistenceExpectat
 		return tsprotocol.RowExistenceExpectation_EXPECT_NOT_EXIST.Enum()
 	}
 
-	// Todo : refine the error
 	panic(errInvalidInput)
 }
 
 // build primary key for create table, put row, delete row and update row
+// value only support int64,string,[]byte or you will get panic
 func buildPrimaryKey(primaryKeyName string, value interface{}) *PrimaryKeyColumn {
 	// Todo: validate the input
 	return &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: NONE}
 }
 
-// Todo: consider block user pass any type
+// value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumn(columnName string, value interface{}) {
 	// Todo: validate the input
 	column := &AttributeColumn{ColumnName: columnName, Value:value}
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 
+// value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
 	// Todo: validate the input
 	column := &AttributeColumn{ColumnName: columnName, Value:value}
@@ -695,6 +696,7 @@ func (meta *TableMeta) AddPrimaryKeyColumnOption(name string, keyType PrimaryKey
 	meta.SchemaEntry = append(meta.SchemaEntry, &PrimaryKeySchema{Name:&name, Type: &keyType, Option: &keyOption})
 }
 
+// value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *UpdateRowChange) PutColumn(columnName string, value interface{}) {
 	// Todo: validate the input
 	column := &ColumnToUpdate{ColumnName: columnName, Value: value}
@@ -825,7 +827,6 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 				if _, ok := response.columnMap.Columns[column.ColumnName]; ok {
 					response.columnMap.Columns[column.ColumnName] = append(response.columnMap.Columns[column.ColumnName], column)
 				} else {
-					fmt.Println("new", column.ColumnName)
 					response.columnMap.columnsKey = append(response.columnMap.columnsKey, column.ColumnName)
 					value := []*AttributeColumn{}
 					value = append(value, column)
