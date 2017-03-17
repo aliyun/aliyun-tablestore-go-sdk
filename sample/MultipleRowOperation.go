@@ -47,15 +47,20 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 
 	mqCriteria.TableName = tableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
+
+
+	/*condition := tablestore.NewSingleColumnCondition("col1", tablestore.CT_GREATER_THAN, int64(0))
+	mqCriteria.Filter = condition*/
+
 	batchGetResponse, err := client.BatchGetRow(batchGetReq)
 
 	if err != nil {
-		fmt.Println("putrow failed with error:", err)
+		fmt.Println("batachget failed with error:", err)
 	} else {
 		for _, row := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
 			fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 		}
-		fmt.Println("putrow finished")
+		fmt.Println("batchget finished")
 	}
 }
 

@@ -544,6 +544,8 @@ func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	putPk.AddPrimaryKeyColumn("pk1", keyToUpdate)
 	putRowChange.PrimaryKey = putPk
 	putRowChange.AddColumn("col1", "col1data1")
+	timeNow := int64(time.Now().Unix() * 1000)
+	putRowChange.AddColumnWithTimestamp("col10", "col10data10", timeNow)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
 	_, error := client.PutRow(putRowRequest)
@@ -556,6 +558,7 @@ func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	updatePk.AddPrimaryKeyColumn("pk1", keyToUpdate)
 	updateRowChange.PrimaryKey = updatePk
 	updateRowChange.DeleteColumn("col1")
+	updateRowChange.DeleteColumnWithTimestamp("col10", timeNow)
 	updateRowChange.PutColumn("col2", int64(77))
 	updateRowChange.PutColumn("col3", "newcol3")
 	updateRowChange.SetCondition(RowExistenceExpectation_EXPECT_EXIST)
@@ -1066,13 +1069,29 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 	getResp = &GetRowResponse{}
 	col1 := &AttributeColumn{ColumnName:"col1", Value:"value1"}
 	col2 := &AttributeColumn{ColumnName:"col1", Value:"value2"}
+	col3 := &AttributeColumn{ColumnName:"col2", Value:"value3"}
+
 	getResp.Columns = append(getResp.Columns, col1)
 	getResp.Columns = append(getResp.Columns, col2)
+	getResp.Columns = append(getResp.Columns, col3)
 	colMap = getResp.GetColumnMap()
 	c.Check(colMap, NotNil)
 	cols := colMap.Columns["col1"]
 	c.Check(cols, NotNil)
 	c.Check(len(cols), Equals, 2)
+
+	cols2 := colMap.Columns["col2"]
+	c.Check(cols2, NotNil)
+	c.Check(len(cols2), Equals, 1)
+
+	cols3, _ := colMap.GetRange(1, 1)
+
+	c.Check(cols3, NotNil)
+	c.Check(len(cols3), Equals, 1)
+
+	var resp2 *GetRowResponse
+	resp2 = nil
+	c.Check(resp2.GetColumnMap(), IsNil)
 }
 
 func SetSth() ClientOption{

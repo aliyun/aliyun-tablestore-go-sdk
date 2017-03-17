@@ -45,6 +45,9 @@ func GetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
 	getResp, err := client.GetRow(getRowRequest)
 
+	colmap := getResp.GetColumnMap()
+
+	fmt.Println("length is ",len(colmap.Columns))
 	if err != nil {
 		fmt.Println("getrow failed with error:", err)
 	} else {

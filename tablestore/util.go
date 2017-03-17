@@ -799,7 +799,7 @@ func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, 
 	columns := []*AttributeColumn{}
 
 	end := start + count
-	if (len(columnMap.columnsKey) <= end) {
+	if (len(columnMap.columnsKey) < end ) {
 		return nil, fmt.Errorf("invalid arugment")
 	}
 
@@ -814,6 +814,9 @@ func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, 
 }
 
 func (response *GetRowResponse) GetColumnMap() *ColumnMap {
+	if response == nil {
+		return nil
+	}
 	if response.columnMap != nil {
 		return response.columnMap
 	} else {

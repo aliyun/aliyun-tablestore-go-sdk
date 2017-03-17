@@ -24,6 +24,7 @@ func main() {
 	// Single row operation
 	sample.PutRowSample(client,"sampletable")
 	sample.UpdateRowSample(client, "sampletable")
+	sample.GetRowSample(client, "sampletable")
 	sample.DeleteRowSample(client, "sampletable")
 	sample.PutRowWithKeyAutoIncrementSample(client)
 
