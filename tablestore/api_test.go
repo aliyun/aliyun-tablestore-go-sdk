@@ -234,6 +234,11 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		_, error := client.PutRow(putRowRequest)
 		c.Check(error, Equals, nil)
 	}
+
+	describeTableReq := new(DescribeTableRequest)
+	describeTableReq.TableName = tableName
+	_, error := client.DescribeTable(describeTableReq)
+	c.Check(error, IsNil)
 }
 
 func (s *TableStoreSuite) TestPutGetRow(c *C) {
@@ -320,6 +325,15 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 
 	_, error = invalidClient.GetRow(getRowRequest)
 	c.Check(error, NotNil)
+
+	getRowRequest = new(GetRowRequest)
+	criteria = new(SingleRowQueryCriteria);
+	criteria.PrimaryKey = putPk
+	getRowRequest.SingleRowQueryCriteria = criteria
+	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
+	_, error = client.GetRow(getRowRequest)
+	c.Check(error, NotNil)
+
 	fmt.Println("TestPutGetRow finished")
 }
 
@@ -948,6 +962,8 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	updateTableReq.TableOption = new(TableOption)
 	updateTableReq.TableOption.TimeToAlive = -1
 	updateTableReq.TableOption.MaxVersion = 5
+	updateTableReq.ReservedThroughput = &ReservedThroughput{}
+	updateTableReq.ReservedThroughput.Readcap = 0
 
 	_, error = invalidClient.UpdateTable(updateTableReq)
 	c.Assert(error, NotNil)

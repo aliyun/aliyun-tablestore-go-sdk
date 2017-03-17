@@ -96,8 +96,7 @@ func GetRangeSample(client *tablestore.TableStoreClient, tableName string) {
 			if getRangeResp.NextStartPrimaryKey == nil {
 				break
 			} else {
-				fmt.Println("len is",len(getRangeResp.NextStartPrimaryKey.PrimaryKeys))
-				fmt.Println("next pk is :", getRangeResp.NextStartPrimaryKey.PrimaryKeys[0].ColumnName)
+				fmt.Println("next pk is :", getRangeResp.NextStartPrimaryKey.PrimaryKeys[0].Value, getRangeResp.NextStartPrimaryKey.PrimaryKeys[1].Value, getRangeResp.NextStartPrimaryKey.PrimaryKeys[2].Value)
 				getRangeRequest.RangeRowQueryCriteria.StartPrimaryKey = getRangeResp.NextStartPrimaryKey
 				getRangeResp, err = client.GetRange(getRangeRequest)
 			}

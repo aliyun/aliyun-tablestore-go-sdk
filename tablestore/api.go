@@ -338,12 +338,15 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 
 	for _, key := range (resp.TableMeta.PrimaryKey) {
 		keyType := PrimaryKeyType(*key.Type)
-		if key.Option != nil {
+
+		// enable it when we support kep option in describe table
+		/*if key.Option != nil {
 			keyOption := PrimaryKeyOption(*key.Option)
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption })
 		} else {
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
-		}
+		}*/
+		responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
 	}
 	response.TableMeta = responseTableMeta
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
