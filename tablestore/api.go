@@ -721,9 +721,9 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 			return nil, err
 		}
 
+		response.NextStartPrimaryKey = &PrimaryKey{}
 		for _, pk := range (currentRows[0].primaryKey) {
 			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
-			response.NextStartPrimaryKey = &PrimaryKey{}
 			response.NextStartPrimaryKey.PrimaryKeys = append(response.NextStartPrimaryKey.PrimaryKeys, pkColumn)
 		}
 	}
