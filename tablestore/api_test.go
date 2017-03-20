@@ -334,6 +334,23 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	_, error = client.GetRow(getRowRequest)
 	c.Check(error, NotNil)
 
+	notExistPk := new(PrimaryKey)
+	notExistPk.AddPrimaryKeyColumn("pk1", "notexistpk")
+	getRowRequest = new(GetRowRequest)
+	criteria = new(SingleRowQueryCriteria);
+
+	criteria.PrimaryKey = notExistPk
+	getRowRequest.SingleRowQueryCriteria = criteria
+	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
+
+	getResp, error = client.GetRow(getRowRequest)
+	c.Check(error, IsNil)
+	c.Check(getResp, NotNil)
+
+	colmap := getResp.GetColumnMap()
+	c.Check(colmap, NotNil)
+
 	fmt.Println("TestPutGetRow finished")
 }
 

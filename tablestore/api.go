@@ -476,8 +476,10 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		return nil, err
 	}
 
+
+	response := &GetRowResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
 	if len(resp.Row) == 0 {
-		return nil, nil
+		return response, nil
 	}
 
 	rows, err := readRowsWithHeader(bytes.NewReader(resp.Row))
@@ -485,7 +487,6 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		return nil, err
 	}
 
-	response := &GetRowResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
 	for _, pk := range (rows[0].primaryKey) {
 		pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
 		response.PrimaryKey.PrimaryKeys = append(response.PrimaryKey.PrimaryKeys, pkColumn)
