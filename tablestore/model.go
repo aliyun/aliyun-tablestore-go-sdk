@@ -130,6 +130,8 @@ type ConsumedCapacityUnit struct {
 }
 
 type PutRowResponse struct {
+	PrimaryKey           PrimaryKey
+Columns              []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 }
 

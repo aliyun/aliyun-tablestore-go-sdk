@@ -1,31 +1,32 @@
 package tablestore
 
 import (
-	"fmt"
-	"time"
 	"bytes"
-	"net/http"
 	"crypto/md5"
 	"encoding/base64"
-	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
-	"net"
+	"fmt"
 	"math/rand"
+	"net"
+	"net/http"
+	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	"github.com/golang/protobuf/proto"
 )
 
 const (
-	createTableUri = "/CreateTable"
-	listTableUri = "/ListTable"
-	deleteTableUri = "/DeleteTable"
+	createTableUri   = "/CreateTable"
+	listTableUri     = "/ListTable"
+	deleteTableUri   = "/DeleteTable"
 	describeTableUri = "/DescribeTable"
-	updateTableUri = "/UpdateTable"
-	putRowUri = "/PutRow"
-	deleteRowUri = "/DeleteRow"
-	getRowUri = "/GetRow"
-	updateRowUri = "/UpdateRow"
-	batchGetRowUri = "/BatchGetRow"
+	updateTableUri   = "/UpdateTable"
+	putRowUri        = "/PutRow"
+	deleteRowUri     = "/DeleteRow"
+	getRowUri        = "/GetRow"
+	updateRowUri     = "/UpdateRow"
+	batchGetRowUri   = "/BatchGetRow"
 	batchWriteRowUri = "/BatchWriteRow"
-	getRangeUri = "/GetRange"
+	getRangeUri      = "/GetRange"
 )
 
 // Constructor: to create the client of OTS service.
@@ -67,17 +68,17 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 		tableStoreClient.config = getTableStoreDefaultConfig()
 	}
 	tableStoreTransportProxy := &http.Transport{
-		MaxIdleConnsPerHost:   2000,
+		MaxIdleConnsPerHost: 2000,
 		Dial: (&net.Dialer{
-			Timeout:   tableStoreClient.config.HTTPTimeout.ConnectionTimeout,
+			Timeout: tableStoreClient.config.HTTPTimeout.ConnectionTimeout,
 		}).Dial,
 	}
 
 	tableStoreClient.httpClient = currentGetHttpClientFunc()
 
 	httpClient := &http.Client{
-		Transport:tableStoreTransportProxy,
-		Timeout: tableStoreClient.config.HTTPTimeout.RequestTimeout,
+		Transport: tableStoreTransportProxy,
+		Timeout:   tableStoreClient.config.HTTPTimeout.RequestTimeout,
 	}
 	tableStoreClient.httpClient.New(httpClient)
 
@@ -99,7 +100,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 			return err
 		}
 	} else {
-		body = nil;
+		body = nil
 	}
 
 	var value int64
@@ -153,7 +154,7 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *ts
 	} else if err == nil && !shouldRetry(*serverError.Code, *serverError.Message, action, statusCode) {
 		return 0
 	} else {
-		value := lastInterval * 2 + tableStoreClient.random.Int63n(DefaultRetryInterval - 1) + 1
+		value := lastInterval*2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
 		if value > MaxRetryInterval {
 			return MaxRetryInterval
 		}
@@ -164,34 +165,34 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *ts
 
 func shouldRetry(errorCode string, errorMsg string, action string, httpStatus int) bool {
 	if retryNotMatterActions(errorCode, errorMsg) == true {
-		return true;
+		return true
 	}
 
-	serverError := httpStatus >= 500 && httpStatus <= 599;
-	if (isIdempotent(action) &&
-		( errorCode == STORAGE_TIMEOUT || errorCode == INTERNAL_SERVER_ERROR || errorCode == SERVER_UNAVAILABLE || serverError)) {
-		return true;
+	serverError := httpStatus >= 500 && httpStatus <= 599
+	if isIdempotent(action) &&
+		(errorCode == STORAGE_TIMEOUT || errorCode == INTERNAL_SERVER_ERROR || errorCode == SERVER_UNAVAILABLE || serverError) {
+		return true
 	}
-	return false;
+	return false
 }
 
 func retryNotMatterActions(errorCode string, errorMsg string) bool {
-	if (errorCode == ROW_OPERATION_CONFLICT || errorCode == NOT_ENOUGH_CAPACITY_UNIT ||
+	if errorCode == ROW_OPERATION_CONFLICT || errorCode == NOT_ENOUGH_CAPACITY_UNIT ||
 		errorCode == TABLE_NOT_READY || errorCode == PARTITION_UNAVAILABLE ||
-		errorCode == SERVER_BUSY || (errorCode == QUOTA_EXHAUSTED && errorMsg == "Too frequent table operations.")) {
-		return true;
+		errorCode == SERVER_BUSY || (errorCode == QUOTA_EXHAUSTED && errorMsg == "Too frequent table operations.") {
+		return true
 	} else {
-		return false;
+		return false
 	}
 }
 
 func isIdempotent(action string) bool {
-	if (action == batchGetRowUri || action == describeTableUri ||
+	if action == batchGetRowUri || action == describeTableUri ||
 		action == getRangeUri || action == getRowUri ||
-		action == listTableUri) {
-		return true;
+		action == listTableUri {
+		return true
 	} else {
-		return false;
+		return false
 	}
 }
 
@@ -226,7 +227,9 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	otshead.set(xOtsInstanceName, tableStoreClient.instanceName)
 	sign, err := otshead.signature(uri, "POST", tableStoreClient.accessKeySecret)
 
-	if err != nil { return nil, err, 0 , ""}
+	if err != nil {
+		return nil, err, 0, ""
+	}
 	hreq.Header.Set(xOtsSignature, sign)
 
 	/* end set headers */
@@ -257,11 +260,11 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableMeta = new(tsprotocol.TableMeta)
 	req.TableMeta.TableName = proto.String(request.TableMeta.TableName)
 
-	for _, key := range (request.TableMeta.SchemaEntry) {
+	for _, key := range request.TableMeta.SchemaEntry {
 		keyType := tsprotocol.PrimaryKeyType(*key.Type)
 		if key.Option != nil {
 			keyOption := tsprotocol.PrimaryKeyOption(*key.Option)
-			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &tsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption })
+			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &tsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption})
 		} else {
 			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &tsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType})
 		}
@@ -336,7 +339,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	responseTableMeta := new(TableMeta)
 	responseTableMeta.TableName = *resp.TableMeta.TableName
 
-	for _, key := range (resp.TableMeta.PrimaryKey) {
+	for _, key := range resp.TableMeta.PrimaryKey {
 		keyType := PrimaryKeyType(*key.Type)
 
 		// enable it when we support kep option in describe table
@@ -346,7 +349,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 		} else {
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
 		}*/
-		responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
+		responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType})
 	}
 	response.TableMeta = responseTableMeta
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
@@ -360,14 +363,14 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	req := new(tsprotocol.UpdateTableRequest)
 	req.TableName = proto.String(request.TableName)
 
-	if (request.ReservedThroughput != nil) {
+	if request.ReservedThroughput != nil {
 		req.ReservedThroughput = new(tsprotocol.ReservedThroughput)
 		req.ReservedThroughput.CapacityUnit = new(tsprotocol.CapacityUnit)
 		req.ReservedThroughput.CapacityUnit.Read = proto.Int32(int32(request.ReservedThroughput.Readcap))
 		req.ReservedThroughput.CapacityUnit.Write = proto.Int32(int32(request.ReservedThroughput.Writecap))
 	}
 
-	if (request.TableOption != nil) {
+	if request.TableOption != nil {
 		req.TableOptions = new(tsprotocol.TableOptions)
 		req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
@@ -422,6 +425,22 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 	response := &PutRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+
+	rows, err := readRowsWithHeader(bytes.NewReader(resp.Row))
+	if err != nil {
+		return response, err
+	}
+
+	for _, pk := range rows[0].primaryKey {
+		pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+		response.PrimaryKey.PrimaryKeys = append(response.PrimaryKey.PrimaryKeys, pkColumn)
+	}
+
+	for _, cell := range rows[0].cells {
+		dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
+		response.Columns = append(response.Columns, dataColumn)
+	}
+
 	return response, nil
 }
 
@@ -463,7 +482,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 	if request.SingleRowQueryCriteria.MaxVersion != 0 {
 		req.MaxVersions = proto.Int32(int32(request.SingleRowQueryCriteria.MaxVersion))
 	} else if req.TimeRange != nil {
-		req.TimeRange = &tsprotocol.TimeRange{StartTime: req.TimeRange.StartTime, EndTime:req.TimeRange.EndTime, SpecificTime:req.TimeRange.SpecificTime}
+		req.TimeRange = &tsprotocol.TimeRange{StartTime: req.TimeRange.StartTime, EndTime: req.TimeRange.EndTime, SpecificTime: req.TimeRange.SpecificTime}
 	} else {
 		return nil, errInvalidInput
 	}
@@ -476,8 +495,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		return nil, err
 	}
 
-
-	response := &GetRowResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
+	response := &GetRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	if len(resp.Row) == 0 {
 		return response, nil
 	}
@@ -487,13 +505,13 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		return nil, err
 	}
 
-	for _, pk := range (rows[0].primaryKey) {
+	for _, pk := range rows[0].primaryKey {
 		pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
 		response.PrimaryKey.PrimaryKeys = append(response.PrimaryKey.PrimaryKeys, pkColumn)
 	}
 
-	for _, cell := range (rows[0].cells) {
-		dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+	for _, cell := range rows[0].cells {
+		dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
 		response.Columns = append(response.Columns, dataColumn)
 	}
 
@@ -516,7 +534,7 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 		return nil, err
 	}
 
-	response := &UpdateRowResponse{ConsumedCapacityUnit : &ConsumedCapacityUnit{}}
+	response := &UpdateRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 	return response, nil
@@ -529,7 +547,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 
 	var tablesInBatch []*tsprotocol.TableInBatchGetRowRequest
 
-	for _, Criteria := range (request.MultiRowQueryCriteria) {
+	for _, Criteria := range request.MultiRowQueryCriteria {
 		table := new(tsprotocol.TableInBatchGetRowRequest)
 		table.TableName = proto.String(Criteria.TableName)
 		table.ColumnsToGet = Criteria.ColumnsToGet
@@ -539,7 +557,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 		}
 		table.MaxVersions = proto.Int32(int32(Criteria.MaxVersion))
 
-		for _, pk := range (Criteria.PrimaryKey) {
+		for _, pk := range Criteria.PrimaryKey {
 			pkWithBytes := pk.Build(false)
 			table.PrimaryKey = append(table.PrimaryKey, pkWithBytes)
 		}
@@ -554,28 +572,28 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 		return nil, err
 	}
 
-	response := &BatchGetRowResponse{TableToRowsResult:make(map[string][]RowResult) }
+	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
-	for _, table := range (resp.Tables) {
+	for _, table := range resp.Tables {
 		index := int32(0)
-		for _, row := range (table.Rows) {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}, Index: index}
+		for _, row := range table.Rows {
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
 			index++
 			if *row.IsOk == false {
-				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
+				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message}
 			} else {
 				rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
 				if err != nil {
 					return nil, err
 				}
 
-				for _, pk := range (rows[0].primaryKey) {
+				for _, pk := range rows[0].primaryKey {
 					pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
 					rowResult.PrimaryKey.PrimaryKeys = append(rowResult.PrimaryKey.PrimaryKeys, pkColumn)
 				}
 
-				for _, cell := range (rows[0].cells) {
-					dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+				for _, cell := range rows[0].cells {
+					dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
 					rowResult.Columns = append(rowResult.Columns, dataColumn)
 				}
 
@@ -597,11 +615,11 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 
 	var tablesInBatch []*tsprotocol.TableInBatchWriteRowRequest
 
-	for key, value := range (request.RowChangesGroupByTable) {
+	for key, value := range request.RowChangesGroupByTable {
 		table := new(tsprotocol.TableInBatchWriteRowRequest)
 		table.TableName = proto.String(key)
 
-		for _, row := range (value) {
+		for _, row := range value {
 			rowInBatch := &tsprotocol.RowInBatchWriteRowRequest{}
 			rowInBatch.Condition = row.getCondition()
 			rowInBatch.RowChange = row.Serialize()
@@ -620,17 +638,17 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 		return nil, err
 	}
 
-	response := &BatchWriteRowResponse{TableToRowsResult:make(map[string][]RowResult) }
+	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
-	for _, table := range (resp.Tables) {
+	for _, table := range resp.Tables {
 		index := int32(0)
-		for _, row := range (table.Rows) {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}, Index: index}
+		for _, row := range table.Rows {
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
 			index++
 			rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
 			rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			if *row.IsOk == false {
-				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
+				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message}
 			} /*else {
 				rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
 				if err != nil {
@@ -698,19 +716,19 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		return nil, err
 	}
 
-	response := &GetRangeResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
+	response := &GetRangeResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	for _, row := range rows {
 		currentRow := &Row{}
 		currentpk := new(PrimaryKey)
-		for _, pk := range (row.primaryKey) {
+		for _, pk := range row.primaryKey {
 			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
 			currentpk.PrimaryKeys = append(currentpk.PrimaryKeys, pkColumn)
 		}
 
 		currentRow.PrimaryKey = currentpk
 
-		for _, cell := range (row.cells) {
-			dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+		for _, cell := range row.cells {
+			dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 
@@ -726,7 +744,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		}
 
 		response.NextStartPrimaryKey = &PrimaryKey{}
-		for _, pk := range (currentRows[0].primaryKey) {
+		for _, pk := range currentRows[0].primaryKey {
 			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
 			response.NextStartPrimaryKey.PrimaryKeys = append(response.NextStartPrimaryKey.PrimaryKeys, pkColumn)
 		}
@@ -735,5 +753,3 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 	return response, nil
 
 }
-
-
