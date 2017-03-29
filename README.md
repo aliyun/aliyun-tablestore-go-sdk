@@ -10,6 +10,9 @@
 
 ## 贡献代码
  - 我们非常欢迎大家为TableStore Go# SDK以及其他阿里云SDK贡献代码
+ 
+## Fork改动
+- PutRow操作返回主键，含自增ID
 
 ## 联系我们
 - [阿里云TableStore官方网站](http://www.aliyun.com/product/ots)
