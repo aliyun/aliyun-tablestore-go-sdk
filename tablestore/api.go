@@ -415,6 +415,9 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 	}
 
 	req.Condition = condition
+	req.ReturnContent = &tsprotocol.ReturnContent{
+		ReturnType: tsprotocol.ReturnType_RT_PK.Enum(),
+	}
 
 	resp := new(tsprotocol.PutRowResponse)
 
