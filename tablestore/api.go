@@ -627,10 +627,11 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 		for _, row := range (table.Rows) {
 			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit : &ConsumedCapacityUnit{}, Index: index}
 			index++
-			rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
-			rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
+			} else {
+				rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
+				rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			} /*else {
 				rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
 				if err != nil {
