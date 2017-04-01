@@ -8,6 +8,14 @@
 > - 此Go SDK基于阿里云表格存储服务 API构建。
 > - 阿里云表格存储是阿里云自主研发的NoSQL数据存储服务，提供海量结构化数据的存储和实时访问。
 
+## 运行环境
+> - 推荐使用Go 1.4及以上。
+
+## 安装方法
+### GitHub安装
+> - 执行命令`go get github.com/aliyun/aliyun-tablestore-go-sdk`获取远程代码包。
+> - 在您的代码中使用`import "github.com/aliyun/aliyun-tablestore-go-sdk"`引入TableStore Go SDK的包。
+
 ## 贡献代码
  - 我们非常欢迎大家为TableStore Go# SDK以及其他阿里云SDK贡献代码
 
