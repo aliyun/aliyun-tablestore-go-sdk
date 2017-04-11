@@ -36,15 +36,21 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	batchGetReq := &tablestore.BatchGetRowRequest{}
 	mqCriteria := &tablestore.MultiRowQueryCriteria{}
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 20; i++ {
 		pkToGet := new(tablestore.PrimaryKey)
 		pkToGet.AddPrimaryKeyColumn("pk1", "pk1value1")
 		pkToGet.AddPrimaryKeyColumn("pk2", int64(i))
 		pkToGet.AddPrimaryKeyColumn("pk3", []byte("pk3"))
 		mqCriteria.AddRow(pkToGet)
-		mqCriteria.MaxVersion = 1
 	}
+	pkToGet2 := new(tablestore.PrimaryKey)
+	pkToGet2.AddPrimaryKeyColumn("pk1", "pk1value2")
+	pkToGet2.AddPrimaryKeyColumn("pk2", int64(300))
+	pkToGet2.AddPrimaryKeyColumn("pk3", []byte("pk3"))
+	mqCriteria.AddColumnToGet("col1")
+	mqCriteria.AddRow(pkToGet2)
 
+	mqCriteria.MaxVersion = 1
 	mqCriteria.TableName = tableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 
@@ -58,7 +64,11 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 		fmt.Println("batachget failed with error:", err)
 	} else {
 		for _, row := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
-			fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
+			if row.PrimaryKey.PrimaryKeys != nil {
+				fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
+			} else {
+				fmt.Println("this row is not exist")
+			}
 		}
 		fmt.Println("batchget finished")
 	}

@@ -564,19 +564,22 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message }
 			} else {
-				rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
-				if err != nil {
-					return nil, err
-				}
+				// len == 0 means row not exist
+				if (len(row.Row) > 0) {
+					rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
+					if err != nil {
+						return nil, err
+					}
 
-				for _, pk := range (rows[0].primaryKey) {
-					pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
-					rowResult.PrimaryKey.PrimaryKeys = append(rowResult.PrimaryKey.PrimaryKeys, pkColumn)
-				}
+					for _, pk := range (rows[0].primaryKey) {
+						pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+						rowResult.PrimaryKey.PrimaryKeys = append(rowResult.PrimaryKey.PrimaryKeys, pkColumn)
+					}
 
-				for _, cell := range (rows[0].cells) {
-					dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
-					rowResult.Columns = append(rowResult.Columns, dataColumn)
+					for _, cell := range (rows[0].cells) {
+						dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp:cell.cellTimestamp}
+						rowResult.Columns = append(rowResult.Columns, dataColumn)
+					}
 				}
 
 				rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
