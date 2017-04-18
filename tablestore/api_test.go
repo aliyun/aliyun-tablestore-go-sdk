@@ -458,7 +458,9 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
 	fmt.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
-	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 100, End: timeNow + 300}
+	//getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 1}
+	// getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow - 1, End: timeNow + 1}
 	getResp2, error := client.GetRow(getRowRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getResp2, NotNil)
