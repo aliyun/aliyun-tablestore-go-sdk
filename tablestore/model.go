@@ -370,6 +370,7 @@ type MultiRowQueryCriteria struct {
 	ColumnsToGet []string
 	TableName    string
 	MaxVersion   int
+	TimeRange    *TimeRange
 	Filter       ColumnFilter
 }
 

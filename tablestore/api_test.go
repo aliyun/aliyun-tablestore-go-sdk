@@ -705,10 +705,10 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 		key := "batchkey" + strconv.Itoa(i)
 		pkToGet.AddPrimaryKeyColumn("pk1", key)
 		mqCriteria.AddRow(pkToGet)
-		mqCriteria.MaxVersion = 1
 		mqCriteria.AddColumnToGet("col1")
 	}
-
+	timeNow := time.Now().Unix() * 1000
+	mqCriteria.TimeRange = &TimeRange{Start: timeNow - 10000, End : timeNow + 10000}
 	mqCriteria.TableName = defaultTableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 	batchGetResponse, error = client.BatchGetRow(batchGetReq)
@@ -726,6 +726,34 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 		index++
 	}
 
+	// test timerange
+	batchGetReq = &BatchGetRowRequest{}
+	mqCriteria = &MultiRowQueryCriteria{}
+
+	for i := 0; i < rowCount; i++ {
+		pkToGet := new(PrimaryKey)
+		key := "batchkey" + strconv.Itoa(i)
+		pkToGet.AddPrimaryKeyColumn("pk1", key)
+		mqCriteria.AddRow(pkToGet)
+	}
+	mqCriteria.TimeRange = &TimeRange{Start: timeNow + 10000, End : timeNow + 20000}
+	mqCriteria.TableName = defaultTableName
+	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
+	batchGetResponse, error = client.BatchGetRow(batchGetReq)
+	c.Check(error, Equals, nil)
+
+	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
+	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
+
+	index = int32(0)
+	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
+		c.Check(rowToCheck.IsSucceed, Equals, true)
+		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
+		c.Check(len(rowToCheck.Columns), Equals, 0)
+		c.Check(rowToCheck.Index, Equals, index)
+		index++
+	}
 	_, error = invalidClient.BatchGetRow(batchGetReq)
 	c.Check(error, NotNil)
 

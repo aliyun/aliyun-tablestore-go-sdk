@@ -543,7 +543,19 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 		if Criteria.Filter != nil {
 			table.Filter = Criteria.Filter.Serialize()
 		}
-		table.MaxVersions = proto.Int32(int32(Criteria.MaxVersion))
+		if (Criteria.MaxVersion != 0) {
+			table.MaxVersions = proto.Int32(int32(Criteria.MaxVersion))
+		}
+
+		if Criteria.TimeRange != nil {
+			if (Criteria.TimeRange.Specific != 0) {
+				table.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(Criteria.TimeRange.Specific)}
+			} else {
+				table.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(Criteria.TimeRange.Start), EndTime: proto.Int64(Criteria.TimeRange.End)}
+			}
+		} else if Criteria.MaxVersion == 0 {
+			return nil, errInvalidInput
+		}
 
 		for _, pk := range (Criteria.PrimaryKey) {
 			pkWithBytes := pk.Build(false)
