@@ -462,9 +462,11 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 
 	if request.SingleRowQueryCriteria.MaxVersion != 0 {
 		req.MaxVersions = proto.Int32(int32(request.SingleRowQueryCriteria.MaxVersion))
-	} else if req.TimeRange != nil {
-		req.TimeRange = &tsprotocol.TimeRange{StartTime: req.TimeRange.StartTime, EndTime:req.TimeRange.EndTime, SpecificTime:req.TimeRange.SpecificTime}
-	} else {
+	}
+
+	if request.SingleRowQueryCriteria.TimeRange != nil {
+		req.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.End), SpecificTime:proto.Int64(request.SingleRowQueryCriteria.TimeRange.Specific)}
+	} else if request.SingleRowQueryCriteria.MaxVersion == 0 {
 		return nil, errInvalidInput
 	}
 

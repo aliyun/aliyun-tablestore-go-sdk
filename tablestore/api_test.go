@@ -433,7 +433,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
-	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow}
+	// getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow}
 	getResp, error := client.GetRow(getRowRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getResp, NotNil)
@@ -454,6 +454,15 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(getResp.Columns[4].Value, Equals, int64(50))
 	c.Check(getResp.Columns[5].ColumnName, Equals, "col6")
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
+
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
+	fmt.Println("timerange", timeNow)
+	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 100, End: timeNow + 300}
+	getResp2, error := client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp2, NotNil)
+	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 0)
 	fmt.Println("TestPutGetRowWithTimestamp finished")
 }
 
