@@ -678,6 +678,16 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		req.MaxVersions = proto.Int32(request.RangeRowQueryCriteria.MaxVersion)
 	}
 
+	if request.RangeRowQueryCriteria.TimeRange != nil {
+		if (request.RangeRowQueryCriteria.TimeRange.Specific != 0) {
+			req.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(request.RangeRowQueryCriteria.TimeRange.Specific)}
+		} else {
+			req.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.End)}
+		}
+	} else if request.RangeRowQueryCriteria.MaxVersion == 0 {
+		return nil, errInvalidInput
+	}
+
 	if request.RangeRowQueryCriteria.Limit != 0 {
 		req.Limit = proto.Int32(request.RangeRowQueryCriteria.Limit)
 	}

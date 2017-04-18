@@ -353,6 +353,10 @@ func (rowQueryCriteria *MultiRowQueryCriteria) AddColumnToGet(columnName string)
 	rowQueryCriteria.ColumnsToGet = append(rowQueryCriteria.ColumnsToGet, columnName)
 }
 
+func (rowQueryCriteria *RangeRowQueryCriteria) AddColumnToGet(columnName string) {
+	rowQueryCriteria.ColumnsToGet = append(rowQueryCriteria.ColumnsToGet, columnName)
+}
+
 func (rowQueryCriteria *MultiRowQueryCriteria) AddRow(pk *PrimaryKey) {
 	rowQueryCriteria.PrimaryKey = append(rowQueryCriteria.PrimaryKey, pk)
 }
@@ -432,6 +436,7 @@ type RangeRowQueryCriteria struct{
 	EndPrimaryKey *PrimaryKey
 	ColumnsToGet []string
 	MaxVersion   int32
+	TimeRange    *TimeRange
 	Filter       ColumnFilter
 	Direction    Direction
 	Limit        int32

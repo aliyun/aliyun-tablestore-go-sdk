@@ -458,13 +458,37 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
 	fmt.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
-	//getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
 	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 1}
-	// getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow - 1, End: timeNow + 1}
 	getResp2, error := client.GetRow(getRowRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getResp2, NotNil)
 	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 0)
+
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
+	fmt.Println("timerange", timeNow)
+	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 1, End: timeNow + 2}
+	getResp2, error = client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp2, NotNil)
+
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
+	fmt.Println("timerange", timeNow)
+	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 1}
+	getResp2, error = client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp2, NotNil)
+	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 0)
+
+	fmt.Println("timerange", timeNow)
+	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
+	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow - 1, End: timeNow + 2}
+	getResp2, error = client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp2, NotNil)
+	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 1)
+
 	fmt.Println("TestPutGetRowWithTimestamp finished")
 }
 
@@ -640,7 +664,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	fmt.Println("TestBatchGetRow started")
 	rowCount := 100
 	for i := 0; i < rowCount; i++ {
-		key := "key" + strconv.Itoa(i)
+		key := "batchkey" + strconv.Itoa(i)
 		value := "value" + strconv.Itoa(i)
 		PrepareDataInDefaultTable(key, value)
 	}
@@ -650,12 +674,11 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 
 	for i := 0; i < rowCount; i++ {
 		pkToGet := new(PrimaryKey)
-		key := "key" + strconv.Itoa(i)
+		key := "batchkey" + strconv.Itoa(i)
 		pkToGet.AddPrimaryKeyColumn("pk1", key)
 		mqCriteria.AddRow(pkToGet)
-		mqCriteria.MaxVersion = 1
 	}
-
+	mqCriteria.MaxVersion = 1
 	mqCriteria.TableName = defaultTableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 	batchGetResponse, error := client.BatchGetRow(batchGetReq)
@@ -679,7 +702,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 
 	for i := 0; i < rowCount; i++ {
 		pkToGet := new(PrimaryKey)
-		key := "key" + strconv.Itoa(i)
+		key := "batchkey" + strconv.Itoa(i)
 		pkToGet.AddPrimaryKeyColumn("pk1", key)
 		mqCriteria.AddRow(pkToGet)
 		mqCriteria.MaxVersion = 1
@@ -762,10 +785,11 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 func (s *TableStoreSuite) TestGetRange(c *C) {
 	fmt.Println("TestGetRange started")
 	rowCount := 9
+	timeNow := time.Now().Unix() * 1000
 	for i := 0; i < rowCount; i++ {
 		key := "getrange" + strconv.Itoa(i)
 		value := "value" + strconv.Itoa(i)
-		PrepareDataInDefaultTable(key, value)
+		PrepareDataInDefaultTableWithTimestamp(key, value, timeNow)
 	}
 
 	getRangeRequest := &GetRangeRequest{}
@@ -788,6 +812,7 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	c.Check(getRangeResp.Rows, NotNil)
 	count := end - start
 	c.Check(len(getRangeResp.Rows), Equals, count)
+	c.Check(len(getRangeResp.Rows[0].Columns), Equals, 1)
 	c.Check(getRangeResp.NextStartPrimaryKey, IsNil)
 
 	getRangeRequest = &GetRangeRequest{}
@@ -802,6 +827,23 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	getRangeResp, error = client.GetRange(getRangeRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getRangeResp.Rows, NotNil)
+
+	fmt.Println("use time range to query rows")
+
+	rangeRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 100001}
+	getRangeResp, error = client.GetRange(getRangeRequest)
+	c.Check(error, NotNil)
+	fmt.Println(error)
+
+	fmt.Println("use time range to query rows 2")
+	rangeRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 1, End: timeNow + 2}
+	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
+	getRangeResp2, error := client.GetRange(getRangeRequest)
+
+	c.Check(error, Equals, nil)
+	c.Check(getRangeResp2.Rows, NotNil)
+	c.Check(len(getRangeResp2.Rows), Equals, count)
+	c.Check(len(getRangeResp2.Rows[0].Columns), Equals, 0)
 
 	_, error = invalidClient.GetRange(getRangeRequest)
 	c.Check(error, NotNil)
@@ -1171,8 +1213,22 @@ func PrepareDataInDefaultTable(key string, value string) error {
 	putRowChange.TableName = defaultTableName
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", key)
-	putRowChange.PrimaryKey = putPk
 	putRowChange.AddColumn("col1", value)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error := client.PutRow(putRowRequest)
+	return error
+}
+
+func PrepareDataInDefaultTableWithTimestamp(key string, value string, timeNow int64) error {
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = defaultTableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", key)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.AddColumnWithTimestamp("col1", value, timeNow)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
 	_, error := client.PutRow(putRowRequest)
