@@ -664,6 +664,10 @@ func (Criteria *SingleRowQueryCriteria) SetFilter(filter ColumnFilter) {
 	Criteria.Filter = filter
 }
 
+func (Criteria *MultiRowQueryCriteria) SetFilter(filter ColumnFilter) {
+	Criteria.Filter = filter
+}
+
 func NewSingleColumnCondition(columnName string, comparator ComparatorType, value interface{}) *SingleColumnCondition {
 	return &SingleColumnCondition{ColumnName: &columnName, Comparator: &comparator, ColumnValue:value}
 }

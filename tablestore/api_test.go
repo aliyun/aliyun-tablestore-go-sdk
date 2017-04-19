@@ -760,6 +760,99 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	fmt.Println("TestBatchGetRow started")
 }
 
+func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
+	fmt.Println("TestBatchGetRowWithFilter started")
+	rowCount := 100
+	for i := 0; i < rowCount; i++ {
+		key := "filterbatchkey" + strconv.Itoa(i)
+		value1 := "col0value" + strconv.Itoa(i)
+		value2 := "col1value" + strconv.Itoa(i)
+		value3 := "col2value" + strconv.Itoa(i)
+		PrepareDataInDefaultTableWithMultiAttribute(key, value1, value2, value3)
+	}
+
+	// pagination filter
+	pagedFilter := &PaginationFilter{}
+	pagedFilter.Limit = 2
+	pagedFilter.Offset = 1
+
+	batchGetReq := &BatchGetRowRequest{}
+	mqCriteria := &MultiRowQueryCriteria{}
+	mqCriteria.SetFilter(pagedFilter)
+
+	for i := 0; i < rowCount; i++ {
+		pkToGet := new(PrimaryKey)
+		key := "filterbatchkey" + strconv.Itoa(i)
+		pkToGet.AddPrimaryKeyColumn("pk1", key)
+		mqCriteria.AddRow(pkToGet)
+	}
+
+	mqCriteria.MaxVersion = 1
+	mqCriteria.TableName = defaultTableName
+	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
+	batchGetResponse, error := client.BatchGetRow(batchGetReq)
+	c.Check(error, Equals, nil)
+
+	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
+	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
+
+	index := int32(0)
+	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
+		c.Check(rowToCheck.IsSucceed, Equals, true)
+		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
+		c.Check(len(rowToCheck.Columns), Equals, 2)
+		//fmt.Println(rowToCheck.Columns[0].ColumnName)
+		c.Check(rowToCheck.Index, Equals, index)
+		index++
+	}
+
+	// compsite filter
+	batchGetReq = &BatchGetRowRequest{}
+	clCondition1 := NewSingleColumnCondition("col1", CT_EQUAL, "col0value1")
+	clCondition2 := NewSingleColumnCondition("col2", CT_EQUAL, "col1value1")
+
+	cf := NewCompositeColumnCondition(LO_AND)
+	cf.AddFilter(clCondition1)
+	cf.AddFilter(clCondition2)
+
+	mqCriteria = &MultiRowQueryCriteria{}
+	mqCriteria.SetFilter(cf)
+
+	for i := 0; i < rowCount; i++ {
+		pkToGet := new(PrimaryKey)
+		key := "filterbatchkey" + strconv.Itoa(i)
+		pkToGet.AddPrimaryKeyColumn("pk1", key)
+		mqCriteria.AddRow(pkToGet)
+	}
+
+	mqCriteria.MaxVersion = 1
+	mqCriteria.TableName = defaultTableName
+	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
+	batchGetResponse, error = client.BatchGetRow(batchGetReq)
+	c.Check(error, Equals, nil)
+
+	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
+	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
+
+	index = int32(0)
+	count :=0
+	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
+		c.Check(rowToCheck.IsSucceed, Equals, true)
+
+		if len(rowToCheck.PrimaryKey.PrimaryKeys) > 0 {
+			c.Check(len(rowToCheck.Columns), Equals, 3)
+			count++
+		}
+		c.Check(rowToCheck.Index, Equals, index)
+		index++
+	}
+	c.Check(count, Equals, 1)
+
+	fmt.Println("TestBatchGetRowWithFilter finished")
+}
+
 func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	fmt.Println("TestBatchWriteRow started")
 
@@ -1242,6 +1335,22 @@ func PrepareDataInDefaultTable(key string, value string) error {
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", key)
 	putRowChange.AddColumn("col1", value)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error := client.PutRow(putRowRequest)
+	return error
+}
+
+func PrepareDataInDefaultTableWithMultiAttribute(key string, value1 string, value2 string, value3 string) error {
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = defaultTableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", key)
+	putRowChange.AddColumn("col1", value1)
+	putRowChange.AddColumn("col2", value2)
+	putRowChange.AddColumn("col3", value3)
 	putRowChange.PrimaryKey = putPk
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
