@@ -721,16 +721,31 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		return nil, err
 	}
 
+	response := &GetRangeResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
+	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
+	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+	if len(resp.NextStartPrimaryKey) != 0 {
+		currentRows, err := readRowsWithHeader(bytes.NewReader(resp.NextStartPrimaryKey))
+		if err != nil {
+			return nil, err
+		}
+
+		response.NextStartPrimaryKey = &PrimaryKey{}
+		for _, pk := range (currentRows[0].primaryKey) {
+			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+			response.NextStartPrimaryKey.PrimaryKeys = append(response.NextStartPrimaryKey.PrimaryKeys, pkColumn)
+		}
+	}
+
 	if len(resp.Rows) == 0 {
-		return nil, nil
+		return response, nil
 	}
 
 	rows, err := readRowsWithHeader(bytes.NewReader(resp.Rows))
 	if err != nil {
-		return nil, err
+		return response, err
 	}
 
-	response := &GetRangeResponse{ConsumedCapacityUnit:&ConsumedCapacityUnit{}}
 	for _, row := range rows {
 		currentRow := &Row{}
 		currentpk := new(PrimaryKey)
@@ -747,21 +762,6 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		}
 
 		response.Rows = append(response.Rows, currentRow)
-	}
-
-	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
-	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
-	if len(resp.NextStartPrimaryKey) != 0 {
-		currentRows, err := readRowsWithHeader(bytes.NewReader(resp.NextStartPrimaryKey))
-		if err != nil {
-			return nil, err
-		}
-
-		response.NextStartPrimaryKey = &PrimaryKey{}
-		for _, pk := range (currentRows[0].primaryKey) {
-			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
-			response.NextStartPrimaryKey.PrimaryKeys = append(response.NextStartPrimaryKey.PrimaryKeys, pkColumn)
-		}
 	}
 
 	return response, nil

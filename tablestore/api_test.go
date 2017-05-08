@@ -26,6 +26,7 @@ var tableNamePrefix string
 var _ = Suite(&TableStoreSuite{})
 
 var defaultTableName = "defaulttable"
+var rangeQueryTableName = "rangetable"
 
 // Todo: use config
 var client TableStoreApi
@@ -41,8 +42,9 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 
 	tableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
 	defaultTableName = tableNamePrefix + defaultTableName
+	rangeQueryTableName =  tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
-
+	PrepareTable2(rangeQueryTableName)
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
 }
 
@@ -51,6 +53,25 @@ func PrepareTable(tableName string) error {
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+	_, error := client.CreateTable(createtableRequest)
+	return error
+}
+
+func PrepareTable2(tableName string) error {
+	createtableRequest := new(CreateTableRequest)
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk2", PrimaryKeyType_STRING)
 	tableOption := new(TableOption)
 	tableOption.TimeToAlive = -1
 	tableOption.MaxVersion = 3
@@ -1007,6 +1028,61 @@ func (s *TableStoreSuite) TestGetRangeWithPagination(c *C) {
 	fmt.Println("TestGetRangeWithPagination finished")
 }
 
+func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
+	fmt.Println("TestGetRange started")
+	rowCount := 20
+	timeNow := time.Now().Unix() * 1000
+	for i := 0; i < rowCount; i++ {
+		key := "zgetrangetest" + strconv.Itoa(i)
+		value := "value" + strconv.Itoa(i)
+		PrepareDataInRangeTableWithTimestamp("pk1",key, value, timeNow)
+	}
+
+	for i := 0; i < rowCount; i++ {
+		key := "zgetrangetest2" + strconv.Itoa(i)
+		value := "value" + strconv.Itoa(i)
+		PrepareDataInRangeTableWithTimestamp("pk2", key, value, timeNow)
+	}
+
+	for i := 0; i < rowCount; i++ {
+		key := "zgetrangetest3" + strconv.Itoa(i)
+		value := "value" + strconv.Itoa(i)
+		PrepareDataInRangeTableWithTimestamp("pk3", key, value, timeNow)
+	}
+
+	getRangeRequest := &GetRangeRequest{}
+	rangeRowQueryCriteria := &RangeRowQueryCriteria{}
+	rangeRowQueryCriteria.TableName = rangeQueryTableName
+
+	startPK := new(PrimaryKey)
+	startPK.AddPrimaryKeyColumnWithMinValue("pk1")
+	startPK.AddPrimaryKeyColumnWithMinValue("pk2")
+	endPK := new(PrimaryKey)
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk1")
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk2")
+	rangeRowQueryCriteria.StartPrimaryKey = startPK
+	rangeRowQueryCriteria.EndPrimaryKey = endPK
+	rangeRowQueryCriteria.Direction = FORWARD
+	rangeRowQueryCriteria.MaxVersion = 1
+	filter := NewCompositeColumnCondition(LogicalOperator(LO_AND))
+	filter1:= NewSingleColumnCondition("pk2", ComparatorType(CT_GREATER_EQUAL), "pk3")
+	filter2:= NewSingleColumnCondition("pk2", ComparatorType(CT_LESS_EQUAL), "pk3")
+	filter.AddFilter(filter2)
+	filter.AddFilter(filter1)
+	rangeRowQueryCriteria.Filter = filter
+	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
+
+	getRangeResp, error := client.GetRange(getRangeRequest)
+	c.Check(error, Equals, nil)
+	fmt.Println(getRangeResp)
+	fmt.Println(getRangeResp.NextStartPrimaryKey)
+	fmt.Println(getRangeResp.Rows)
+	//fmt.Println(getRangeResp.NextStartPrimaryKey)
+	//c.Check(getRangeResp.Rows, NotNil)
+
+	fmt.Println("TestGetRange with filter finished")
+}
+
 func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
 	fmt.Println("TestGetRangeWithMinMaxValue started")
 
@@ -1364,6 +1440,21 @@ func PrepareDataInDefaultTableWithTimestamp(key string, value string, timeNow in
 	putRowChange.TableName = defaultTableName
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", key)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.AddColumnWithTimestamp("col1", value, timeNow)
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error := client.PutRow(putRowRequest)
+	return error
+}
+
+func PrepareDataInRangeTableWithTimestamp(key1 string, key2 string, value string, timeNow int64) error {
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = rangeQueryTableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", key1)
+	putPk.AddPrimaryKeyColumn("pk2", key2)
 	putRowChange.PrimaryKey = putPk
 	putRowChange.AddColumnWithTimestamp("col1", value, timeNow)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
