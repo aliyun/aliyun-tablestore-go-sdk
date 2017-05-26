@@ -127,7 +127,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 				if errn != nil {
 					return fmt.Errorf("decode resp failed: %s: %s: %s %s", errn, err, string(respBody), requestId)
 				} else {
-					return fmt.Errorf("%s %s", *e.Code, requestId)
+					return fmt.Errorf("%s %s %s", *e.Code, *e.Message ,requestId)
 				}
 			}
 
