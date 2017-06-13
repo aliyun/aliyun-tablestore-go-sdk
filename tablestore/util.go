@@ -639,17 +639,17 @@ func (pk *PrimaryKey) AddPrimaryKeyColumn(primaryKeyName string, value interface
 	pk.PrimaryKeys = append(pk.PrimaryKeys, buildPrimaryKey(primaryKeyName, value))
 }
 
-func (pk *PrimaryKey) AddPrimaryKeyColumnWithAutoIncrement(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: AUTO_INCREMENT })
+func (pk *PrimaryKey) AddPrimaryKeyColumnWithAutoIncrement(primaryKeyName string,value interface{}) {
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: AUTO_INCREMENT })
 }
 
-func (pk *PrimaryKey) AddPrimaryKeyColumnWithMinValue(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MIN })
+func (pk *PrimaryKey) AddPrimaryKeyColumnWithMinValue(primaryKeyName string, value interface{}) {
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, Value: value, PrimaryKeyOption: MIN })
 }
 
 // Only used for range query
-func (pk *PrimaryKey) AddPrimaryKeyColumnWithMaxValue(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MAX })
+func (pk *PrimaryKey) AddPrimaryKeyColumnWithMaxValue(primaryKeyName string, value interface{}) {
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: MAX })
 }
 
 func (rowchange *PutRowChange) SetCondition(rowExistenceExpectation RowExistenceExpectation) {
