@@ -63,7 +63,7 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	if err != nil {
 		fmt.Println("batachget failed with error:", err)
 	} else {
-		for _, row := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		for _, row := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 			if row.PrimaryKey.PrimaryKeys != nil {
 				fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 			} else {
@@ -81,14 +81,15 @@ func GetRangeSample(client *tablestore.TableStoreClient, tableName string) {
 	rangeRowQueryCriteria := &tablestore.RangeRowQueryCriteria{}
 	rangeRowQueryCriteria.TableName = tableName
 
+	// 查询区间：[(1, INF_MIN), (4, INF_MAX))，左闭右开。
 	startPK := new(tablestore.PrimaryKey)
-	startPK.AddPrimaryKeyColumnWithMinValue("pk1")
-	startPK.AddPrimaryKeyColumnWithMinValue("pk2")
-	startPK.AddPrimaryKeyColumnWithMinValue("pk3")
+	startPK.AddPrimaryKeyColumnWithMinValue("pk1",int64(1))
+	startPK.AddPrimaryKeyColumnWithMinValue("pk2",int64(1))
+	startPK.AddPrimaryKeyColumnWithMinValue("pk3",int64(1))
 	endPK := new(tablestore.PrimaryKey)
-	endPK.AddPrimaryKeyColumnWithMaxValue("pk1")
-	endPK.AddPrimaryKeyColumnWithMaxValue("pk2")
-	endPK.AddPrimaryKeyColumnWithMaxValue("pk3")
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk1",int64(4))
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk2",int64(4))
+	endPK.AddPrimaryKeyColumnWithMaxValue("pk3",int64(4))
 	rangeRowQueryCriteria.StartPrimaryKey = startPK
 	rangeRowQueryCriteria.EndPrimaryKey = endPK
 	rangeRowQueryCriteria.Direction = tablestore.FORWARD
@@ -104,7 +105,7 @@ func GetRangeSample(client *tablestore.TableStoreClient, tableName string) {
 		if err != nil {
 			fmt.Println("get range failed with error:", err)
 		}
-		if (len(getRangeResp.Rows) > 0) {
+		if len(getRangeResp.Rows) > 0 {
 			for _, row := range getRangeResp.Rows {
 				fmt.Println("range get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 			}
