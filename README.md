@@ -25,3 +25,6 @@
 - [阿里云TableStore官方文档中心](https://help.aliyun.com/product/8315004_ots.html)
 - [阿里云云栖社区](http://yq.aliyun.com)
 - [阿里云工单系统](https://workorder.console.aliyun.com/#/ticket/createIndex)
+
+### 扫码加入TableStore讨论群，和我们直接交流讨论
+![tablestoregroup](http://workshop-img.oss-cn-shanghai.aliyuncs.com/otsgroup.jpg?x-oss-process=image/resize,m_lfit,h_400)
