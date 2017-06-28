@@ -328,6 +328,7 @@ type SingleRowQueryCriteria struct {
 	MaxVersion   int32
 	TimeRange    *TimeRange
 	Filter       ColumnFilter
+	StartColumn *string
 }
 
 type UpdateRowChange struct {
@@ -343,6 +344,10 @@ type UpdateRowRequest struct {
 
 func (rowQueryCriteria *SingleRowQueryCriteria) AddColumnToGet(columnName string) {
 	rowQueryCriteria.ColumnsToGet = append(rowQueryCriteria.ColumnsToGet, columnName)
+}
+
+func (rowQueryCriteria *SingleRowQueryCriteria) SetStartColumn(columnName string) {
+	rowQueryCriteria.StartColumn = &columnName
 }
 
 func (rowQueryCriteria *SingleRowQueryCriteria) getColumnsToGet() []string {

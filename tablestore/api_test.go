@@ -604,6 +604,24 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	c.Check(error, Equals, nil)
 	c.Check(getResp, NotNil)
 	c.Check(len(getResp.Columns), Equals, 3)
+
+
+	getRowRequest = new(GetRowRequest)
+	criteria = new(SingleRowQueryCriteria);
+	criteria.PrimaryKey = putPk
+	getRowRequest.SingleRowQueryCriteria = criteria
+	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
+	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
+
+	getRowRequest.SingleRowQueryCriteria.SetStartColumn("col3")
+	pagedFilter = &PaginationFilter{}
+	pagedFilter.Limit = 3
+	pagedFilter.Offset = 1
+	getRowRequest.SingleRowQueryCriteria.SetFilter(pagedFilter)
+	getResp, error = client.GetRow(getRowRequest)
+	c.Check(error, Equals, nil)
+	c.Check(getResp, NotNil)
+	c.Check(getResp.Columns[0].ColumnName, Equals, "col4")
 	fmt.Println("TestPutGetRowWithFilter finished")
 }
 

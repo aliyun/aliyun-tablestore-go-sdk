@@ -464,6 +464,10 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		req.MaxVersions = proto.Int32(int32(request.SingleRowQueryCriteria.MaxVersion))
 	}
 
+	if request.SingleRowQueryCriteria.StartColumn !=nil {
+		req.StartColumn = request.SingleRowQueryCriteria.StartColumn
+	}
+
 	if request.SingleRowQueryCriteria.TimeRange != nil {
 		if (request.SingleRowQueryCriteria.TimeRange.Specific != 0) {
 			req.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(request.SingleRowQueryCriteria.TimeRange.Specific)}
