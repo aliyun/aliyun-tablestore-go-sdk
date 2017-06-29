@@ -252,8 +252,16 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		putRowChange.AddColumn("col2", int64(100))
 		putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 		putRowRequest.PutRowChange = putRowChange
-		_, error := client.PutRow(putRowRequest)
+		putRowRequest.PutRowChange.SetReturnPk()
+		response, error := client.PutRow(putRowRequest)
 		c.Check(error, Equals, nil)
+		c.Check(len(response.PrimaryKey.PrimaryKeys), Equals, 2)
+		c.Check(response.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
+		c.Check(response.PrimaryKey.PrimaryKeys[0].Value, Equals,  "key" + strconv.Itoa(i))
+		c.Check(response.PrimaryKey.PrimaryKeys[1].ColumnName, Equals, "pk2")
+		c.Check(response.PrimaryKey.PrimaryKeys[1].Value.(int64) > 0, Equals, true)
+
+		fmt.Println(response.PrimaryKey.PrimaryKeys[1].Value)
 	}
 
 	describeTableReq := new(DescribeTableRequest)

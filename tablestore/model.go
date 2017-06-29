@@ -131,6 +131,7 @@ type ConsumedCapacityUnit struct {
 
 type PutRowResponse struct {
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+	PrimaryKey           PrimaryKey
 }
 
 type DeleteRowResponse struct {
@@ -239,6 +240,13 @@ type SingleColumnCondition struct {
 	LatestVersionOnly bool
 }
 
+type ReturnType int32
+
+const (
+	ReturnType_RT_NONE ReturnType = 0
+	ReturnType_RT_PK   ReturnType = 1
+)
+
 type PaginationFilter struct {
 	Offset int32
 	Limit  int32
@@ -305,6 +313,7 @@ type PutRowChange struct {
 	PrimaryKey *PrimaryKey
 	Columns    []AttributeColumn
 	Condition  *RowCondition
+	ReturnType ReturnType
 }
 
 type PutRowRequest struct {

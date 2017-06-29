@@ -627,6 +627,10 @@ func (rowchange *PutRowChange) AddColumn(columnName string, value interface{}) {
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 
+func (rowchange *PutRowChange) SetReturnPk() {
+	rowchange.ReturnType = ReturnType(ReturnType_RT_PK)
+}
+
 // value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
 	// Todo: validate the input

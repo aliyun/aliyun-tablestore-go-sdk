@@ -411,6 +411,11 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 		condition.ColumnCondition = request.PutRowChange.Condition.ColumnCondition.Serialize()
 	}
 
+	if request.PutRowChange.ReturnType == ReturnType_RT_PK {
+		content := tsprotocol.ReturnContent{ ReturnType: tsprotocol.ReturnType_RT_PK.Enum() }
+		req.ReturnContent = &content
+	}
+
 	req.Condition = condition
 
 	resp := new(tsprotocol.PutRowResponse)
@@ -422,6 +427,19 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 	response := &PutRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+
+	if request.PutRowChange.ReturnType == ReturnType_RT_PK {
+		rows, err := readRowsWithHeader(bytes.NewReader(resp.Row))
+		if err != nil {
+			return response, err
+		}
+
+		for _, pk := range rows[0].primaryKey {
+			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+			response.PrimaryKey.PrimaryKeys = append(response.PrimaryKey.PrimaryKeys, pkColumn)
+		}
+	}
+
 	return response, nil
 }
 
