@@ -251,7 +251,6 @@ func (row *PlainBufferRow) getCheckSum(crc byte) byte {
 func readRawByte(r *bytes.Reader) byte {
 	if r.Len() == 0 {
 		panic(errUnexpectIoEnd)
-		return 0
 	}
 
 	b, _ := r.ReadByte()
@@ -266,7 +265,6 @@ func readTag(r *bytes.Reader) int {
 func readRawLittleEndian64(r *bytes.Reader) int64 {
 	if r.Len() < 8 {
 		panic(errUnexpectIoEnd)
-		return 0
 	}
 
 	var v int64
@@ -278,7 +276,6 @@ func readRawLittleEndian64(r *bytes.Reader) int64 {
 func readRawLittleEndian32(r *bytes.Reader) int32 {
 	if r.Len() < 4 {
 		panic(errUnexpectIoEnd)
-		return 0
 	}
 
 	var v int32
@@ -294,7 +291,6 @@ func readBoolean(r *bytes.Reader) bool {
 func readBytes(r *bytes.Reader, size int32) []byte {
 	if int32(r.Len()) < size {
 		panic(errUnexpectIoEnd)
-		return nil
 	}
 	v := make([]byte, size)
 	r.Read(v)
