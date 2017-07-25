@@ -8,26 +8,25 @@ import (
 	"math/rand"
 )
 
-// @class OTSClient
-// The OTSClient, which will connect OTS service for authorization, create/list/
+// @class TableStoreClient
+// The TableStoreClient, which will connect OTS service for authorization, create/list/
 // delete tables/table groups, to get/put/delete a row.
-// Note: OTSClient is NOT thread-safe.
-// OTSClient的功能包括连接OTS服务进行验证、创建/列出/删除表或表组、插入/获取/
+// Note: TableStoreClient is thread-safe.
+// TableStoreClient的功能包括连接OTS服务进行验证、创建/列出/删除表或表组、插入/获取/
 // 删除/更新行数据
-type (
-	TableStoreClient struct {
-		endPoint        string
-		instanceName    string
-		accessKeyId     string
-		accessKeySecret string
-		securityToken   string
+type TableStoreClient struct {
+	endPoint        string
+	instanceName    string
+	accessKeyId     string
+	accessKeySecret string
+	securityToken   string
+	
+	httpClient      IHttpClient
+	config          *TableStoreConfig
+	random          *rand.Rand
+}
 
-		httpClient      IHttpClient
-		config          *TableStoreConfig
-		random          *rand.Rand
-	}
-	ClientOption func(*TableStoreClient)
-)
+type ClientOption func(*TableStoreClient)
 
 type TableStoreHttpClient struct {
 	httpClient      *http.Client
@@ -56,6 +55,19 @@ type TableStoreConfig struct {
 	RetryTimes  uint
 	MaxRetryTime time.Duration
 	HTTPTimeout HTTPTimeout
+	MaxIdleConnections int
+}
+
+func NewDefaultTableStoreConfig() *TableStoreConfig {
+	httpTimeout := &HTTPTimeout{
+		ConnectionTimeout:time.Second * 15,
+		RequestTimeout :time.Second * 30  }
+	config := &TableStoreConfig{
+		RetryTimes: 10,
+		HTTPTimeout: *httpTimeout,
+		MaxRetryTime: time.Second * 5,
+		MaxIdleConnections: 2000}
+	return config
 }
 
 type CreateTableRequest struct {

@@ -34,10 +34,10 @@ var invalidClient TableStoreApi
 
 func (s *TableStoreSuite) SetUpSuite(c *C) {
 
-	endpoint := os.Getenv("TS_TEST_ENDPOINT")
-	instanceName := os.Getenv("TS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("TS_TEST_KEYID")
-	accessKeySecret := os.Getenv("TS_TEST_SECRET")
+	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
+	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
+	accessKeyId := os.Getenv("OTS_TEST_KEYID")
+	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	tableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
@@ -734,14 +734,12 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	index := int32(0)
-	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
 		c.Check(len(rowToCheck.Columns), Equals, 1)
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
 	}
 
 	batchGetReq = &BatchGetRowRequest{}
@@ -763,14 +761,12 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	index = int32(0)
-	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
 		c.Check(len(rowToCheck.Columns), Equals, 1)
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
+		c.Check(rowToCheck.Index, Equals, int32(index))
 	}
 
 	// test timerange
@@ -792,14 +788,12 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	index = int32(0)
-	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
 		c.Check(len(rowToCheck.Columns), Equals, 0)
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
+		c.Check(rowToCheck.Index, Equals, int32(index))
 	}
 	_, error = invalidClient.BatchGetRow(batchGetReq)
 	c.Check(error, NotNil)
@@ -843,15 +837,12 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	index := int32(0)
-	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
 		c.Check(len(rowToCheck.Columns), Equals, 2)
-		//fmt.Println(rowToCheck.Columns[0].ColumnName)
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
+		c.Check(rowToCheck.Index, Equals, int32(index))
 	}
 
 	// compsite filter
@@ -882,9 +873,9 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	index = int32(0)
 	count :=0
-	for _, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 
@@ -892,8 +883,6 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 			c.Check(len(rowToCheck.Columns), Equals, 3)
 			count++
 		}
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
 	}
 	c.Check(count, Equals, 1)
 
@@ -936,12 +925,10 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	c.Check(error, Equals, nil)
 	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
 
-	index := int32(0)
-	for _, rowToCheck := range (batchWriteResponse.TableToRowsResult[defaultTableName]) {
+	for index, rowToCheck := range (batchWriteResponse.TableToRowsResult[defaultTableName]) {
+		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, defaultTableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
-		c.Check(rowToCheck.Index, Equals, index)
-		index++
 	}
 
 	_, error = invalidClient.BatchWriteRow(batchWriteReq)
@@ -1182,7 +1169,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 
 	totalCost := (end - start) / 1000000
 	fmt.Println("total cost:", totalCost)
-	c.Check(totalCost < 10 * 1000, Equals, true)
+	c.Check(totalCost < 30 * 1000, Equals, true)
 
 	time.Sleep(time.Millisecond * 20)
 	fmt.Println("TestPutRowsWorkload finished")
@@ -1277,7 +1264,7 @@ func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
 		return &mockHttpClient{}
 	}
 
-	tempClient := NewClientWithConfig("test","a","b","c","d", getTableStoreDefaultConfig())
+	tempClient := NewClientWithConfig("test","a","b","c","d", NewDefaultTableStoreConfig())
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -1330,7 +1317,7 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	tempClient := NewClient("a","b","c", "d", SetSth())
 	c.Check(tempClient, NotNil)
-	config := getTableStoreDefaultConfig()
+	config := NewDefaultTableStoreConfig()
 	tempClient = NewClientWithConfig("a","b","c", "d", "e", config)
 	c.Check(tempClient, NotNil)
 

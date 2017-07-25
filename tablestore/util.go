@@ -7,7 +7,6 @@ import (
 	"reflect"
 	"github.com/golang/protobuf/proto"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
-	"time"
 	"net/http"
 	"fmt"
 	"io/ioutil"
@@ -36,7 +35,7 @@ const (
 	ApiVersion = "2015-12-31"
 	xOtsDateFormat = "2006-01-02T15:04:05.123Z"
 	xOtsInstanceName = "x-ots-instancename"
-	xOtsRequestId = "X-Ots-Requestid"
+	xOtsRequestId = "x-ots-requestid"
 )
 
 type ColumnValue struct {
@@ -520,12 +519,6 @@ func NewPaginationFilter(filter *PaginationFilter) *tsprotocol.ColumnPaginationF
 	pageFilter.Offset = proto.Int32(filter.Offset)
 	pageFilter.Limit = proto.Int32(filter.Limit)
 	return pageFilter
-}
-
-func getTableStoreDefaultConfig() *TableStoreConfig {
-	httpTimeout := &HTTPTimeout{ConnectionTimeout:time.Second * 15, RequestTimeout :time.Second * 30  }
-	config := &TableStoreConfig{RetryTimes: 10, HTTPTimeout: *httpTimeout, MaxRetryTime: time.Second * 5 }
-	return config
 }
 
 func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byte, error, int, string) {

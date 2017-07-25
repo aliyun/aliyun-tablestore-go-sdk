@@ -28,10 +28,10 @@ const (
 	getRangeUri = "/GetRange"
 )
 
-// Constructor: to create the client of OTS service.
-// 构造函数：创建OTS服务的客户端。
+// Constructor: to create the client of TableStore service.
+// 构造函数：创建表格存储服务的客户端。
 //
-// @param endPoint The address of OTS service. OTS服务地址。
+// @param endPoint The address of TableStore service. 表格存储服务地址。
 // @param instanceName
 // @param accessId The Access ID. 用于标示用户的ID。
 // @param accessKey The Access Key. 用于签名和验证的密钥。
@@ -61,15 +61,14 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 	tableStoreClient.accessKeyId = accessKeyId
 	tableStoreClient.accessKeySecret = accessKeySecret
 	tableStoreClient.securityToken = securityToken
-	if config != nil {
-		tableStoreClient.config = config
-	} else {
-		tableStoreClient.config = getTableStoreDefaultConfig()
+	if config == nil {
+		config = NewDefaultTableStoreConfig()
 	}
+	tableStoreClient.config = config
 	tableStoreTransportProxy := &http.Transport{
-		MaxIdleConnsPerHost:   2000,
+		MaxIdleConnsPerHost: config.MaxIdleConnections,
 		Dial: (&net.Dialer{
-			Timeout:   tableStoreClient.config.HTTPTimeout.ConnectionTimeout,
+			Timeout: config.HTTPTimeout.ConnectionTimeout,
 		}).Dial,
 	}
 
