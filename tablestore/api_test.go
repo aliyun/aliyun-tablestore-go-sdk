@@ -802,6 +802,36 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	fmt.Println("TestBatchGetRow started")
 }
 
+func (s *TableStoreSuite) TestListStream(c *C) {
+	tableName := defaultTableName + "_ListStream"
+	fmt.Printf("TestListStream starts on table %s\n", tableName)
+	{
+		err := PrepareTable(tableName)
+		c.Assert(err, Equals, nil)
+	}
+	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, Equals, nil)
+		fmt.Printf("%v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 0)
+	}
+	{
+		_, err := client.UpdateTable(&UpdateTableRequest{
+			TableName: tableName,
+			StreamSpecification: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
+		c.Assert(err, Equals, nil)
+	}
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, Equals, nil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 1)
+	}
+	
+	fmt.Println("TestListStream finish")
+}
+
 func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	fmt.Println("TestBatchGetRowWithFilter started")
 	rowCount := 100

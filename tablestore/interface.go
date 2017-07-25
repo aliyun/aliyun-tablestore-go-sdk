@@ -13,4 +13,5 @@ type TableStoreApi interface {
 	BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse,error)
         BatchWriteRow(request *BatchWriteRowRequest) (*BatchWriteRowResponse,error)
 	GetRange(request *GetRangeRequest) (*GetRangeResponse,error)
+	ListStream(request *ListStreamRequest) (*ListStreamResponse, error)
 }

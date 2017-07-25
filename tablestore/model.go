@@ -130,6 +130,7 @@ type UpdateTableRequest struct {
 	TableName          string
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamSpecification *StreamSpecification
 }
 
 type UpdateTableResponse struct {
@@ -483,4 +484,23 @@ type GetRangeResponse struct {
 	Rows []*Row
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	NextStartPrimaryKey *PrimaryKey
+}
+
+type ListStreamRequest struct {
+	TableName *string
+}
+
+type Stream struct {
+	StreamId *string
+	TableName *string
+	CreationTime int64
+}
+
+type ListStreamResponse struct {
+	Streams []Stream
+}
+
+type StreamSpecification struct {
+	EnableStream bool
+	ExpirationTime int32
 }

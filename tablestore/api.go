@@ -15,6 +15,8 @@ import (
 )
 
 const (
+	userAgent = "aliyun-tablestore-sdk-golang/4.0.2"
+
 	createTableUri = "/CreateTable"
 	listTableUri = "/ListTable"
 	deleteTableUri = "/DeleteTable"
@@ -27,8 +29,7 @@ const (
 	batchGetRowUri = "/BatchGetRow"
 	batchWriteRowUri = "/BatchWriteRow"
 	getRangeUri = "/GetRange"
-
-	userAgent = "aliyun-tablestore-sdk-golang/4.0.1"
+	listStreamUri = "/ListStream"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -373,6 +374,13 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		req.TableOptions = new(otsprotocol.TableOptions)
 		req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
+	}
+
+	if request.StreamSpecification != nil {
+		ss := otsprotocol.StreamSpecification{
+			EnableStream: &request.StreamSpecification.EnableStream,
+			ExpirationTime: &request.StreamSpecification.ExpirationTime}
+		req.StreamSpec = &ss
 	}
 
 	resp := new(otsprotocol.UpdateTableResponse)
@@ -792,4 +800,23 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 }
 
+func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamResponse, error) {
+	pbReq := &otsprotocol.ListStreamRequest{}
+	pbReq.TableName = req.TableName
 
+	pbResp := otsprotocol.ListStreamResponse{}
+	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp); err != nil {
+		return nil, err
+	}
+	
+	resp := ListStreamResponse{}
+	streams := make([]Stream, len(pbResp.Streams))
+	for i, pbStream  := range pbResp.Streams {
+		streams[i] = Stream{
+			StreamId: pbStream.StreamId,
+			TableName: pbStream.TableName,
+			CreationTime: *pbStream.CreationTime}
+	}
+	resp.Streams = streams[:]
+	return &resp, nil
+}
