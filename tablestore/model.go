@@ -4,7 +4,8 @@ import (
 	"net/http"
 	"time"
 	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"./otsprotocol"
 	"math/rand"
 )
 
@@ -241,7 +242,7 @@ const (
 
 type ColumnFilter interface {
 	Serialize() []byte
-	ToFilter() *tsprotocol.Filter
+	ToFilter() *otsprotocol.Filter
 }
 
 type SingleColumnCondition struct {
@@ -274,11 +275,11 @@ func (ccvfilter *CompositeColumnValueFilter) Serialize() []byte {
 	return result
 }
 
-func (ccvfilter *CompositeColumnValueFilter) ToFilter() *tsprotocol.Filter {
+func (ccvfilter *CompositeColumnValueFilter) ToFilter() *otsprotocol.Filter {
 	compositefilter := NewCompositeFilter(ccvfilter.Filters, ccvfilter.Operator)
 	compositeFilterToBytes, _ := proto.Marshal(compositefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_COMPOSITE_COLUMN_VALUE.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_COMPOSITE_COLUMN_VALUE.Enum()
 	filter.Filter = compositeFilterToBytes
 	return filter
 }
@@ -287,11 +288,11 @@ func (ccvfilter *CompositeColumnValueFilter) AddFilter(filter ColumnFilter) {
 	ccvfilter.Filters = append(ccvfilter.Filters, filter)
 }
 
-func (condition *SingleColumnCondition) ToFilter() *tsprotocol.Filter {
+func (condition *SingleColumnCondition) ToFilter() *otsprotocol.Filter {
 	singlefilter := NewSingleColumnValueFilter(condition)
 	singleFilterToBytes, _ := proto.Marshal(singlefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_SINGLE_COLUMN_VALUE.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_SINGLE_COLUMN_VALUE.Enum()
 	filter.Filter = singleFilterToBytes
 	return filter
 }
@@ -301,11 +302,11 @@ func (condition *SingleColumnCondition) Serialize() []byte {
 	return result
 }
 
-func (pageFilter *PaginationFilter) ToFilter() *tsprotocol.Filter {
+func (pageFilter *PaginationFilter) ToFilter() *otsprotocol.Filter {
 	compositefilter := NewPaginationFilter(pageFilter)
 	compositeFilterToBytes, _ := proto.Marshal(compositefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_COLUMN_PAGINATION.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_COLUMN_PAGINATION.Enum()
 	filter.Filter = compositeFilterToBytes
 	return filter
 }
@@ -433,8 +434,8 @@ type RowResult struct {
 
 type RowChange interface {
 	Serialize() []byte
-	getOperationType() tsprotocol.OperationType
-	getCondition() *tsprotocol.Condition
+	getOperationType() otsprotocol.OperationType
+	getCondition() *otsprotocol.Condition
 	GetTableName() string
 }
 

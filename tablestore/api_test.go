@@ -11,7 +11,8 @@ import (
 	"time"
 	"math/rand"
 	"net/http"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"./otsprotocol"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -1323,23 +1324,23 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	errorCode := INTERNAL_SERVER_ERROR
 	tsClient := client.(*TableStoreClient)
-	value := getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value := getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = ROW_OPERATION_CONFLICT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, putRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, putRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), MaxRetryInterval, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), MaxRetryInterval, getRowUri, 500)
 	c.Check(value == MaxRetryInterval, Equals, true)
 
 	getResp := &GetRowResponse{}

@@ -8,7 +8,8 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"./otsprotocol"
 	"net"
 	"math/rand"
 )
@@ -118,7 +119,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 			if len(respBody) <= 0 {
 				return err
 			}
-			e := new(tsprotocol.Error)
+			e := new(otsprotocol.Error)
 			errn := proto.Unmarshal(respBody, e)
 
 			value = getNextPause(tableStoreClient, errn, e, i, end, value, uri, statusCode)
@@ -148,7 +149,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	return nil
 }
 
-func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *tsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
+func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *otsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
 	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
 		return 0
 	} else if err == nil && !shouldRetry(*serverError.Code, *serverError.Message, action, statusCode) {
@@ -254,30 +255,30 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 		return nil, errCreateTableNoPrimaryKey
 	}
 
-	req := new(tsprotocol.CreateTableRequest)
-	req.TableMeta = new(tsprotocol.TableMeta)
+	req := new(otsprotocol.CreateTableRequest)
+	req.TableMeta = new(otsprotocol.TableMeta)
 	req.TableMeta.TableName = proto.String(request.TableMeta.TableName)
 
 	for _, key := range (request.TableMeta.SchemaEntry) {
-		keyType := tsprotocol.PrimaryKeyType(*key.Type)
+		keyType := otsprotocol.PrimaryKeyType(*key.Type)
 		if key.Option != nil {
-			keyOption := tsprotocol.PrimaryKeyOption(*key.Option)
-			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &tsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption })
+			keyOption := otsprotocol.PrimaryKeyOption(*key.Option)
+			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &otsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption })
 		} else {
-			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &tsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType})
+			req.TableMeta.PrimaryKey = append(req.TableMeta.PrimaryKey, &otsprotocol.PrimaryKeySchema{Name: key.Name, Type: &keyType})
 		}
 	}
 
-	req.ReservedThroughput = new(tsprotocol.ReservedThroughput)
-	req.ReservedThroughput.CapacityUnit = new(tsprotocol.CapacityUnit)
+	req.ReservedThroughput = new(otsprotocol.ReservedThroughput)
+	req.ReservedThroughput.CapacityUnit = new(otsprotocol.CapacityUnit)
 	req.ReservedThroughput.CapacityUnit.Read = proto.Int32(int32(request.ReservedThroughput.Readcap))
 	req.ReservedThroughput.CapacityUnit.Write = proto.Int32(int32(request.ReservedThroughput.Writecap))
 
-	req.TableOptions = new(tsprotocol.TableOptions)
+	req.TableOptions = new(otsprotocol.TableOptions)
 	req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 	req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 
-	resp := new(tsprotocol.CreateTableResponse)
+	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp); err != nil {
 		return nil, err
@@ -292,7 +293,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 // @param tableNames The returned table names. 返回的表名集合。
 // @return Void. 无返回值。
 func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error) {
-	resp := new(tsprotocol.ListTableResponse)
+	resp := new(otsprotocol.ListTableResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp); err != nil {
 		return &ListTableResponse{}, err
@@ -308,7 +309,7 @@ func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error
 // @param tableName The table name. 表名。
 // @return Void. 无返回值。
 func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableRequest) (*DeleteTableResponse, error) {
-	req := new(tsprotocol.DeleteTableRequest)
+	req := new(otsprotocol.DeleteTableRequest)
 	req.TableName = proto.String(request.TableName)
 
 	response := &DeleteTableResponse{}
@@ -322,10 +323,10 @@ func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableReques
 // @param DescribeTableRequest
 // @param DescribeTableResponse
 func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRequest) (*DescribeTableResponse, error) {
-	req := new(tsprotocol.DescribeTableRequest)
+	req := new(otsprotocol.DescribeTableRequest)
 	req.TableName = proto.String(request.TableName)
 
-	resp := new(tsprotocol.DescribeTableResponse)
+	resp := new(otsprotocol.DescribeTableResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp); err != nil {
 		return &DescribeTableResponse{}, err
@@ -358,23 +359,23 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 // @param UpdateTableRequest
 // @param UpdateTableResponse
 func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableRequest) (*UpdateTableResponse, error) {
-	req := new(tsprotocol.UpdateTableRequest)
+	req := new(otsprotocol.UpdateTableRequest)
 	req.TableName = proto.String(request.TableName)
 
 	if (request.ReservedThroughput != nil) {
-		req.ReservedThroughput = new(tsprotocol.ReservedThroughput)
-		req.ReservedThroughput.CapacityUnit = new(tsprotocol.CapacityUnit)
+		req.ReservedThroughput = new(otsprotocol.ReservedThroughput)
+		req.ReservedThroughput.CapacityUnit = new(otsprotocol.CapacityUnit)
 		req.ReservedThroughput.CapacityUnit.Read = proto.Int32(int32(request.ReservedThroughput.Readcap))
 		req.ReservedThroughput.CapacityUnit.Write = proto.Int32(int32(request.ReservedThroughput.Writecap))
 	}
 
 	if (request.TableOption != nil) {
-		req.TableOptions = new(tsprotocol.TableOptions)
+		req.TableOptions = new(otsprotocol.TableOptions)
 		req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 	}
 
-	resp := new(tsprotocol.UpdateTableResponse)
+	resp := new(otsprotocol.UpdateTableResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp); err != nil {
 		return &UpdateTableResponse{}, err
@@ -402,24 +403,24 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 		return nil, nil
 	}
 
-	req := new(tsprotocol.PutRowRequest)
+	req := new(otsprotocol.PutRowRequest)
 	req.TableName = proto.String(request.PutRowChange.TableName)
 	req.Row = request.PutRowChange.Serialize()
 
-	condition := new(tsprotocol.Condition)
+	condition := new(otsprotocol.Condition)
 	condition.RowExistence = request.PutRowChange.Condition.buildCondition()
 	if request.PutRowChange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = request.PutRowChange.Condition.ColumnCondition.Serialize()
 	}
 
 	if request.PutRowChange.ReturnType == ReturnType_RT_PK {
-		content := tsprotocol.ReturnContent{ ReturnType: tsprotocol.ReturnType_RT_PK.Enum() }
+		content := otsprotocol.ReturnContent{ ReturnType: otsprotocol.ReturnType_RT_PK.Enum() }
 		req.ReturnContent = &content
 	}
 
 	req.Condition = condition
 
-	resp := new(tsprotocol.PutRowResponse)
+	resp := new(otsprotocol.PutRowResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp); err != nil {
 		return nil, err
@@ -447,11 +448,11 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 // Delete row with pk
 // @param DeleteRowRequest
 func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (*DeleteRowResponse, error) {
-	req := new(tsprotocol.DeleteRowRequest)
+	req := new(otsprotocol.DeleteRowRequest)
 	req.TableName = proto.String(request.DeleteRowChange.TableName)
 	req.Condition = request.DeleteRowChange.getCondition()
 	req.PrimaryKey = request.DeleteRowChange.PrimaryKey.Build(true)
-	resp := new(tsprotocol.DeleteRowResponse)
+	resp := new(otsprotocol.DeleteRowResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp); err != nil {
 		return nil, err
@@ -468,8 +469,8 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 //
 // @param getrowrequest
 func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRowResponse, error) {
-	req := new(tsprotocol.GetRowRequest)
-	resp := new(tsprotocol.GetRowResponse)
+	req := new(otsprotocol.GetRowRequest)
+	resp := new(otsprotocol.GetRowResponse)
 
 	req.TableName = proto.String(request.SingleRowQueryCriteria.TableName)
 
@@ -489,9 +490,9 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 
 	if request.SingleRowQueryCriteria.TimeRange != nil {
 		if (request.SingleRowQueryCriteria.TimeRange.Specific != 0) {
-			req.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(request.SingleRowQueryCriteria.TimeRange.Specific)}
+			req.TimeRange = &otsprotocol.TimeRange{SpecificTime : proto.Int64(request.SingleRowQueryCriteria.TimeRange.Specific)}
 		} else {
-			req.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.End)}
+			req.TimeRange = &otsprotocol.TimeRange{StartTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.End)}
 		}
 	} else if request.SingleRowQueryCriteria.MaxVersion == 0 {
 		return nil, errInvalidInput
@@ -534,8 +535,8 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 // Update row
 // @param UpdateRowRequest
 func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (*UpdateRowResponse, error) {
-	req := new(tsprotocol.UpdateRowRequest)
-	resp := new(tsprotocol.UpdateRowResponse)
+	req := new(otsprotocol.UpdateRowRequest)
+	resp := new(otsprotocol.UpdateRowResponse)
 
 	req.TableName = proto.String(request.UpdateRowChange.TableName)
 	req.Condition = request.UpdateRowChange.getCondition()
@@ -554,12 +555,12 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 // Batch Get Row
 // @param BatchGetRowRequest
 func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse, error) {
-	req := new(tsprotocol.BatchGetRowRequest)
+	req := new(otsprotocol.BatchGetRowRequest)
 
-	var tablesInBatch []*tsprotocol.TableInBatchGetRowRequest
+	var tablesInBatch []*otsprotocol.TableInBatchGetRowRequest
 
 	for _, Criteria := range (request.MultiRowQueryCriteria) {
-		table := new(tsprotocol.TableInBatchGetRowRequest)
+		table := new(otsprotocol.TableInBatchGetRowRequest)
 		table.TableName = proto.String(Criteria.TableName)
 		table.ColumnsToGet = Criteria.ColumnsToGet
 
@@ -572,9 +573,9 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 
 		if Criteria.TimeRange != nil {
 			if (Criteria.TimeRange.Specific != 0) {
-				table.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(Criteria.TimeRange.Specific)}
+				table.TimeRange = &otsprotocol.TimeRange{SpecificTime : proto.Int64(Criteria.TimeRange.Specific)}
 			} else {
-				table.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(Criteria.TimeRange.Start), EndTime: proto.Int64(Criteria.TimeRange.End)}
+				table.TimeRange = &otsprotocol.TimeRange{StartTime: proto.Int64(Criteria.TimeRange.Start), EndTime: proto.Int64(Criteria.TimeRange.End)}
 			}
 		} else if Criteria.MaxVersion == 0 {
 			return nil, errInvalidInput
@@ -589,7 +590,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	}
 
 	req.Tables = tablesInBatch
-	resp := new(tsprotocol.BatchGetRowResponse)
+	resp := new(otsprotocol.BatchGetRowResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(batchGetRowUri, req, resp); err != nil {
 		return nil, err
@@ -637,16 +638,16 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 // Batch Write Row
 // @param BatchWriteRowRequest
 func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRequest) (*BatchWriteRowResponse, error) {
-	req := new(tsprotocol.BatchWriteRowRequest)
+	req := new(otsprotocol.BatchWriteRowRequest)
 
-	var tablesInBatch []*tsprotocol.TableInBatchWriteRowRequest
+	var tablesInBatch []*otsprotocol.TableInBatchWriteRowRequest
 
 	for key, value := range (request.RowChangesGroupByTable) {
-		table := new(tsprotocol.TableInBatchWriteRowRequest)
+		table := new(otsprotocol.TableInBatchWriteRowRequest)
 		table.TableName = proto.String(key)
 
 		for _, row := range (value) {
-			rowInBatch := &tsprotocol.RowInBatchWriteRowRequest{}
+			rowInBatch := &otsprotocol.RowInBatchWriteRowRequest{}
 			rowInBatch.Condition = row.getCondition()
 			rowInBatch.RowChange = row.Serialize()
 			rowInBatch.Type = row.getOperationType().Enum()
@@ -658,7 +659,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 
 	req.Tables = tablesInBatch
 
-	resp := new(tsprotocol.BatchWriteRowResponse)
+	resp := new(otsprotocol.BatchWriteRowResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(batchWriteRowUri, req, resp); err != nil {
 		return nil, err
@@ -705,7 +706,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 // Get Range
 // @param GetRangeRequest
 func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*GetRangeResponse, error) {
-	req := new(tsprotocol.GetRangeRequest)
+	req := new(otsprotocol.GetRangeRequest)
 	req.TableName = proto.String(request.RangeRowQueryCriteria.TableName)
 	req.Direction = request.RangeRowQueryCriteria.Direction.ToDirection().Enum()
 
@@ -715,9 +716,9 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	if request.RangeRowQueryCriteria.TimeRange != nil {
 		if (request.RangeRowQueryCriteria.TimeRange.Specific != 0) {
-			req.TimeRange = &tsprotocol.TimeRange{SpecificTime : proto.Int64(request.RangeRowQueryCriteria.TimeRange.Specific)}
+			req.TimeRange = &otsprotocol.TimeRange{SpecificTime : proto.Int64(request.RangeRowQueryCriteria.TimeRange.Specific)}
 		} else {
-			req.TimeRange = &tsprotocol.TimeRange{StartTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.End)}
+			req.TimeRange = &otsprotocol.TimeRange{StartTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.Start), EndTime: proto.Int64(request.RangeRowQueryCriteria.TimeRange.End)}
 		}
 	} else if request.RangeRowQueryCriteria.MaxVersion == 0 {
 		return nil, errInvalidInput
@@ -738,7 +739,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 	req.InclusiveStartPrimaryKey = request.RangeRowQueryCriteria.StartPrimaryKey.Build(false)
 	req.ExclusiveEndPrimaryKey = request.RangeRowQueryCriteria.EndPrimaryKey.Build(false)
 
-	resp := new(tsprotocol.GetRangeResponse)
+	resp := new(otsprotocol.GetRangeResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp); err != nil {
 		return nil, err

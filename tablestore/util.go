@@ -6,7 +6,8 @@ import (
 	"bytes"
 	"reflect"
 	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"./otsprotocol"
 	"net/http"
 	"fmt"
 	"io/ioutil"
@@ -228,7 +229,7 @@ func (c *Column) toPlainBufferCell(ignoreValue bool) *PlainBufferCell {
 
 type PrimaryKeyColumnInner struct {
 	Name  []byte
-	Type  tsprotocol.PrimaryKeyType
+	Type  otsprotocol.PrimaryKeyType
 	Value interface{}
 }
 
@@ -267,13 +268,13 @@ func NewPrimaryKeyColumn(name []byte, value interface{}, option PrimaryKeyOption
 		t := reflect.TypeOf(value)
 		switch t.Kind() {
 		case reflect.String:
-			v.Type = tsprotocol.PrimaryKeyType_STRING
+			v.Type = otsprotocol.PrimaryKeyType_STRING
 
 		case reflect.Int64:
-			v.Type = tsprotocol.PrimaryKeyType_INTEGER
+			v.Type = otsprotocol.PrimaryKeyType_INTEGER
 
 		case reflect.Slice:
-			v.Type = tsprotocol.PrimaryKeyType_BINARY
+			v.Type = otsprotocol.PrimaryKeyType_BINARY
 
 		default:
 			panic(errInvalidInput)
@@ -293,11 +294,11 @@ func NewPrimaryKeyColumn(name []byte, value interface{}, option PrimaryKeyOption
 
 func (pkc *PrimaryKeyColumnInner) toColumnValue() *ColumnValue {
 	switch pkc.Type {
-	case tsprotocol.PrimaryKeyType_INTEGER:
+	case otsprotocol.PrimaryKeyType_INTEGER:
 		return &ColumnValue{ColumnType_INTEGER, pkc.Value}
-	case tsprotocol.PrimaryKeyType_STRING:
+	case otsprotocol.PrimaryKeyType_STRING:
 		return &ColumnValue{ColumnType_STRING, pkc.Value}
-	case tsprotocol.PrimaryKeyType_BINARY:
+	case otsprotocol.PrimaryKeyType_BINARY:
 		return &ColumnValue{ColumnType_BINARY, pkc.Value}
 	}
 
@@ -460,36 +461,36 @@ const (
 	MinValue = "_get_range_min"
 )
 
-func (comparatorType *ComparatorType) ConvertToPbComparatorType() tsprotocol.ComparatorType {
+func (comparatorType *ComparatorType) ConvertToPbComparatorType() otsprotocol.ComparatorType {
 	switch *comparatorType {
 	case CT_EQUAL:
-		return tsprotocol.ComparatorType_CT_EQUAL
+		return otsprotocol.ComparatorType_CT_EQUAL
 	case CT_NOT_EQUAL:
-		return tsprotocol.ComparatorType_CT_NOT_EQUAL
+		return otsprotocol.ComparatorType_CT_NOT_EQUAL
 	case CT_GREATER_THAN:
-		return tsprotocol.ComparatorType_CT_GREATER_THAN
+		return otsprotocol.ComparatorType_CT_GREATER_THAN
 	case CT_GREATER_EQUAL:
-		return tsprotocol.ComparatorType_CT_GREATER_EQUAL
+		return otsprotocol.ComparatorType_CT_GREATER_EQUAL
 	case CT_LESS_THAN:
-		return tsprotocol.ComparatorType_CT_LESS_THAN
+		return otsprotocol.ComparatorType_CT_LESS_THAN
 	default:
-		return tsprotocol.ComparatorType_CT_LESS_EQUAL
+		return otsprotocol.ComparatorType_CT_LESS_EQUAL
 	}
 }
 
-func (loType *LogicalOperator) ConvertToPbLoType() tsprotocol.LogicalOperator {
+func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 	switch *loType {
 	case LO_NOT:
-		return tsprotocol.LogicalOperator_LO_NOT
+		return otsprotocol.LogicalOperator_LO_NOT
 	case LO_AND:
-		return tsprotocol.LogicalOperator_LO_AND
+		return otsprotocol.LogicalOperator_LO_AND
 	default:
-		return tsprotocol.LogicalOperator_LO_OR
+		return otsprotocol.LogicalOperator_LO_OR
 	}
 }
 
-func NewSingleColumnValueFilter(condition *SingleColumnCondition) *tsprotocol.SingleColumnValueFilter {
-	filter := new(tsprotocol.SingleColumnValueFilter)
+func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.SingleColumnValueFilter {
+	filter := new(otsprotocol.SingleColumnValueFilter)
 
 	comparatorType := condition.Comparator.ConvertToPbComparatorType()
 	filter.Comparator = &comparatorType
@@ -502,8 +503,8 @@ func NewSingleColumnValueFilter(condition *SingleColumnCondition) *tsprotocol.Si
 	return filter
 }
 
-func NewCompositeFilter(filters []ColumnFilter, lo LogicalOperator) *tsprotocol.CompositeColumnValueFilter {
-	ccvfilter := new(tsprotocol.CompositeColumnValueFilter)
+func NewCompositeFilter(filters []ColumnFilter, lo LogicalOperator) *otsprotocol.CompositeColumnValueFilter {
+	ccvfilter := new(otsprotocol.CompositeColumnValueFilter)
 	combinator := lo.ConvertToPbLoType()
 	ccvfilter.Combinator = &combinator
 	for _, cf := range (filters) {
@@ -514,8 +515,8 @@ func NewCompositeFilter(filters []ColumnFilter, lo LogicalOperator) *tsprotocol.
 	return ccvfilter
 }
 
-func NewPaginationFilter(filter *PaginationFilter) *tsprotocol.ColumnPaginationFilter {
-	pageFilter := new(tsprotocol.ColumnPaginationFilter)
+func NewPaginationFilter(filter *PaginationFilter) *otsprotocol.ColumnPaginationFilter {
+	pageFilter := new(otsprotocol.ColumnPaginationFilter)
 	pageFilter.Offset = proto.Int32(filter.Offset)
 	pageFilter.Limit = proto.Int32(filter.Limit)
 	return pageFilter
@@ -593,14 +594,14 @@ func buildRowUpdateChange(primarykey *PrimaryKey, columns []ColumnToUpdate) *Row
 	return row
 }
 
-func (condition *RowCondition) buildCondition() *tsprotocol.RowExistenceExpectation {
+func (condition *RowCondition) buildCondition() *otsprotocol.RowExistenceExpectation {
 	switch condition.RowExistenceExpectation {
 	case RowExistenceExpectation_IGNORE:
-		return tsprotocol.RowExistenceExpectation_IGNORE.Enum()
+		return otsprotocol.RowExistenceExpectation_IGNORE.Enum()
 	case RowExistenceExpectation_EXPECT_EXIST:
-		return tsprotocol.RowExistenceExpectation_EXPECT_EXIST.Enum()
+		return otsprotocol.RowExistenceExpectation_EXPECT_EXIST.Enum()
 	case RowExistenceExpectation_EXPECT_NOT_EXIST:
-		return tsprotocol.RowExistenceExpectation_EXPECT_NOT_EXIST.Enum()
+		return otsprotocol.RowExistenceExpectation_EXPECT_NOT_EXIST.Enum()
 	}
 
 	panic(errInvalidInput)
@@ -742,20 +743,20 @@ func (rowchange *UpdateRowChange) GetTableName() string {
 	return rowchange.TableName
 }
 
-func (rowchange *DeleteRowChange) getOperationType() tsprotocol.OperationType {
-	return tsprotocol.OperationType_DELETE
+func (rowchange *DeleteRowChange) getOperationType() otsprotocol.OperationType {
+	return otsprotocol.OperationType_DELETE
 }
 
-func (rowchange *PutRowChange) getOperationType() tsprotocol.OperationType {
-	return tsprotocol.OperationType_PUT
+func (rowchange *PutRowChange) getOperationType() otsprotocol.OperationType {
+	return otsprotocol.OperationType_PUT
 }
 
-func (rowchange *UpdateRowChange) getOperationType() tsprotocol.OperationType {
-	return tsprotocol.OperationType_UPDATE
+func (rowchange *UpdateRowChange) getOperationType() otsprotocol.OperationType {
+	return otsprotocol.OperationType_UPDATE
 }
 
-func (rowchange *DeleteRowChange) getCondition() *tsprotocol.Condition {
-	condition := new(tsprotocol.Condition)
+func (rowchange *DeleteRowChange) getCondition() *otsprotocol.Condition {
+	condition := new(otsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
 	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
@@ -763,8 +764,8 @@ func (rowchange *DeleteRowChange) getCondition() *tsprotocol.Condition {
 	return condition
 }
 
-func (rowchange *UpdateRowChange) getCondition() *tsprotocol.Condition {
-	condition := new(tsprotocol.Condition)
+func (rowchange *UpdateRowChange) getCondition() *otsprotocol.Condition {
+	condition := new(otsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
 	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
@@ -772,8 +773,8 @@ func (rowchange *UpdateRowChange) getCondition() *tsprotocol.Condition {
 	return condition
 }
 
-func (rowchange *PutRowChange) getCondition() *tsprotocol.Condition {
-	condition := new(tsprotocol.Condition)
+func (rowchange *PutRowChange) getCondition() *otsprotocol.Condition {
+	condition := new(otsprotocol.Condition)
 	condition.RowExistence = rowchange.Condition.buildCondition()
 	if rowchange.Condition.ColumnCondition != nil {
 		condition.ColumnCondition = rowchange.Condition.ColumnCondition.Serialize()
@@ -788,11 +789,11 @@ func (request *BatchWriteRowRequest) AddRowChange(change RowChange) {
 	request.RowChangesGroupByTable[change.GetTableName()] = append(request.RowChangesGroupByTable[change.GetTableName()], change)
 }
 
-func (direction Direction) ToDirection() tsprotocol.Direction {
+func (direction Direction) ToDirection() otsprotocol.Direction {
 	if direction == FORWARD {
-		return tsprotocol.Direction_FORWARD
+		return otsprotocol.Direction_FORWARD
 	} else {
-		return tsprotocol.Direction_BACKWARD
+		return otsprotocol.Direction_BACKWARD
 	}
 }
 
