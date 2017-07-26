@@ -279,6 +279,13 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 	req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 
+	if request.StreamSpecification != nil {
+		ss := otsprotocol.StreamSpecification{
+			EnableStream: &request.StreamSpecification.EnableStream,
+			ExpirationTime: &request.StreamSpecification.ExpirationTime}
+		req.StreamSpec = &ss
+	}
+	
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp); err != nil {

@@ -75,6 +75,7 @@ type CreateTableRequest struct {
 	TableMeta          *TableMeta
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamSpecification *StreamSpecification
 }
 
 type CreateTableResponse struct {

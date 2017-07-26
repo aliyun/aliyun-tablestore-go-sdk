@@ -832,6 +832,38 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	fmt.Println("TestListStream finish")
 }
 
+func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
+	tableName := defaultTableName + "_CreateTableWithStream"
+	fmt.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
+	{
+		req := CreateTableRequest{}
+		tableMeta := TableMeta{}
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+		req.TableMeta = &tableMeta
+
+		tableOption := TableOption{}
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 3
+		req.TableOption = &tableOption
+
+		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
+
+		req.StreamSpecification = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
+		
+		_, err := client.CreateTable(&req)
+		c.Assert(err, Equals, nil)
+	}
+	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, Equals, nil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 1)
+	}
+	fmt.Println("TestCreateTableWithStream finish")
+}
+
 func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	fmt.Println("TestBatchGetRowWithFilter started")
 	rowCount := 100
