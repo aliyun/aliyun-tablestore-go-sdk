@@ -819,7 +819,7 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	{
 		_, err := client.UpdateTable(&UpdateTableRequest{
 			TableName: tableName,
-			StreamSpecification: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
+			StreamSpec: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
 		c.Assert(err, Equals, nil)
 	}
 	{
@@ -849,7 +849,7 @@ func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
 
 		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
 
-		req.StreamSpecification = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
+		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
 		
 		_, err := client.CreateTable(&req)
 		c.Assert(err, Equals, nil)

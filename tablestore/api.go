@@ -279,10 +279,10 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 	req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 
-	if request.StreamSpecification != nil {
+	if request.StreamSpec != nil {
 		ss := otsprotocol.StreamSpecification{
-			EnableStream: &request.StreamSpecification.EnableStream,
-			ExpirationTime: &request.StreamSpecification.ExpirationTime}
+			EnableStream: &request.StreamSpec.EnableStream,
+			ExpirationTime: &request.StreamSpec.ExpirationTime}
 		req.StreamSpec = &ss
 	}
 	
@@ -383,10 +383,10 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 	}
 
-	if request.StreamSpecification != nil {
+	if request.StreamSpec != nil {
 		ss := otsprotocol.StreamSpecification{
-			EnableStream: &request.StreamSpecification.EnableStream,
-			ExpirationTime: &request.StreamSpecification.ExpirationTime}
+			EnableStream: &request.StreamSpec.EnableStream,
+			ExpirationTime: &request.StreamSpec.ExpirationTime}
 		req.StreamSpec = &ss
 	}
 
