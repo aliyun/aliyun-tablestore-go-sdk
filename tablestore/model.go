@@ -137,6 +137,7 @@ type UpdateTableRequest struct {
 type UpdateTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamDetails *StreamDetails
 }
 
 type ConsumedCapacityUnit struct {
@@ -503,5 +504,13 @@ type ListStreamResponse struct {
 
 type StreamSpecification struct {
 	EnableStream bool
-	ExpirationTime int32
+	ExpirationTime int32 // must be positive. in hours
 }
+
+type StreamDetails struct {
+	EnableStream bool
+	StreamId *string // ID of a stream. nil when stream is disabled.
+	ExpirationTime int32 // in hours
+	LastEnableTime int64 // the last time stream is enabled, in usec
+}
+

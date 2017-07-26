@@ -399,6 +399,11 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	response := new(UpdateTableResponse)
 	response.ReservedThroughput = &ReservedThroughput{Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)), Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
+	response.StreamDetails = &StreamDetails{
+		EnableStream: *resp.StreamDetails.EnableStream,
+		StreamId: resp.StreamDetails.StreamId,
+		ExpirationTime: *resp.StreamDetails.ExpirationTime,
+		LastEnableTime: *resp.StreamDetails.LastEnableTime}
 	return response, nil
 }
 

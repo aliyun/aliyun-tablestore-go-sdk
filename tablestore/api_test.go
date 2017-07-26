@@ -817,10 +817,11 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 		c.Assert(len(resp.Streams), Equals, 0)
 	}
 	{
-		_, err := client.UpdateTable(&UpdateTableRequest{
+		resp, err := client.UpdateTable(&UpdateTableRequest{
 			TableName: tableName,
 			StreamSpec: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
 		c.Assert(err, Equals, nil)
+		c.Assert(resp.StreamDetails, NotNil)
 	}
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
