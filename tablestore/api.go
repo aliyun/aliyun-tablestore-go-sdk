@@ -26,6 +26,8 @@ const (
 	batchGetRowUri = "/BatchGetRow"
 	batchWriteRowUri = "/BatchWriteRow"
 	getRangeUri = "/GetRange"
+
+	userAgent = "aliyun-tablestore-sdk-golang/4.0.1"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -200,7 +202,7 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 		return nil, err, 0, ""
 	}
 	/* set headers */
-	hreq.Header.Set("User-Agent", "skyeye")
+	hreq.Header.Set("User-Agent", userAgent)
 
 	date := time.Now().UTC().Format(xOtsDateFormat)
 
