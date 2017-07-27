@@ -122,9 +122,10 @@ type DescribeTableRequest struct {
 }
 
 type DescribeTableResponse struct {
-	TableMeta          *TableMeta
-	TableOption        *TableOption
+	TableMeta *TableMeta
+	TableOption *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamDetails *StreamDetails
 }
 
 type UpdateTableRequest struct {

@@ -807,12 +807,21 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	fmt.Printf("TestListStream starts on table %s\n", tableName)
 	{
 		err := PrepareTable(tableName)
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 	}
 	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
 	{
+		resp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
+		c.Assert(err, IsNil)
+		c.Assert(resp.StreamDetails, NotNil)
+		c.Assert(resp.StreamDetails.EnableStream, Equals, false)
+		c.Assert(resp.StreamDetails.StreamId, IsNil)
+		c.Assert(resp.StreamDetails.ExpirationTime, Equals, int32(0))
+		c.Assert(resp.StreamDetails.LastEnableTime, Equals, int64(0))
+	}
+	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 		fmt.Printf("%v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 0)
 	}
@@ -820,16 +829,25 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 		resp, err := client.UpdateTable(&UpdateTableRequest{
 			TableName: tableName,
 			StreamSpec: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 		c.Assert(resp.StreamDetails, NotNil)
 	}
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 		fmt.Printf("%#v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 1)
 	}
-	
+	{
+		resp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
+		c.Assert(err, IsNil)
+		c.Assert(resp.StreamDetails, NotNil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(resp.StreamDetails.EnableStream, Equals, true)
+		c.Assert(resp.StreamDetails.StreamId, NotNil)
+		c.Assert(resp.StreamDetails.ExpirationTime, Equals, int32(24))
+		c.Assert(resp.StreamDetails.LastEnableTime > 0, Equals, true)
+	}
 	fmt.Println("TestListStream finish")
 }
 
@@ -853,12 +871,12 @@ func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
 		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
 		
 		_, err := client.CreateTable(&req)
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 	}
 	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
-		c.Assert(err, Equals, nil)
+		c.Assert(err, IsNil)
 		fmt.Printf("%#v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 1)
 	}
