@@ -31,6 +31,7 @@ const (
 	getRangeUri = "/GetRange"
 	listStreamUri = "/ListStream"
 	describeStreamUri = "/DescribeStream"
+	getShardIteratorUri = "/GetShardIterator"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -888,3 +889,19 @@ func (client *TableStoreClient) DescribeStream(req *DescribeStreamRequest) (*Des
 	resp.Shards = shards[:]
 	return &resp, nil
 }
+
+func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (*GetShardIteratorResponse, error) {
+	pbReq := &otsprotocol.GetShardIteratorRequest{
+		StreamId: (*string)(req.StreamId),
+		ShardId: (*string)(req.ShardId)}
+	
+	pbResp:= otsprotocol.GetShardIteratorResponse{}
+	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp); err != nil {
+		return nil, err
+	}
+
+	resp := GetShardIteratorResponse{
+		ShardIterator: (*ShardIterator)(pbResp.ShardIterator)}
+	return &resp, nil
+}
+

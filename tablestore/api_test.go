@@ -207,15 +207,15 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	c.Assert(updateTableResp.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
 	c.Assert(updateTableResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
 
-	// describeTableReq := new(DescribeTableRequest)
-	// describeTableReq.TableName = defaultTableName
-	// describ, error := client.DescribeTable(describeTableReq)
-	// c.Assert(error, Equals, nil)
+	describeTableReq := new(DescribeTableRequest)
+	describeTableReq.TableName = defaultTableName
+	describ, error := client.DescribeTable(describeTableReq)
+	c.Assert(error, Equals, nil)
 
-	// c.Assert(describ, NotNil)
-	// c.Assert(describ.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
-	// c.Assert(describ.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
-	// fmt.Println("TestUpdateAndDescribeTable finished")
+	c.Assert(describ, NotNil)
+	c.Assert(describ.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
+	c.Assert(describ.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
+	fmt.Println("TestUpdateAndDescribeTable finished")
 }
 
 func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
@@ -1606,6 +1606,13 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		}
 	}
 	c.Assert(shardId, NotNil)
+	{
+		resp, err := client.GetShardIterator(&GetShardIteratorRequest{
+			StreamId: streamId,
+			ShardId: shardId})
+		c.Assert(err, IsNil)
+		c.Assert(resp.ShardIterator, NotNil)
+	}
 	fmt.Println("TestCreateTableWithStream finish")
 }
 

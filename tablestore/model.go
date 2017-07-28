@@ -531,8 +531,18 @@ type DescribeStreamResponse struct {
 	NextShardId *ShardId // optional. nil means "no more shards"
 }
 
+type GetShardIteratorRequest struct {
+	StreamId *StreamId // required
+	ShardId *ShardId // required
+}
+
+type GetShardIteratorResponse struct {
+	ShardIterator *ShardIterator // required
+}
+
 type StreamId string
 type ShardId string
+type ShardIterator string
 type StreamStatus int
 const (
 	Enabling StreamStatus = iota
