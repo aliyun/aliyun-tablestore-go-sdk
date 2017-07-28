@@ -30,6 +30,7 @@ const (
 	batchWriteRowUri = "/BatchWriteRow"
 	getRangeUri = "/GetRange"
 	listStreamUri = "/ListStream"
+	describeStreamUri = "/DescribeStream"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -363,7 +364,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	if *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: *resp.StreamDetails.EnableStream,
-			StreamId: resp.StreamDetails.StreamId,
+			StreamId: (*StreamId)(resp.StreamDetails.StreamId),
 			ExpirationTime: *resp.StreamDetails.ExpirationTime,
 			LastEnableTime: *resp.StreamDetails.LastEnableTime}
 	} else {
@@ -395,26 +396,34 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	}
 
 	if request.StreamSpec != nil {
-		ss := otsprotocol.StreamSpecification{
+		req.StreamSpec = &otsprotocol.StreamSpecification{
 			EnableStream: &request.StreamSpec.EnableStream,
 			ExpirationTime: &request.StreamSpec.ExpirationTime}
-		req.StreamSpec = &ss
 	}
 
 	resp := new(otsprotocol.UpdateTableResponse)
 
 	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp); err != nil {
-		return &UpdateTableResponse{}, err
+		return nil, err
 	}
 
 	response := new(UpdateTableResponse)
-	response.ReservedThroughput = &ReservedThroughput{Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)), Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
-	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
-	response.StreamDetails = &StreamDetails{
-		EnableStream: *resp.StreamDetails.EnableStream,
-		StreamId: resp.StreamDetails.StreamId,
-		ExpirationTime: *resp.StreamDetails.ExpirationTime,
-		LastEnableTime: *resp.StreamDetails.LastEnableTime}
+	response.ReservedThroughput = &ReservedThroughput{
+		Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)),
+		Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
+	response.TableOption = &TableOption{
+		TimeToAlive: int(*resp.TableOptions.TimeToLive),
+		MaxVersion: int(*resp.TableOptions.MaxVersions)}
+	if *resp.StreamDetails.EnableStream {
+		response.StreamDetails = &StreamDetails{
+			EnableStream: *resp.StreamDetails.EnableStream,
+			StreamId: (*StreamId)(resp.StreamDetails.StreamId),
+			ExpirationTime: *resp.StreamDetails.ExpirationTime,
+			LastEnableTime: *resp.StreamDetails.LastEnableTime}
+	} else {
+		response.StreamDetails = &StreamDetails{
+			EnableStream: false}
+	}
 	return response, nil
 }
 
@@ -836,10 +845,46 @@ func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamR
 	streams := make([]Stream, len(pbResp.Streams))
 	for i, pbStream  := range pbResp.Streams {
 		streams[i] = Stream{
-			StreamId: pbStream.StreamId,
+			Id: (*StreamId)(pbStream.StreamId),
 			TableName: pbStream.TableName,
 			CreationTime: *pbStream.CreationTime}
 	}
 	resp.Streams = streams[:]
+	return &resp, nil
+}
+
+func (client *TableStoreClient) DescribeStream(req *DescribeStreamRequest) (*DescribeStreamResponse, error) {
+	pbReq := &otsprotocol.DescribeStreamRequest{}
+	{
+		pbReq.StreamId = (*string)(req.StreamId)
+		pbReq.InclusiveStartShardId = (*string)(req.InclusiveStartShardId)
+		pbReq.ShardLimit = req.ShardLimit
+	}
+	pbResp:= otsprotocol.DescribeStreamResponse{}
+	if err := client.doRequestWithRetry(describeStreamUri, pbReq, &pbResp); err != nil {
+		return nil, err
+	}
+
+	resp := DescribeStreamResponse{}
+	resp.StreamId = (*StreamId)(pbResp.StreamId)
+	resp.ExpirationTime = *pbResp.ExpirationTime
+	resp.TableName = pbResp.TableName
+	resp.CreationTime = *pbResp.CreationTime
+	Assert(pbResp.StreamStatus != nil, "StreamStatus in DescribeStreamResponse is required.")
+	switch *pbResp.StreamStatus {
+	case otsprotocol.StreamStatus_STREAM_ENABLING:
+		resp.Status = Enabling
+	case otsprotocol.StreamStatus_STREAM_ACTIVE:
+		resp.Status = Active
+	}
+	resp.NextShardId = (*ShardId)(pbResp.NextShardId)
+	shards := make([]*StreamShard, len(pbResp.Shards))
+	for i, pbShard := range pbResp.Shards {
+		shards[i] = &StreamShard{
+			SelfShard: (*ShardId)(pbShard.ShardId),
+			ParentShard: (*ShardId)(pbShard.ParentId),
+			SiblingShard: (*ShardId)(pbShard.ParentSiblingId)}
+	}
+	resp.Shards = shards[:]
 	return &resp, nil
 }

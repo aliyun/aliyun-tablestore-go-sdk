@@ -494,7 +494,7 @@ type ListStreamRequest struct {
 }
 
 type Stream struct {
-	StreamId *string
+	Id *StreamId
 	TableName *string
 	CreationTime int64
 }
@@ -510,8 +510,38 @@ type StreamSpecification struct {
 
 type StreamDetails struct {
 	EnableStream bool
-	StreamId *string // ID of a stream. nil when stream is disabled.
+	StreamId *StreamId // nil when stream is disabled.
 	ExpirationTime int32 // in hours
 	LastEnableTime int64 // the last time stream is enabled, in usec
+}
+
+type DescribeStreamRequest struct {
+	StreamId *StreamId // required
+	InclusiveStartShardId *ShardId // optional
+	ShardLimit *int32 // optional
+}
+
+type DescribeStreamResponse struct {
+	StreamId *StreamId // required
+	ExpirationTime int32 // in hours
+	TableName *string // required
+	CreationTime int64 // in usec
+	Status StreamStatus // required
+	Shards []*StreamShard
+	NextShardId *ShardId // optional. nil means "no more shards"
+}
+
+type StreamId string
+type ShardId string
+type StreamStatus int
+const (
+	Enabling StreamStatus = iota
+	Active
+)
+
+type StreamShard struct {
+	SelfShard *ShardId // required
+	ParentShard *ShardId // optional
+	SiblingShard *ShardId // optional
 }
 
