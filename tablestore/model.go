@@ -3,6 +3,7 @@ package tablestore
 import (
 	"fmt"
 	"strings"
+	"strconv"
 	"net/http"
 	"time"
 	"github.com/golang/protobuf/proto"
@@ -192,6 +193,16 @@ type PrimaryKeyColumn struct {
 func (this *PrimaryKeyColumn) String() string {
 	xs := make([]string, 0)
 	xs = append(xs, fmt.Sprintf("\"Name\": \"%s\"", this.ColumnName))
+	switch this.PrimaryKeyOption {
+	case NONE:
+		xs = append(xs, fmt.Sprintf("\"Value\": \"%s\"", this.Value))
+	case MIN:
+		xs = append(xs, "\"Value\": -inf")
+	case MAX:
+		xs = append(xs, "\"Value\": +inf")
+	case AUTO_INCREMENT:
+		xs = append(xs, "\"Value\": auto-incr")
+	}
 	return fmt.Sprintf("{%s}", strings.Join(xs, ", "))
 }
 
@@ -563,44 +574,51 @@ type ShardId string
 type ShardIterator string
 type StreamStatus int
 const (
-	Enabling StreamStatus = iota
-	Active
+	SS_Enabling StreamStatus = iota
+	SS_Active
 )
 
+/*
+ * Shards are possibly splitted into two or merged from two.
+ * After splitting, both newly generated shards have the same FatherShard.
+ * After merging, the newly generated shard have both FatherShard and MotherShard.
+ */
 type StreamShard struct {
 	SelfShard *ShardId // required
-	ParentShard *ShardId // optional
-	SiblingShard *ShardId // optional
+	FatherShard *ShardId // optional
+	MotherShard *ShardId // optional
 }
 
 type StreamRecord struct {
 	Type ActionType
-	//Info *RecordSequenceInfo
-	PrimaryKey *PrimaryKey
-	//List<RecordColumn> columns;
+	Info *RecordSequenceInfo // required
+	PrimaryKey *PrimaryKey // required
+	Columns []*RecordColumn
 }
 
 func (this *StreamRecord) String() string {
 	return fmt.Sprintf(
-		"{\"Struct\":\"StreamRecord\", \"Type\":%s, \"PrimaryKey\":%s}",
+		"{\"Type\":%s, \"PrimaryKey\":%s, \"Info\":%s, \"Columns\":%s}",
 		this.Type,
-		*this.PrimaryKey)
+		*this.PrimaryKey,
+		this.Info,
+		this.Columns)
 }
 
 type ActionType int
 const (
-	ActionType_Put ActionType = iota
-	ActionType_Update
-	ActionType_Delete
+	AT_Put ActionType = iota
+	AT_Update
+	AT_Delete
 )
 
 func (this ActionType) String() string {
 	switch this {
-	case ActionType_Put:
+	case AT_Put:
 		return "\"PutRow\""
-	case ActionType_Update:
+	case AT_Update:
 		return "\"UpdateRow\""
-	case ActionType_Delete:
+	case AT_Delete:
 		return "\"DeleteRow\""
 	default:
 		panic(fmt.Sprintf("unknown action type: %d", int(this)))
@@ -613,3 +631,41 @@ type RecordSequenceInfo struct {
 	RowIndex int32
 }
 
+func (this *RecordSequenceInfo) String() string {
+	return fmt.Sprintf(
+		"{\"Epoch\":%d, \"Timestamp\": %d, \"RowIndex\": %d}",
+		this.Epoch,
+		this.Timestamp,
+		this.RowIndex)
+}
+
+type RecordColumn struct {
+	Type RecordColumnType
+	Name *string // required
+	Value interface{} // optional. present when Type is RCT_Put
+	Timestamp *int64 // optional, in msec. present when Type is RCT_Put or RCT_DeleteOneVersion
+}
+
+func (this *RecordColumn) String() string {
+	xs := make([]string, 0)
+	xs = append(xs, fmt.Sprintf("\"Name\":%s", strconv.Quote(*this.Name)))
+	switch this.Type {
+	case RCT_DeleteAllVersions:
+		xs = append(xs, "\"Type\":\"DeleteAllVersions\"")
+	case RCT_DeleteOneVersion:
+		xs = append(xs, "\"Type\":\"DeleteOneVersion\"")
+		xs = append(xs, fmt.Sprintf("\"Timestamp\":%d", *this.Timestamp))
+	case RCT_Put:
+		xs = append(xs, "\"Type\":\"Put\"")
+		xs = append(xs, fmt.Sprintf("\"Timestamp\":%d", *this.Timestamp))
+		xs = append(xs, fmt.Sprintf("\"Value\":%s", this.Value))
+	}
+	return fmt.Sprintf("{%s}", strings.Join(xs, ", "))
+}
+
+type RecordColumnType int
+const (
+	RCT_Put RecordColumnType = iota
+	RCT_DeleteOneVersion
+	RCT_DeleteAllVersions
+)

@@ -7,11 +7,11 @@ import (
 	"net/http"
 	"crypto/md5"
 	"encoding/base64"
+	"net"
+	"math/rand"
 	"github.com/golang/protobuf/proto"
 	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"./otsprotocol"
-	"net"
-	"math/rand"
 )
 
 const (
@@ -875,17 +875,17 @@ func (client *TableStoreClient) DescribeStream(req *DescribeStreamRequest) (*Des
 	Assert(pbResp.StreamStatus != nil, "StreamStatus in DescribeStreamResponse is required.")
 	switch *pbResp.StreamStatus {
 	case otsprotocol.StreamStatus_STREAM_ENABLING:
-		resp.Status = Enabling
+		resp.Status = SS_Enabling
 	case otsprotocol.StreamStatus_STREAM_ACTIVE:
-		resp.Status = Active
+		resp.Status = SS_Active
 	}
 	resp.NextShardId = (*ShardId)(pbResp.NextShardId)
 	shards := make([]*StreamShard, len(pbResp.Shards))
 	for i, pbShard := range pbResp.Shards {
 		shards[i] = &StreamShard{
 			SelfShard: (*ShardId)(pbShard.ShardId),
-			ParentShard: (*ShardId)(pbShard.ParentId),
-			SiblingShard: (*ShardId)(pbShard.ParentSiblingId)}
+			FatherShard: (*ShardId)(pbShard.ParentId),
+			MotherShard: (*ShardId)(pbShard.ParentSiblingId)}
 	}
 	resp.Shards = shards[:]
 	return &resp, nil
@@ -929,18 +929,19 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 
 		switch *pbRecord.ActionType {
 		case otsprotocol.ActionType_PUT_ROW:
-			record.Type = ActionType_Put
+			record.Type = AT_Put
 		case otsprotocol.ActionType_UPDATE_ROW:
-			record.Type = ActionType_Update
+			record.Type = AT_Update
 		case otsprotocol.ActionType_DELETE_ROW:
-			record.Type = ActionType_Delete
+			record.Type = AT_Delete
 		}
 
 		plainRows, err := readRowsWithHeader(bytes.NewReader(pbRecord.Record))
 		if err != nil {
 			return nil, err
 		}
-		Assert(len(plainRows) == 1, "There must be exactly one row in a StreamRecord.")
+		Assert(len(plainRows) == 1,
+			"There must be exactly one row in a StreamRecord.")
 		plainRow := plainRows[0]
 		pkey := PrimaryKey{}
 		record.PrimaryKey = &pkey
@@ -950,6 +951,35 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 				ColumnName: string(pk.cellName),
 				Value: pk.cellValue.Value}
 			pkey.PrimaryKeys[i] = &pkc
+		}
+		Assert(plainRow.extension != nil,
+			"extension in a stream record is required.")
+		record.Info = plainRow.extension
+		record.Columns = make([]*RecordColumn, len(plainRow.cells))
+		for i, plainCell := range plainRow.cells {
+			cell := RecordColumn{}
+			record.Columns[i] = &cell
+
+			name := string(plainCell.cellName)
+			cell.Name = &name
+			if plainCell.cellValue != nil {
+				cell.Type = RCT_Put
+			} else {
+				if plainCell.cellTimestamp > 0 {
+					cell.Type = RCT_DeleteOneVersion
+				} else {
+					cell.Type = RCT_DeleteAllVersions
+				}
+			}
+			switch cell.Type {
+			case RCT_Put:
+				cell.Value = plainCell.cellValue.Value
+				fallthrough
+			case RCT_DeleteOneVersion:
+				cell.Timestamp = &plainCell.cellTimestamp
+			case RCT_DeleteAllVersions:
+				break
+			}
 		}
 	}
 	resp.Records = records

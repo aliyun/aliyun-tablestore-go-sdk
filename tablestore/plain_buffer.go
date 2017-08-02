@@ -299,9 +299,6 @@ func readBytes(r *bytes.Reader, size int32) []byte {
 }
 
 func readCellValue(r *bytes.Reader) *ColumnValue {
-	if readTag(r) != TAG_CELL_VALUE {
-		panic(errTag)
-	}
 	value := new(ColumnValue)
 	readRawLittleEndian32(r)
 	tp := readRawByte(r)
@@ -327,14 +324,18 @@ func readCellValue(r *bytes.Reader) *ColumnValue {
 
 func readCell(r *bytes.Reader) *PlainBufferCell {
 	cell := new(PlainBufferCell)
-
-	if readTag(r) != TAG_CELL_NAME {
+	tag := readTag(r)
+	if tag != TAG_CELL_NAME {
 		panic(errTag)
 	}
 
 	cell.cellName = readBytes(r, readRawLittleEndian32(r))
-	cell.cellValue = readCellValue(r)
-	tag := readTag(r)
+	tag = readTag(r)
+
+	if tag == TAG_CELL_VALUE {
+		cell.cellValue = readCellValue(r)
+		tag = readTag(r)
+	}
 	if tag == TAG_CELL_TYPE {
 		readRawByte(r)
 		tag = readTag(r)
@@ -389,7 +390,7 @@ func readRow(r *bytes.Reader) *PlainBufferRow {
 	row := new(PlainBufferRow)
 	row.primaryKey = readRowPk(r)
 	tag := readTag(r)
-
+	
 	if tag == TAG_ROW_DATA {
 		row.cells = readRowData(r)
 		tag = readTag(r)

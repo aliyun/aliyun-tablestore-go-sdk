@@ -1601,12 +1601,13 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		c.Assert(len(resp.Shards), Equals, 1)
 		fmt.Printf("StreamShard: %#v\n", resp.Shards[0])
 		shardId = resp.Shards[0].SelfShard
-		if resp.Status == Active {
+		if resp.Status == SS_Active {
 			break
 		}
 	}
 	c.Assert(shardId, NotNil)
 	var iter *ShardIterator
+	var records []*StreamRecord
 	{
 		resp, err := client.GetShardIterator(&GetShardIteratorRequest{
 			StreamId: streamId,
@@ -1616,26 +1617,140 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		iter = resp.ShardIterator
 	}
 	fmt.Printf("init iterator: %#v\n", *iter)
-	iter = exhaustStreamRecords(c, iter)
+	iter, _ = exhaustStreamRecords(c, iter)
 	fmt.Printf("put row:\n")
 	{
 		req := PutRowRequest{}
 		rowChange := PutRowChange{}
 		rowChange.TableName = tableName
 		pk := PrimaryKey{}
-		pk.AddPrimaryKeyColumn("pk1", "putrow")
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
 		rowChange.PrimaryKey = &pk
-		rowChange.AddColumn("col1", "put")
+		rowChange.AddColumn("colToDel", "abc")
+		rowChange.AddColumn("colToDelAll", true)
+		rowChange.AddColumn("colToUpdate", int64(123))
 		rowChange.SetCondition(RowExistenceExpectation_IGNORE)
 		req.PutRowChange = &rowChange
 		_, err := client.PutRow(&req)
 		c.Assert(err, IsNil)
 	}
-	iter = exhaustStreamRecords(c, iter)
+	iter, records = exhaustStreamRecords(c, iter)
+	var timestamp int64
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Put)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 3)
+		attr0 := r.Columns[0]
+		attr1 := r.Columns[1]
+		attr2 := r.Columns[2]
+		c.Assert(attr0, NotNil)
+		c.Assert(*attr0.Name, Equals, "colToDel")
+		c.Assert(attr0.Type, Equals, RCT_Put)
+		c.Assert(attr0.Value, Equals, "abc")
+		c.Assert(attr1, NotNil)
+		c.Assert(*attr1.Name, Equals, "colToDelAll")
+		c.Assert(attr1.Type, Equals, RCT_Put)
+		c.Assert(attr1.Value, Equals, true)
+		timestamp = *attr0.Timestamp
+		c.Assert(attr2, NotNil)
+		c.Assert(*attr2.Name, Equals, "colToUpdate")
+		c.Assert(attr2.Type, Equals, RCT_Put)
+		c.Assert(attr2.Value, Equals, int64(123))
+	}
+	{
+		chg := UpdateRowChange{}
+		chg.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
+		chg.PrimaryKey = &pk
+		chg.SetCondition(RowExistenceExpectation_IGNORE)
+		chg.DeleteColumnWithTimestamp("colToDel", timestamp)
+		chg.DeleteColumn("colToDelAll")
+		chg.PutColumn("colToUpdate", 3.14)
+		_, err := client.UpdateRow(&UpdateRowRequest{UpdateRowChange: &chg})
+		c.Assert(err, IsNil)
+	}
+	iter, records = exhaustStreamRecords(c, iter)
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Update)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 3)
+		attr0 := r.Columns[0]
+		attr1 := r.Columns[1]
+		attr2 := r.Columns[2]
+		c.Assert(attr0, NotNil)
+		c.Assert(*attr0.Name, Equals, "colToDel")
+		c.Assert(attr0.Type, Equals, RCT_DeleteOneVersion)
+		c.Assert(attr0.Value, IsNil)
+		c.Assert(attr0.Timestamp, NotNil)
+		c.Assert(*attr0.Timestamp, Equals, timestamp)
+		c.Assert(attr1, NotNil)
+		c.Assert(*attr1.Name, Equals, "colToDelAll")
+		c.Assert(attr1.Type, Equals, RCT_DeleteAllVersions)
+		c.Assert(attr1.Value, IsNil)
+		c.Assert(attr1.Timestamp, IsNil)
+		c.Assert(attr2, NotNil)
+		c.Assert(*attr2.Name, Equals, "colToUpdate")
+		c.Assert(attr2.Type, Equals, RCT_Put)
+		c.Assert(attr2.Value, Equals, 3.14)
+	}
+	{
+		chg := DeleteRowChange{}
+		chg.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
+		chg.PrimaryKey = &pk
+		chg.SetCondition(RowExistenceExpectation_IGNORE)
+		_, err := client.DeleteRow(&DeleteRowRequest{DeleteRowChange: &chg})
+		c.Assert(err, IsNil)
+	}
+	iter, records = exhaustStreamRecords(c, iter)
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Delete)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 0)
+	}
 	fmt.Println("TestCreateTableWithStream finish")
 }
 
-func exhaustStreamRecords(c *C, iter *ShardIterator) *ShardIterator {
+func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamRecord) {
+	records := make([]*StreamRecord, 0)
 	for {
 		resp, err := client.GetStreamRecord(&GetStreamRecordRequest{
 			ShardIterator: iter})
@@ -1643,6 +1758,9 @@ func exhaustStreamRecords(c *C, iter *ShardIterator) *ShardIterator {
 		fmt.Printf("#records: %d\n", len(resp.Records))
 		for i, rec := range resp.Records {
 			fmt.Printf("record %d: %s\n", i, rec)
+		}
+		for _, rec := range resp.Records {
+			records = append(records, rec)
 		}
 		nextIter := resp.NextShardIterator
 		if nextIter == nil {
@@ -1656,6 +1774,6 @@ func exhaustStreamRecords(c *C, iter *ShardIterator) *ShardIterator {
 		}
 		iter = nextIter
 	}
-	return iter
+	return iter, records
 }
 
