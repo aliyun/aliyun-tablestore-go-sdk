@@ -10,8 +10,8 @@ import (
 	"net"
 	"math/rand"
 	"github.com/golang/protobuf/proto"
-	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"./otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	//"./otsprotocol"
 )
 
 const (

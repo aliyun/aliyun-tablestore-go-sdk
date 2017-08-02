@@ -6,12 +6,12 @@ import (
 	"bytes"
 	"reflect"
 	"github.com/golang/protobuf/proto"
-	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"./otsprotocol"
 	"net/http"
 	"fmt"
 	"io/ioutil"
 	"sort"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	//"./otsprotocol"
 )
 
 const (

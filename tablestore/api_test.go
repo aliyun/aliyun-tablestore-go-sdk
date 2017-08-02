@@ -11,8 +11,8 @@ import (
 	"time"
 	"math/rand"
 	"net/http"
-	// "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"./otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	//"./otsprotocol"
 )
 
 // Hook up gocheck into the "go test" runner.
