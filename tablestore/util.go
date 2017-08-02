@@ -11,7 +11,6 @@ import (
 	"io/ioutil"
 	"sort"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	//"./otsprotocol"
 )
 
 const (

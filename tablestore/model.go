@@ -9,7 +9,6 @@ import (
 	"github.com/golang/protobuf/proto"
 	"math/rand"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	//"./otsprotocol"
 )
 
 // @class TableStoreClient
