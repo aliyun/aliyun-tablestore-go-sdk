@@ -1,4 +1,5 @@
-package tsprotocol;
+syntax = "proto2";
+package otsprotocol;
 
 enum FilterType {
     FT_SINGLE_COLUMN_VALUE = 1;

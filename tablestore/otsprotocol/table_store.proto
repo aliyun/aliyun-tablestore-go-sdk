@@ -1,4 +1,6 @@
-package tsprotocol;
+syntax = "proto2";
+
+package otsprotocol;
 
 message Error {
     required string code = 1;
@@ -90,6 +92,18 @@ message ConsumedCapacity {
     required CapacityUnit capacity_unit = 1;
 }
 
+message StreamSpecification {
+    required bool enable_stream = 1;
+    optional int32 expiration_time = 2;
+}
+
+message StreamDetails {
+    required bool enable_stream = 1;
+    optional string stream_id = 2;
+    optional int32 expiration_time = 3;
+    optional int64 last_enable_time = 4;
+}
+
 /* #############################################  CreateTable  ############################################# */
 /**
  * table_meta用于存储表中不可更改的schema属性，可以更改的ReservedThroughput和TableOptions独立出来，作为UpdateTable的参数。
@@ -107,6 +121,7 @@ message CreateTableRequest {
     required ReservedThroughput reserved_throughput = 2; // 未放在TableOptions内，原因是UpdateTableResponse中会返回ReservedThroughputDetails，而TableOptions没有类似的返回结构。
     optional TableOptions table_options = 3;
     repeated PartitionRange partitions = 4;
+    optional StreamSpecification stream_spec = 5;
 }
 
 message CreateTableResponse {
@@ -120,11 +135,13 @@ message UpdateTableRequest {
     required string table_name = 1;
     optional ReservedThroughput reserved_throughput = 2;
     optional TableOptions table_options = 3;
+    optional StreamSpecification stream_spec = 4;
 }
 
 message UpdateTableResponse {
     required ReservedThroughputDetails reserved_throughput_details = 1;
     required TableOptions table_options = 2;
+    optional StreamDetails stream_details = 3;
 }
 /* ######################################################################################################### */
 
@@ -138,6 +155,7 @@ message DescribeTableResponse {
     required ReservedThroughputDetails reserved_throughput_details = 2;
     required TableOptions table_options = 3;
     required TableStatus table_status = 4;
+    optional StreamDetails stream_details = 5;
     repeated bytes shard_splits = 6;
 }
 /* ########################################################################################################### */
@@ -396,4 +414,112 @@ message GetRangeResponse {
     optional bytes next_token = 4;
 }
 /* ###################################################################################################### */
+/* #############################################  Stream  ############################################# */
+
+message ListStreamRequest {
+    optional string table_name = 1;
+}
+
+message Stream {
+    required string stream_id = 1;
+    required string table_name = 2;
+    required int64 creation_time = 3;
+}
+
+message ListStreamResponse {
+    repeated Stream streams = 1;
+}
+
+message StreamShard {
+    required string shard_id = 1;
+    optional string parent_id = 2;
+    optional string parent_sibling_id = 3;
+}
+
+enum StreamStatus {
+    STREAM_ENABLING = 1;
+    STREAM_ACTIVE = 2;
+}
+
+message DescribeStreamRequest {
+    required string stream_id = 1;
+    optional string inclusive_start_shard_id = 2;
+    optional int32 shard_limit = 3;
+}
+
+message DescribeStreamResponse {
+    required string stream_id = 1;
+    required int32 expiration_time = 2;
+    required string table_name = 3;
+    required int64 creation_time = 4;
+    required StreamStatus stream_status = 5;
+    repeated StreamShard shards = 6;
+    optional string next_shard_id = 7;
+}
+
+message GetShardIteratorRequest {
+    required string stream_id = 1;
+    required string shard_id = 2;
+}
+
+message GetShardIteratorResponse {
+    required string shard_iterator = 1;
+}
+
+message GetStreamRecordRequest {
+    required string shard_iterator = 1;
+    optional int32 limit = 2;
+}
+
+enum ActionType {
+    PUT_ROW = 1;
+    UPDATE_ROW = 2;
+    DELETE_ROW = 3;
+}
+
+message GetStreamRecordResponse {
+    message StreamRecord {
+        required ActionType action_type = 1;
+        required bytes record = 2;
+    }
+    repeated StreamRecord stream_records = 1;
+    optional string next_shard_iterator = 2;
+}
+
+/* +++++ ComputeSplitPointsBySize  +++++ */
+message ComputeSplitPointsBySizeRequest {
+    required string table_name = 1;
+    required int64 split_size = 2; // in 100MB
+}
+
+message ComputeSplitPointsBySizeResponse {
+    required ConsumedCapacity consumed = 1;
+    repeated PrimaryKeySchema schema = 2;
+
+    /**
+     * Split points between splits, in the increasing order
+     *
+     * A split is a consecutive range of primary keys,
+     * whose data size is about split_size specified in the request.
+     * The size could be hard to be precise.
+     * 
+     * A split point is an array of primary-key column w.r.t. table schema,
+     * which is never longer than that of table schema.
+     * Tailing -inf will be omitted to reduce transmission payloads.
+     */
+    repeated bytes split_points = 3;
+
+    /**
+     * Locations where splits lies in.
+     *
+     * By the managed nature of TableStore, these locations are no more than hints.
+     * If a location is not suitable to be seen, an empty string will be placed.
+     */
+     message SplitLocation {
+         required string location = 1;
+         required sint64 repeat = 2;
+     }
+     repeated SplitLocation locations = 4;
+}
+/* -------------------------------------- */
 

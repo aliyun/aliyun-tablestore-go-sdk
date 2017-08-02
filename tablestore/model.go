@@ -1,11 +1,14 @@
 package tablestore
 
 import (
+	"fmt"
+	"strings"
+	"strconv"
 	"net/http"
 	"time"
 	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
 	"math/rand"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 // @class TableStoreClient
@@ -74,6 +77,7 @@ type CreateTableRequest struct {
 	TableMeta          *TableMeta
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamSpec *StreamSpecification
 }
 
 type CreateTableResponse struct {
@@ -120,20 +124,23 @@ type DescribeTableRequest struct {
 }
 
 type DescribeTableResponse struct {
-	TableMeta          *TableMeta
-	TableOption        *TableOption
+	TableMeta *TableMeta
+	TableOption *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamDetails *StreamDetails
 }
 
 type UpdateTableRequest struct {
 	TableName          string
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamSpec *StreamSpecification
 }
 
 type UpdateTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
+	StreamDetails *StreamDetails
 }
 
 type ConsumedCapacityUnit struct {
@@ -180,6 +187,22 @@ type PrimaryKeyColumn struct {
 	ColumnName string
 	Value      interface{}
 	PrimaryKeyOption PrimaryKeyOption
+}
+
+func (this *PrimaryKeyColumn) String() string {
+	xs := make([]string, 0)
+	xs = append(xs, fmt.Sprintf("\"Name\": \"%s\"", this.ColumnName))
+	switch this.PrimaryKeyOption {
+	case NONE:
+		xs = append(xs, fmt.Sprintf("\"Value\": \"%s\"", this.Value))
+	case MIN:
+		xs = append(xs, "\"Value\": -inf")
+	case MAX:
+		xs = append(xs, "\"Value\": +inf")
+	case AUTO_INCREMENT:
+		xs = append(xs, "\"Value\": auto-incr")
+	}
+	return fmt.Sprintf("{%s}", strings.Join(xs, ", "))
 }
 
 type AttributeColumn struct {
@@ -241,7 +264,7 @@ const (
 
 type ColumnFilter interface {
 	Serialize() []byte
-	ToFilter() *tsprotocol.Filter
+	ToFilter() *otsprotocol.Filter
 }
 
 type SingleColumnCondition struct {
@@ -274,11 +297,11 @@ func (ccvfilter *CompositeColumnValueFilter) Serialize() []byte {
 	return result
 }
 
-func (ccvfilter *CompositeColumnValueFilter) ToFilter() *tsprotocol.Filter {
+func (ccvfilter *CompositeColumnValueFilter) ToFilter() *otsprotocol.Filter {
 	compositefilter := NewCompositeFilter(ccvfilter.Filters, ccvfilter.Operator)
 	compositeFilterToBytes, _ := proto.Marshal(compositefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_COMPOSITE_COLUMN_VALUE.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_COMPOSITE_COLUMN_VALUE.Enum()
 	filter.Filter = compositeFilterToBytes
 	return filter
 }
@@ -287,11 +310,11 @@ func (ccvfilter *CompositeColumnValueFilter) AddFilter(filter ColumnFilter) {
 	ccvfilter.Filters = append(ccvfilter.Filters, filter)
 }
 
-func (condition *SingleColumnCondition) ToFilter() *tsprotocol.Filter {
+func (condition *SingleColumnCondition) ToFilter() *otsprotocol.Filter {
 	singlefilter := NewSingleColumnValueFilter(condition)
 	singleFilterToBytes, _ := proto.Marshal(singlefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_SINGLE_COLUMN_VALUE.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_SINGLE_COLUMN_VALUE.Enum()
 	filter.Filter = singleFilterToBytes
 	return filter
 }
@@ -301,11 +324,11 @@ func (condition *SingleColumnCondition) Serialize() []byte {
 	return result
 }
 
-func (pageFilter *PaginationFilter) ToFilter() *tsprotocol.Filter {
+func (pageFilter *PaginationFilter) ToFilter() *otsprotocol.Filter {
 	compositefilter := NewPaginationFilter(pageFilter)
 	compositeFilterToBytes, _ := proto.Marshal(compositefilter)
-	filter := new(tsprotocol.Filter)
-	filter.Type = tsprotocol.FilterType_FT_COLUMN_PAGINATION.Enum()
+	filter := new(otsprotocol.Filter)
+	filter.Type = otsprotocol.FilterType_FT_COLUMN_PAGINATION.Enum()
 	filter.Filter = compositeFilterToBytes
 	return filter
 }
@@ -433,8 +456,8 @@ type RowResult struct {
 
 type RowChange interface {
 	Serialize() []byte
-	getOperationType() tsprotocol.OperationType
-	getCondition() *tsprotocol.Condition
+	getOperationType() otsprotocol.OperationType
+	getCondition() *otsprotocol.Condition
 	GetTableName() string
 }
 
@@ -483,3 +506,165 @@ type GetRangeResponse struct {
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	NextStartPrimaryKey *PrimaryKey
 }
+
+type ListStreamRequest struct {
+	TableName *string
+}
+
+type Stream struct {
+	Id *StreamId
+	TableName *string
+	CreationTime int64
+}
+
+type ListStreamResponse struct {
+	Streams []Stream
+}
+
+type StreamSpecification struct {
+	EnableStream bool
+	ExpirationTime int32 // must be positive. in hours
+}
+
+type StreamDetails struct {
+	EnableStream bool
+	StreamId *StreamId // nil when stream is disabled.
+	ExpirationTime int32 // in hours
+	LastEnableTime int64 // the last time stream is enabled, in usec
+}
+
+type DescribeStreamRequest struct {
+	StreamId *StreamId // required
+	InclusiveStartShardId *ShardId // optional
+	ShardLimit *int32 // optional
+}
+
+type DescribeStreamResponse struct {
+	StreamId *StreamId // required
+	ExpirationTime int32 // in hours
+	TableName *string // required
+	CreationTime int64 // in usec
+	Status StreamStatus // required
+	Shards []*StreamShard
+	NextShardId *ShardId // optional. nil means "no more shards"
+}
+
+type GetShardIteratorRequest struct {
+	StreamId *StreamId // required
+	ShardId *ShardId // required
+}
+
+type GetShardIteratorResponse struct {
+	ShardIterator *ShardIterator // required
+}
+
+type GetStreamRecordRequest struct {
+	ShardIterator *ShardIterator // required
+	Limit *int32 // optional. max records which will reside in response
+}
+
+type GetStreamRecordResponse struct {
+	Records []*StreamRecord
+	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
+}
+
+type StreamId string
+type ShardId string
+type ShardIterator string
+type StreamStatus int
+const (
+	SS_Enabling StreamStatus = iota
+	SS_Active
+)
+
+/*
+ * Shards are possibly splitted into two or merged from two.
+ * After splitting, both newly generated shards have the same FatherShard.
+ * After merging, the newly generated shard have both FatherShard and MotherShard.
+ */
+type StreamShard struct {
+	SelfShard *ShardId // required
+	FatherShard *ShardId // optional
+	MotherShard *ShardId // optional
+}
+
+type StreamRecord struct {
+	Type ActionType
+	Info *RecordSequenceInfo // required
+	PrimaryKey *PrimaryKey // required
+	Columns []*RecordColumn
+}
+
+func (this *StreamRecord) String() string {
+	return fmt.Sprintf(
+		"{\"Type\":%s, \"PrimaryKey\":%s, \"Info\":%s, \"Columns\":%s}",
+		this.Type,
+		*this.PrimaryKey,
+		this.Info,
+		this.Columns)
+}
+
+type ActionType int
+const (
+	AT_Put ActionType = iota
+	AT_Update
+	AT_Delete
+)
+
+func (this ActionType) String() string {
+	switch this {
+	case AT_Put:
+		return "\"PutRow\""
+	case AT_Update:
+		return "\"UpdateRow\""
+	case AT_Delete:
+		return "\"DeleteRow\""
+	default:
+		panic(fmt.Sprintf("unknown action type: %d", int(this)))
+	}
+}
+
+type RecordSequenceInfo struct {
+	Epoch int32
+	Timestamp int64
+	RowIndex int32
+}
+
+func (this *RecordSequenceInfo) String() string {
+	return fmt.Sprintf(
+		"{\"Epoch\":%d, \"Timestamp\": %d, \"RowIndex\": %d}",
+		this.Epoch,
+		this.Timestamp,
+		this.RowIndex)
+}
+
+type RecordColumn struct {
+	Type RecordColumnType
+	Name *string // required
+	Value interface{} // optional. present when Type is RCT_Put
+	Timestamp *int64 // optional, in msec. present when Type is RCT_Put or RCT_DeleteOneVersion
+}
+
+func (this *RecordColumn) String() string {
+	xs := make([]string, 0)
+	xs = append(xs, fmt.Sprintf("\"Name\":%s", strconv.Quote(*this.Name)))
+	switch this.Type {
+	case RCT_DeleteAllVersions:
+		xs = append(xs, "\"Type\":\"DeleteAllVersions\"")
+	case RCT_DeleteOneVersion:
+		xs = append(xs, "\"Type\":\"DeleteOneVersion\"")
+		xs = append(xs, fmt.Sprintf("\"Timestamp\":%d", *this.Timestamp))
+	case RCT_Put:
+		xs = append(xs, "\"Type\":\"Put\"")
+		xs = append(xs, fmt.Sprintf("\"Timestamp\":%d", *this.Timestamp))
+		xs = append(xs, fmt.Sprintf("\"Value\":%s", this.Value))
+	}
+	return fmt.Sprintf("{%s}", strings.Join(xs, ", "))
+}
+
+type RecordColumnType int
+const (
+	RCT_Put RecordColumnType = iota
+	RCT_DeleteOneVersion
+	RCT_DeleteAllVersions
+)

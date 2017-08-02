@@ -11,7 +11,7 @@ import (
 	"time"
 	"math/rand"
 	"net/http"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/tsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -1323,23 +1323,23 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	errorCode := INTERNAL_SERVER_ERROR
 	tsClient := client.(*TableStoreClient)
-	value := getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value := getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = ROW_OPERATION_CONFLICT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, putRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, putRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &tsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), MaxRetryInterval, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), MaxRetryInterval, getRowUri, 500)
 	c.Check(value == MaxRetryInterval, Equals, true)
 
 	getResp := &GetRowResponse{}
@@ -1475,3 +1475,304 @@ func PrepareDataInRangeTableWithTimestamp(key1 string, key2 string, value string
 	_, error := client.PutRow(putRowRequest)
 	return error
 }
+
+func (s *TableStoreSuite) TestListStream(c *C) {
+	tableName := defaultTableName + "_ListStream"
+	fmt.Printf("TestListStream starts on table %s\n", tableName)
+	{
+		err := PrepareTable(tableName)
+		c.Assert(err, IsNil)
+	}
+	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	{
+		resp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
+		c.Assert(err, IsNil)
+		c.Assert(resp.StreamDetails, NotNil)
+		c.Assert(resp.StreamDetails.EnableStream, Equals, false)
+		c.Assert(resp.StreamDetails.StreamId, IsNil)
+		c.Assert(resp.StreamDetails.ExpirationTime, Equals, int32(0))
+		c.Assert(resp.StreamDetails.LastEnableTime, Equals, int64(0))
+	}
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, IsNil)
+		fmt.Printf("%v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 0)
+	}
+	{
+		resp, err := client.UpdateTable(&UpdateTableRequest{
+			TableName: tableName,
+			StreamSpec: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
+		c.Assert(err, IsNil)
+		c.Assert(resp.StreamDetails, NotNil)
+	}
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, IsNil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 1)
+	}
+	{
+		resp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
+		c.Assert(err, IsNil)
+		c.Assert(resp.StreamDetails, NotNil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(resp.StreamDetails.EnableStream, Equals, true)
+		c.Assert(resp.StreamDetails.StreamId, NotNil)
+		c.Assert(resp.StreamDetails.ExpirationTime, Equals, int32(24))
+		c.Assert(resp.StreamDetails.LastEnableTime > 0, Equals, true)
+	}
+	fmt.Println("TestListStream finish")
+}
+
+func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
+	tableName := defaultTableName + "_CreateTableWithStream"
+	fmt.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
+	{
+		req := CreateTableRequest{}
+		tableMeta := TableMeta{}
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+		req.TableMeta = &tableMeta
+
+		tableOption := TableOption{}
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 3
+		req.TableOption = &tableOption
+
+		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
+
+		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
+		
+		_, err := client.CreateTable(&req)
+		c.Assert(err, IsNil)
+	}
+	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, IsNil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 1)
+	}
+	fmt.Println("TestCreateTableWithStream finish")
+}
+
+func (s *TableStoreSuite) TestStream(c *C) {
+	tableName := defaultTableName + "_Stream"
+	fmt.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
+	{
+		req := CreateTableRequest{}
+		tableMeta := TableMeta{}
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+		req.TableMeta = &tableMeta
+
+		tableOption := TableOption{}
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 3
+		req.TableOption = &tableOption
+
+		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
+
+		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
+		
+		_, err := client.CreateTable(&req)
+		c.Assert(err, IsNil)
+	}
+	defer client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	var streamId *StreamId
+	{
+		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
+		c.Assert(err, IsNil)
+		fmt.Printf("%#v\n", resp)
+		c.Assert(len(resp.Streams), Equals, 1)
+		streamId = resp.Streams[0].Id
+	}
+	c.Assert(streamId, NotNil)
+	var shardId *ShardId
+	for {
+		resp, err := client.DescribeStream(&DescribeStreamRequest{StreamId: streamId})
+		c.Assert(err, IsNil)
+		fmt.Printf("DescribeStreamResponse: %#v\n", resp)
+		c.Assert(*resp.StreamId, Equals, *streamId)
+		c.Assert(resp.ExpirationTime, Equals, int32(24))
+		c.Assert(*resp.TableName, Equals, tableName)
+		c.Assert(len(resp.Shards), Equals, 1)
+		fmt.Printf("StreamShard: %#v\n", resp.Shards[0])
+		shardId = resp.Shards[0].SelfShard
+		if resp.Status == SS_Active {
+			break
+		}
+	}
+	c.Assert(shardId, NotNil)
+	var iter *ShardIterator
+	var records []*StreamRecord
+	{
+		resp, err := client.GetShardIterator(&GetShardIteratorRequest{
+			StreamId: streamId,
+			ShardId: shardId})
+		c.Assert(err, IsNil)
+		c.Assert(resp.ShardIterator, NotNil)
+		iter = resp.ShardIterator
+	}
+	fmt.Printf("init iterator: %#v\n", *iter)
+	iter, _ = exhaustStreamRecords(c, iter)
+	fmt.Printf("put row:\n")
+	{
+		req := PutRowRequest{}
+		rowChange := PutRowChange{}
+		rowChange.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
+		rowChange.PrimaryKey = &pk
+		rowChange.AddColumn("colToDel", "abc")
+		rowChange.AddColumn("colToDelAll", true)
+		rowChange.AddColumn("colToUpdate", int64(123))
+		rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+		req.PutRowChange = &rowChange
+		_, err := client.PutRow(&req)
+		c.Assert(err, IsNil)
+	}
+	iter, records = exhaustStreamRecords(c, iter)
+	var timestamp int64
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Put)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 3)
+		attr0 := r.Columns[0]
+		attr1 := r.Columns[1]
+		attr2 := r.Columns[2]
+		c.Assert(attr0, NotNil)
+		c.Assert(*attr0.Name, Equals, "colToDel")
+		c.Assert(attr0.Type, Equals, RCT_Put)
+		c.Assert(attr0.Value, Equals, "abc")
+		c.Assert(attr1, NotNil)
+		c.Assert(*attr1.Name, Equals, "colToDelAll")
+		c.Assert(attr1.Type, Equals, RCT_Put)
+		c.Assert(attr1.Value, Equals, true)
+		timestamp = *attr0.Timestamp
+		c.Assert(attr2, NotNil)
+		c.Assert(*attr2.Name, Equals, "colToUpdate")
+		c.Assert(attr2.Type, Equals, RCT_Put)
+		c.Assert(attr2.Value, Equals, int64(123))
+	}
+	{
+		chg := UpdateRowChange{}
+		chg.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
+		chg.PrimaryKey = &pk
+		chg.SetCondition(RowExistenceExpectation_IGNORE)
+		chg.DeleteColumnWithTimestamp("colToDel", timestamp)
+		chg.DeleteColumn("colToDelAll")
+		chg.PutColumn("colToUpdate", 3.14)
+		_, err := client.UpdateRow(&UpdateRowRequest{UpdateRowChange: &chg})
+		c.Assert(err, IsNil)
+	}
+	iter, records = exhaustStreamRecords(c, iter)
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Update)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 3)
+		attr0 := r.Columns[0]
+		attr1 := r.Columns[1]
+		attr2 := r.Columns[2]
+		c.Assert(attr0, NotNil)
+		c.Assert(*attr0.Name, Equals, "colToDel")
+		c.Assert(attr0.Type, Equals, RCT_DeleteOneVersion)
+		c.Assert(attr0.Value, IsNil)
+		c.Assert(attr0.Timestamp, NotNil)
+		c.Assert(*attr0.Timestamp, Equals, timestamp)
+		c.Assert(attr1, NotNil)
+		c.Assert(*attr1.Name, Equals, "colToDelAll")
+		c.Assert(attr1.Type, Equals, RCT_DeleteAllVersions)
+		c.Assert(attr1.Value, IsNil)
+		c.Assert(attr1.Timestamp, IsNil)
+		c.Assert(attr2, NotNil)
+		c.Assert(*attr2.Name, Equals, "colToUpdate")
+		c.Assert(attr2.Type, Equals, RCT_Put)
+		c.Assert(attr2.Value, Equals, 3.14)
+	}
+	{
+		chg := DeleteRowChange{}
+		chg.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "rowkey")
+		chg.PrimaryKey = &pk
+		chg.SetCondition(RowExistenceExpectation_IGNORE)
+		_, err := client.DeleteRow(&DeleteRowRequest{DeleteRowChange: &chg})
+		c.Assert(err, IsNil)
+	}
+	iter, records = exhaustStreamRecords(c, iter)
+	{
+		c.Assert(len(records), Equals, 1)
+		r := records[0]
+		c.Assert(r.Type, Equals, AT_Delete)
+		c.Assert(r.Info, NotNil)
+		c.Assert(r.PrimaryKey, NotNil)
+
+		pkey := r.PrimaryKey
+		c.Assert(len(pkey.PrimaryKeys), Equals, 1)
+		pkc := pkey.PrimaryKeys[0]
+		c.Assert(pkc, NotNil)
+		c.Assert(pkc.ColumnName, Equals, "pk1")
+		c.Assert(pkc.Value, Equals, "rowkey")
+		c.Assert(pkc.PrimaryKeyOption, Equals, NONE)
+
+		c.Assert(len(r.Columns), Equals, 0)
+	}
+	fmt.Println("TestCreateTableWithStream finish")
+}
+
+func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamRecord) {
+	records := make([]*StreamRecord, 0)
+	for {
+		resp, err := client.GetStreamRecord(&GetStreamRecordRequest{
+			ShardIterator: iter})
+		c.Assert(err, IsNil)
+		fmt.Printf("#records: %d\n", len(resp.Records))
+		for i, rec := range resp.Records {
+			fmt.Printf("record %d: %s\n", i, rec)
+		}
+		for _, rec := range resp.Records {
+			records = append(records, rec)
+		}
+		nextIter := resp.NextShardIterator
+		if nextIter == nil {
+			fmt.Printf("next iterator: %#v\n", nextIter)
+			break
+		} else {
+			fmt.Printf("next iterator: %#v\n", *nextIter)
+		}
+		if *iter == *nextIter {
+			break
+		}
+		iter = nextIter
+	}
+	return iter, records
+}
+
