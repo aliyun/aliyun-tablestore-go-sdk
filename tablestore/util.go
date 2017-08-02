@@ -431,7 +431,9 @@ func (rpc *RowPutChange) Build() []byte {
 		cells[i] = c.toPlainBufferCell(false)
 	}
 
-	row := &PlainBufferRow{pkCells, cells, false}
+	row := &PlainBufferRow{
+		primaryKey: pkCells,
+		cells: cells}
 	var b bytes.Buffer
 	row.writeRowWithHeader(&b)
 
@@ -449,7 +451,9 @@ func (ruc *RowUpdateChange) Build() []byte {
 		cells[i] = c.toPlainBufferCell(c.IgnoreValue)
 	}
 
-	row := &PlainBufferRow{pkCells, cells, false}
+	row := &PlainBufferRow{
+		primaryKey: pkCells,
+		cells: cells}
 	var b bytes.Buffer
 	row.writeRowWithHeader(&b)
 

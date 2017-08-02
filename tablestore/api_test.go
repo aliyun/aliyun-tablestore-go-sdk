@@ -1606,13 +1606,56 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		}
 	}
 	c.Assert(shardId, NotNil)
+	var iter *ShardIterator
 	{
 		resp, err := client.GetShardIterator(&GetShardIteratorRequest{
 			StreamId: streamId,
 			ShardId: shardId})
 		c.Assert(err, IsNil)
 		c.Assert(resp.ShardIterator, NotNil)
+		iter = resp.ShardIterator
 	}
+	fmt.Printf("init iterator: %#v\n", *iter)
+	iter = exhaustStreamRecords(c, iter)
+	fmt.Printf("put row:\n")
+	{
+		req := PutRowRequest{}
+		rowChange := PutRowChange{}
+		rowChange.TableName = tableName
+		pk := PrimaryKey{}
+		pk.AddPrimaryKeyColumn("pk1", "putrow")
+		rowChange.PrimaryKey = &pk
+		rowChange.AddColumn("col1", "put")
+		rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+		req.PutRowChange = &rowChange
+		_, err := client.PutRow(&req)
+		c.Assert(err, IsNil)
+	}
+	iter = exhaustStreamRecords(c, iter)
 	fmt.Println("TestCreateTableWithStream finish")
+}
+
+func exhaustStreamRecords(c *C, iter *ShardIterator) *ShardIterator {
+	for {
+		resp, err := client.GetStreamRecord(&GetStreamRecordRequest{
+			ShardIterator: iter})
+		c.Assert(err, IsNil)
+		fmt.Printf("#records: %d\n", len(resp.Records))
+		for i, rec := range resp.Records {
+			fmt.Printf("record %d: %s\n", i, rec)
+		}
+		nextIter := resp.NextShardIterator
+		if nextIter == nil {
+			fmt.Printf("next iterator: %#v\n", nextIter)
+			break
+		} else {
+			fmt.Printf("next iterator: %#v\n", *nextIter)
+		}
+		if *iter == *nextIter {
+			break
+		}
+		iter = nextIter
+	}
+	return iter
 }
 

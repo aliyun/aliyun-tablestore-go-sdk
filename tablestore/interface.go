@@ -18,4 +18,5 @@ type TableStoreApi interface {
 	ListStream(request *ListStreamRequest) (*ListStreamResponse, error)
 	DescribeStream(request *DescribeStreamRequest) (*DescribeStreamResponse, error)
 	GetShardIterator(request *GetShardIteratorRequest) (*GetShardIteratorResponse, error)
+	GetStreamRecord(request *GetStreamRecordRequest) (*GetStreamRecordResponse, error)
 }

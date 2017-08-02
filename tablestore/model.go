@@ -1,6 +1,8 @@
 package tablestore
 
 import (
+	"fmt"
+	"strings"
 	"net/http"
 	"time"
 	"github.com/golang/protobuf/proto"
@@ -185,6 +187,12 @@ type PrimaryKeyColumn struct {
 	ColumnName string
 	Value      interface{}
 	PrimaryKeyOption PrimaryKeyOption
+}
+
+func (this *PrimaryKeyColumn) String() string {
+	xs := make([]string, 0)
+	xs = append(xs, fmt.Sprintf("\"Name\": \"%s\"", this.ColumnName))
+	return fmt.Sprintf("{%s}", strings.Join(xs, ", "))
 }
 
 type AttributeColumn struct {
@@ -540,6 +548,16 @@ type GetShardIteratorResponse struct {
 	ShardIterator *ShardIterator // required
 }
 
+type GetStreamRecordRequest struct {
+	ShardIterator *ShardIterator // required
+	Limit *int32 // optional. max records which will reside in response
+}
+
+type GetStreamRecordResponse struct {
+	Records []*StreamRecord
+	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
+}
+
 type StreamId string
 type ShardId string
 type ShardIterator string
@@ -553,5 +571,45 @@ type StreamShard struct {
 	SelfShard *ShardId // required
 	ParentShard *ShardId // optional
 	SiblingShard *ShardId // optional
+}
+
+type StreamRecord struct {
+	Type ActionType
+	//Info *RecordSequenceInfo
+	PrimaryKey *PrimaryKey
+	//List<RecordColumn> columns;
+}
+
+func (this *StreamRecord) String() string {
+	return fmt.Sprintf(
+		"{\"Struct\":\"StreamRecord\", \"Type\":%s, \"PrimaryKey\":%s}",
+		this.Type,
+		*this.PrimaryKey)
+}
+
+type ActionType int
+const (
+	ActionType_Put ActionType = iota
+	ActionType_Update
+	ActionType_Delete
+)
+
+func (this ActionType) String() string {
+	switch this {
+	case ActionType_Put:
+		return "\"PutRow\""
+	case ActionType_Update:
+		return "\"UpdateRow\""
+	case ActionType_Delete:
+		return "\"DeleteRow\""
+	default:
+		panic(fmt.Sprintf("unknown action type: %d", int(this)))
+	}
+}
+
+type RecordSequenceInfo struct {
+	Epoch int32
+	Timestamp int64
+	RowIndex int32
 }
 

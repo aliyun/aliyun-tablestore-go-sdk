@@ -199,9 +199,10 @@ func (cell *PlainBufferCell) getCheckSum(crc byte) byte {
 }
 
 type PlainBufferRow struct {
-	primaryKey      []*PlainBufferCell
-	cells           []*PlainBufferCell
+	primaryKey []*PlainBufferCell
+	cells []*PlainBufferCell
 	hasDeleteMarker bool
+	extension *RecordSequenceInfo // optional
 }
 
 func (row *PlainBufferRow) writeRow(w io.Writer) {
@@ -395,6 +396,12 @@ func readRow(r *bytes.Reader) *PlainBufferRow {
 	}
 
 	if tag == TAG_DELETE_ROW_MARKER {
+		row.hasDeleteMarker = true
+		tag = readTag(r)
+	}
+
+	if tag == TAG_EXTENSION {
+		row.extension = readRowExtension(r)
 		tag = readTag(r)
 	}
 
@@ -430,5 +437,36 @@ func readRowsWithHeader(r *bytes.Reader) (rows []*PlainBufferRow, err error) {
 	return rows, nil
 }
 
+func readRowExtension(r *bytes.Reader) *RecordSequenceInfo {
+	readRawLittleEndian32(r) // useless
+	tag := readTag(r)
+	if tag != TAG_SEQ_INFO {
+		panic(errTag)
+	}
 
+	readRawLittleEndian32(r) // useless
+	tag = readTag(r)
+	if tag != TAG_SEQ_INFO_EPOCH {
+		panic(errTag)
+	}
+	epoch := readRawLittleEndian32(r)
+
+	tag = readTag(r)
+	if tag != TAG_SEQ_INFO_TS {
+		panic(errTag)
+	}
+	ts := readRawLittleEndian64(r)
+
+	tag = readTag(r)
+	if tag != TAG_SEQ_INFO_ROW_INDEX {
+		panic(errTag)
+	}
+	rowIndex := readRawLittleEndian32(r)
+	
+	ext := RecordSequenceInfo{}
+	ext.Epoch = epoch
+	ext.Timestamp = ts
+	ext.RowIndex = rowIndex
+	return &ext
+}
 

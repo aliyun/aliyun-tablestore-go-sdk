@@ -32,6 +32,7 @@ const (
 	listStreamUri = "/ListStream"
 	describeStreamUri = "/DescribeStream"
 	getShardIteratorUri = "/GetShardIterator"
+	getStreamRecordUri = "/GetStreamRecord"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -905,3 +906,52 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 	return &resp, nil
 }
 
+func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*GetStreamRecordResponse, error) {
+	pbReq := &otsprotocol.GetStreamRecordRequest{
+		ShardIterator: (*string)(req.ShardIterator)}
+	if req.Limit != nil {
+		pbReq.Limit = req.Limit
+	}
+
+	pbResp:= otsprotocol.GetStreamRecordResponse{}
+	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp); err != nil {
+		return nil, err
+	}
+
+	resp := GetStreamRecordResponse{}
+	if pbResp.NextShardIterator != nil {
+		resp.NextShardIterator = (*ShardIterator)(pbResp.NextShardIterator)
+	}
+	records := make([]*StreamRecord, len(pbResp.StreamRecords))
+	for i, pbRecord := range pbResp.StreamRecords {
+		record := StreamRecord{}
+		records[i] = &record
+
+		switch *pbRecord.ActionType {
+		case otsprotocol.ActionType_PUT_ROW:
+			record.Type = ActionType_Put
+		case otsprotocol.ActionType_UPDATE_ROW:
+			record.Type = ActionType_Update
+		case otsprotocol.ActionType_DELETE_ROW:
+			record.Type = ActionType_Delete
+		}
+
+		plainRows, err := readRowsWithHeader(bytes.NewReader(pbRecord.Record))
+		if err != nil {
+			return nil, err
+		}
+		Assert(len(plainRows) == 1, "There must be exactly one row in a StreamRecord.")
+		plainRow := plainRows[0]
+		pkey := PrimaryKey{}
+		record.PrimaryKey = &pkey
+		pkey.PrimaryKeys = make([]*PrimaryKeyColumn, len(plainRow.primaryKey))
+		for i, pk := range plainRow.primaryKey {
+			pkc := PrimaryKeyColumn{
+				ColumnName: string(pk.cellName),
+				Value: pk.cellValue.Value}
+			pkey.PrimaryKeys[i] = &pkc
+		}
+	}
+	resp.Records = records
+	return &resp, nil
+}
