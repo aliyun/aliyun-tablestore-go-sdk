@@ -32,4 +32,7 @@ func main() {
 	sample.BatchWriteRowSample(client,"sampletable")
 	sample.BatchGetRowSample(client, "sampletable")
 	sample.GetRangeSample(client, "sampletable")
+
+	// Stream sample
+	sample.GetStreamRecordSample(client, "streamtable1")
 }
