@@ -960,8 +960,11 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	rangeRowQueryCriteria.EndPrimaryKey = endPK
 	rangeRowQueryCriteria.Direction = FORWARD
 	rangeRowQueryCriteria.MaxVersion = 1
+	rangeRowQueryCriteria.ColumnsToGet = []string{"col1"}
 	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
 
+	fmt.Println("check", rangeRowQueryCriteria.ColumnsToGet)
+	fmt.Println("check2", getRangeRequest.RangeRowQueryCriteria.ColumnsToGet)
 	getRangeResp, error := client.GetRange(getRangeRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getRangeResp.Rows, NotNil)
@@ -1455,6 +1458,8 @@ func PrepareDataInDefaultTableWithTimestamp(key string, value string, timeNow in
 	putPk.AddPrimaryKeyColumn("pk1", key)
 	putRowChange.PrimaryKey = putPk
 	putRowChange.AddColumnWithTimestamp("col1", value, timeNow)
+	putRowChange.AddColumnWithTimestamp("col2", value, timeNow)
+	putRowChange.AddColumnWithTimestamp("col3", value, timeNow)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
 	_, error := client.PutRow(putRowRequest)

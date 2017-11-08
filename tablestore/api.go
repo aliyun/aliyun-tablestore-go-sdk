@@ -769,7 +769,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		req.Limit = proto.Int32(request.RangeRowQueryCriteria.Limit)
 	}
 
-	if (req.ColumnsToGet != nil) && len(req.ColumnsToGet) > 0 {
+	if (request.RangeRowQueryCriteria.ColumnsToGet != nil) && len(request.RangeRowQueryCriteria.ColumnsToGet) > 0 {
 		req.ColumnsToGet = request.RangeRowQueryCriteria.ColumnsToGet
 	}
 
