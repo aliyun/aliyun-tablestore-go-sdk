@@ -362,7 +362,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	}
 	response.TableMeta = responseTableMeta
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
-	if *resp.StreamDetails.EnableStream {
+	if resp.StreamDetails != nil && *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: *resp.StreamDetails.EnableStream,
 			StreamId: (*StreamId)(resp.StreamDetails.StreamId),
