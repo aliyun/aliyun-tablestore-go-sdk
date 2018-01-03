@@ -352,12 +352,12 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 		keyType := PrimaryKeyType(*key.Type)
 
 		// enable it when we support kep option in describe table
-		/*if key.Option != nil {
+		if key.Option != nil {
 			keyOption := PrimaryKeyOption(*key.Option)
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType, Option: &keyOption })
 		} else {
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
-		}*/
+		}
 		responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
 	}
 	response.TableMeta = responseTableMeta
