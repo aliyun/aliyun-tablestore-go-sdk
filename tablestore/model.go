@@ -568,6 +568,23 @@ type GetStreamRecordResponse struct {
 	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
 }
 
+
+type ComputeSplitPointsBySizeRequest struct {
+	TableName string
+	SplitSize int64
+}
+
+type ComputeSplitPointsBySizeResponse struct {
+	SchemaEntry []*PrimaryKeySchema
+	Splits []*Split
+}
+
+type Split struct {
+	LowerBound *PrimaryKey
+	UpperBound *PrimaryKey
+	Location string
+}
+
 type StreamId string
 type ShardId string
 type ShardIterator string

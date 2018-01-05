@@ -32,6 +32,7 @@ const (
 	describeStreamUri = "/DescribeStream"
 	getShardIteratorUri = "/GetShardIterator"
 	getStreamRecordUri = "/GetStreamRecord"
+	computeSplitPointsBySizeRequestUri = "/ComputeSplitPointsBySize"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -287,7 +288,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 			ExpirationTime: &request.StreamSpec.ExpirationTime}
 		req.StreamSpec = &ss
 	}
-	
+
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp); err != nil {
@@ -841,7 +842,7 @@ func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamR
 	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp); err != nil {
 		return nil, err
 	}
-	
+
 	resp := ListStreamResponse{}
 	streams := make([]Stream, len(pbResp.Streams))
 	for i, pbStream  := range pbResp.Streams {
@@ -894,7 +895,7 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 	pbReq := &otsprotocol.GetShardIteratorRequest{
 		StreamId: (*string)(req.StreamId),
 		ShardId: (*string)(req.ShardId)}
-	
+
 	pbResp:= otsprotocol.GetShardIteratorResponse{}
 	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp); err != nil {
 		return nil, err
@@ -984,3 +985,61 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 	resp.Records = records
 	return &resp, nil
 }
+
+func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsBySizeRequest) (*ComputeSplitPointsBySizeResponse, error) {
+	pbReq := &otsprotocol.ComputeSplitPointsBySizeRequest{
+		TableName: &(req.TableName),
+		SplitSize: &(req.SplitSize),
+	}
+
+	pbResp:= otsprotocol.ComputeSplitPointsBySizeResponse{}
+	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp); err != nil {
+		return nil, err
+	}
+
+	resp := ComputeSplitPointsBySizeResponse{}
+	fmt.Println(len(pbResp.SplitPoints))
+	fmt.Println(len(pbResp.Locations))
+
+	beginPk := &PrimaryKey{}
+	endPk := &PrimaryKey{}
+	for _, pkSchema := range pbResp.Schema {
+		beginPk.AddPrimaryKeyColumnWithMinValue(*pkSchema.Name)
+		endPk.AddPrimaryKeyColumnWithMaxValue(*pkSchema.Name)
+	}
+	lastPk := beginPk
+	nowPk := endPk
+
+	for _, pbRecord := range pbResp.SplitPoints {
+		plainRows, err := readRowsWithHeader(bytes.NewReader(pbRecord))
+		if err !=nil {
+			return nil, err
+		}
+
+		nowPk = &PrimaryKey{}
+		for _, pk := range (plainRows[0].primaryKey) {
+			nowPk.AddPrimaryKeyColumn(string(pk.cellName), pk.cellValue.Value)
+		}
+
+		newSplit := &Split{LowerBound: lastPk, UpperBound: nowPk}
+		resp.Splits = append(resp.Splits, newSplit)
+		lastPk = nowPk
+
+	}
+
+	newSplit := &Split{LowerBound: lastPk, UpperBound: nowPk}
+	resp.Splits = append(resp.Splits, newSplit)
+
+	index:=0
+	for _, pbLocation := range pbResp.Locations {
+		count := *pbLocation.Repeat
+		value := *pbLocation.Location
+
+		for i := int64(0) ; i < count; i++{
+			resp.Splits[index].Location = value
+			index++
+		}
+	}
+	return &resp, nil
+}
+

@@ -111,3 +111,18 @@ func DescribeTableSample(client *tablestore.TableStoreClient, tableName string) 
 		fmt.Println("DescribeTableSample finished. Table meta:", describ.TableOption.MaxVersion, describ.TableOption.TimeToAlive)
 	}
 }
+
+func ComputeSplitPointsBySize(client *tablestore.TableStoreClient, tableName string){
+	req := &tablestore.ComputeSplitPointsBySizeRequest{TableName: "table1", SplitSize: int64(1)}
+	va, err := client.ComputeSplitPointsBySize(req)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	for _, val := range (va.Splits) {
+		fmt.Println(val.Location)
+		fmt.Println(*val.LowerBound)
+		fmt.Println(*val.UpperBound)
+	}
+	return
+}
