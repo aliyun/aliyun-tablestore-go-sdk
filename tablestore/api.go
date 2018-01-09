@@ -359,7 +359,6 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 		} else {
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
 		}
-		responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType })
 	}
 	response.TableMeta = responseTableMeta
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
