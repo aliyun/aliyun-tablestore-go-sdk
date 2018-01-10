@@ -397,9 +397,14 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	}
 
 	if request.StreamSpec != nil {
+		var expirationTime *int32
+		if request.StreamSpec.EnableStream {
+			expirationTime = &request.StreamSpec.ExpirationTime
+		}
 		req.StreamSpec = &otsprotocol.StreamSpecification{
 			EnableStream: &request.StreamSpec.EnableStream,
-			ExpirationTime: &request.StreamSpec.ExpirationTime}
+			ExpirationTime: expirationTime,
+		}
 	}
 
 	resp := new(otsprotocol.UpdateTableResponse)
