@@ -25,7 +25,7 @@ func CreateTableSample(client *tablestore.TableStoreClient, tableName string) {
 	createtableRequest.ReservedThroughput = reservedThroughput
 
 	_, err := client.CreateTable(createtableRequest)
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Failed to create table with error:", err)
 	} else {
 		fmt.Println("Create table finished")
@@ -62,7 +62,7 @@ func DeleteTableSample(client *tablestore.TableStoreClient) {
 	deleteReq := new(tablestore.DeleteTableRequest)
 	deleteReq.TableName = tableName
 	_, err := client.DeleteTable(deleteReq)
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Failed to delete table with error:", err)
 	} else {
 		fmt.Println("Delete table finished")
@@ -76,7 +76,7 @@ func ListTableSample(client *tablestore.TableStoreClient) {
 		fmt.Println("Failed to list table")
 	} else {
 		fmt.Println("List table result is")
-		for _, table := range (listtables.TableNames) {
+		for _, table := range listtables.TableNames {
 			fmt.Println("TableName: ", table)
 		}
 	}
@@ -92,7 +92,7 @@ func UpdateTableSample(client *tablestore.TableStoreClient, tableName string) {
 
 	_, err := client.UpdateTable(updateTableReq)
 
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("failed to update table with error:", err)
 	} else {
 		fmt.Println("update finished")
@@ -112,14 +112,14 @@ func DescribeTableSample(client *tablestore.TableStoreClient, tableName string) 
 	}
 }
 
-func ComputeSplitPointsBySize(client *tablestore.TableStoreClient, tableName string){
+func ComputeSplitPointsBySize(client *tablestore.TableStoreClient, tableName string) {
 	req := &tablestore.ComputeSplitPointsBySizeRequest{TableName: tableName, SplitSize: int64(1)}
 	va, err := client.ComputeSplitPointsBySize(req)
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	for _, val := range (va.Splits) {
+	for _, val := range va.Splits {
 		fmt.Println(val.Location)
 		fmt.Println(*val.LowerBound)
 		fmt.Println(*val.UpperBound)

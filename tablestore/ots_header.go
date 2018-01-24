@@ -10,12 +10,12 @@ import (
 )
 
 const (
-	xOtsDate = "x-ots-date"
-	xOtsApiversion = "x-ots-apiversion"
-	xOtsAccesskeyid = "x-ots-accesskeyid"
-	xOtsContentmd5 = "x-ots-contentmd5"
-	xOtsHeaderStsToken = "x-ots-ststoken";
-	xOtsSignature = "x-ots-signature"
+	xOtsDate                = "x-ots-date"
+	xOtsApiversion          = "x-ots-apiversion"
+	xOtsAccesskeyid         = "x-ots-accesskeyid"
+	xOtsContentmd5          = "x-ots-contentmd5"
+	xOtsHeaderStsToken      = "x-ots-ststoken"
+	xOtsSignature           = "x-ots-signature"
 	xOtsRequestCompressType = "x-ots-request-compress-type"
 	xOtsRequestCompressSize = "x-ots-request-compress-size"
 	xOtsResponseCompressTye = "x-ots-response-compress-type"
@@ -75,7 +75,7 @@ func (h *otsHeaders) Less(i, j int) bool {
 }
 
 func (h *otsHeaders) search(name string) *otsHeader {
-	index := sort.Search(len(h.headers) - 1, func(i int) bool {
+	index := sort.Search(len(h.headers)-1, func(i int) bool {
 		return h.headers[i].name >= name
 	})
 
@@ -96,7 +96,7 @@ func (h *otsHeaders) set(name, value string) {
 }
 
 func (h *otsHeaders) signature(uri, method, accessKey string) (string, error) {
-	for _, header := range h.headers[:len(h.headers) - 1] {
+	for _, header := range h.headers[:len(h.headers)-1] {
 		if header.must && header.value == "" {
 			return "", errMissMustHeader(header.name)
 		}
@@ -107,7 +107,7 @@ func (h *otsHeaders) signature(uri, method, accessKey string) (string, error) {
 	stringToSign := uri + "\n" + method + "\n" + "\n"
 
 	// 最后一个header 为 xOtsSignature
-	for _, header := range h.headers[:len(h.headers) - 1] {
+	for _, header := range h.headers[:len(h.headers)-1] {
 		if header.value != "" {
 			stringToSign = stringToSign + header.name + ":" + strings.TrimSpace(header.value) + "\n"
 		}

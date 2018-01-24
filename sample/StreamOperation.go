@@ -3,8 +3,8 @@ package sample
 import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"time"
 	"strconv"
+	"time"
 )
 
 func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string) {
@@ -30,19 +30,18 @@ func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string
 	createtableRequest.StreamSpec = &tablestore.StreamSpecification{EnableStream: true, ExpirationTime: 24}
 
 	_, err := client.CreateTable(createtableRequest)
-	if (err != nil) {
+	if err != nil {
 		fmt.Println("Failed to create table with error:", err)
 	} else {
 		fmt.Println("Create table finished")
 	}
 
-
 	time.Sleep(time.Millisecond * 20)
 
-	for j := 0; j < 300 ; j++ {
+	for j := 0; j < 300; j++ {
 
-		go func () {
-			for i := 0; i < 1000 ; i++ {
+		go func() {
+			for i := 0; i < 1000; i++ {
 				req := tablestore.PutRowRequest{}
 				rowChange := tablestore.PutRowChange{}
 				rowChange.TableName = tableName
@@ -50,12 +49,12 @@ func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string
 				pk.AddPrimaryKeyColumn("pk1", "01f3")
 				pk.AddPrimaryKeyColumn("pk2", "000001")
 				pk.AddPrimaryKeyColumn("pk3", "001")
-				val := 1495246210 + i * 100
+				val := 1495246210 + i*100
 				pk.AddPrimaryKeyColumn("pk4", int64(val))
 
 				rowChange.PrimaryKey = &pk
 
-				val1 := float64(120.1516525097) + float64(0.0000000001) * float64(i)
+				val1 := float64(120.1516525097) + float64(0.0000000001)*float64(i)
 
 				rowChange.AddColumn("longitude", strconv.FormatFloat(val1, 'g', 1, 64))
 				rowChange.AddColumn("latitude", "30.2583277934")
@@ -64,8 +63,8 @@ func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string
 				rowChange.AddColumn("speed", "25")
 				rowChange.AddColumn("wind_speed", "2")
 				rowChange.AddColumn("temperature", "20")
-				distance := 8000 + i;
-				rowChange.AddColumn("distance",  strconv.Itoa(distance))
+				distance := 8000 + i
+				rowChange.AddColumn("distance", strconv.Itoa(distance))
 
 				rowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
 				req.PutRowChange = &rowChange
@@ -75,7 +74,7 @@ func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string
 					fmt.Print(err)
 				}
 			}
-		} ()
+		}()
 
 	}
 
@@ -92,7 +91,7 @@ func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string
 
 	resp3, err := client.GetShardIterator(&tablestore.GetShardIteratorRequest{
 		StreamId: streamId,
-		ShardId: shardId})
+		ShardId:  shardId})
 
 	iter := resp3.ShardIterator
 

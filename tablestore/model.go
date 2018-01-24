@@ -2,13 +2,13 @@ package tablestore
 
 import (
 	"fmt"
-	"strings"
-	"strconv"
-	"net/http"
-	"time"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"net/http"
+	"strconv"
+	"strings"
+	"time"
 )
 
 // @class TableStoreClient
@@ -23,16 +23,16 @@ type TableStoreClient struct {
 	accessKeyId     string
 	accessKeySecret string
 	securityToken   string
-	
-	httpClient      IHttpClient
-	config          *TableStoreConfig
-	random          *rand.Rand
+
+	httpClient IHttpClient
+	config     *TableStoreConfig
+	random     *rand.Rand
 }
 
 type ClientOption func(*TableStoreClient)
 
 type TableStoreHttpClient struct {
-	httpClient      *http.Client
+	httpClient *http.Client
 }
 
 // use this to mock http.client for testing
@@ -55,20 +55,20 @@ type HTTPTimeout struct {
 }
 
 type TableStoreConfig struct {
-	RetryTimes  uint
-	MaxRetryTime time.Duration
-	HTTPTimeout HTTPTimeout
+	RetryTimes         uint
+	MaxRetryTime       time.Duration
+	HTTPTimeout        HTTPTimeout
 	MaxIdleConnections int
 }
 
 func NewDefaultTableStoreConfig() *TableStoreConfig {
 	httpTimeout := &HTTPTimeout{
-		ConnectionTimeout:time.Second * 15,
-		RequestTimeout :time.Second * 30  }
+		ConnectionTimeout: time.Second * 15,
+		RequestTimeout:    time.Second * 30}
 	config := &TableStoreConfig{
-		RetryTimes: 10,
-		HTTPTimeout: *httpTimeout,
-		MaxRetryTime: time.Second * 5,
+		RetryTimes:         10,
+		HTTPTimeout:        *httpTimeout,
+		MaxRetryTime:       time.Second * 5,
 		MaxIdleConnections: 2000}
 	return config
 }
@@ -77,15 +77,13 @@ type CreateTableRequest struct {
 	TableMeta          *TableMeta
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
-	StreamSpec *StreamSpecification
+	StreamSpec         *StreamSpecification
 }
 
 type CreateTableResponse struct {
-
 }
 
 type DeleteTableResponse struct {
-
 }
 
 type TableMeta struct {
@@ -124,23 +122,23 @@ type DescribeTableRequest struct {
 }
 
 type DescribeTableResponse struct {
-	TableMeta *TableMeta
-	TableOption *TableOption
+	TableMeta          *TableMeta
+	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
-	StreamDetails *StreamDetails
+	StreamDetails      *StreamDetails
 }
 
 type UpdateTableRequest struct {
 	TableName          string
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
-	StreamSpec *StreamSpecification
+	StreamSpec         *StreamSpecification
 }
 
 type UpdateTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
-	StreamDetails *StreamDetails
+	StreamDetails      *StreamDetails
 }
 
 type ConsumedCapacityUnit struct {
@@ -165,13 +163,13 @@ type PrimaryKeyType int32
 
 const (
 	PrimaryKeyType_INTEGER PrimaryKeyType = 1
-	PrimaryKeyType_STRING PrimaryKeyType = 2
-	PrimaryKeyType_BINARY PrimaryKeyType = 3
+	PrimaryKeyType_STRING  PrimaryKeyType = 2
+	PrimaryKeyType_BINARY  PrimaryKeyType = 3
 )
 
 const (
 	DefaultRetryInterval = 10
-	MaxRetryInterval = 320
+	MaxRetryInterval     = 320
 )
 
 type PrimaryKeyOption int32
@@ -184,8 +182,8 @@ const (
 )
 
 type PrimaryKeyColumn struct {
-	ColumnName string
-	Value      interface{}
+	ColumnName       string
+	Value            interface{}
 	PrimaryKeyOption PrimaryKeyOption
 }
 
@@ -208,7 +206,7 @@ func (this *PrimaryKeyColumn) String() string {
 type AttributeColumn struct {
 	ColumnName string
 	Value      interface{}
-	Timestamp    int64
+	Timestamp  int64
 }
 
 type TimeRange struct {
@@ -230,20 +228,20 @@ type ColumnToUpdate struct {
 type RowExistenceExpectation int
 
 const (
-	RowExistenceExpectation_IGNORE RowExistenceExpectation = 0
-	RowExistenceExpectation_EXPECT_EXIST RowExistenceExpectation = 1
+	RowExistenceExpectation_IGNORE           RowExistenceExpectation = 0
+	RowExistenceExpectation_EXPECT_EXIST     RowExistenceExpectation = 1
 	RowExistenceExpectation_EXPECT_NOT_EXIST RowExistenceExpectation = 2
 )
 
 type ComparatorType int32
 
 const (
-	CT_EQUAL ComparatorType = 1
-	CT_NOT_EQUAL ComparatorType = 2
-	CT_GREATER_THAN ComparatorType = 3
+	CT_EQUAL         ComparatorType = 1
+	CT_NOT_EQUAL     ComparatorType = 2
+	CT_GREATER_THAN  ComparatorType = 3
 	CT_GREATER_EQUAL ComparatorType = 4
-	CT_LESS_THAN ComparatorType = 5
-	CT_LESS_EQUAL ComparatorType = 6
+	CT_LESS_THAN     ComparatorType = 5
+	CT_LESS_EQUAL    ComparatorType = 6
 )
 
 type LogicalOperator int32
@@ -251,15 +249,15 @@ type LogicalOperator int32
 const (
 	LO_NOT LogicalOperator = 1
 	LO_AND LogicalOperator = 2
-	LO_OR LogicalOperator = 3
+	LO_OR  LogicalOperator = 3
 )
 
 type FilterType int32
 
 const (
-	FT_SINGLE_COLUMN_VALUE FilterType = 1
+	FT_SINGLE_COLUMN_VALUE    FilterType = 1
 	FT_COMPOSITE_COLUMN_VALUE FilterType = 2
-	FT_COLUMN_PAGINATION FilterType = 3
+	FT_COLUMN_PAGINATION      FilterType = 3
 )
 
 type ColumnFilter interface {
@@ -372,7 +370,7 @@ type SingleRowQueryCriteria struct {
 	MaxVersion   int32
 	TimeRange    *TimeRange
 	Filter       ColumnFilter
-	StartColumn *string
+	StartColumn  *string
 }
 
 type UpdateRowChange struct {
@@ -428,7 +426,7 @@ type BatchGetRowRequest struct {
 }
 
 type ColumnMap struct {
-	Columns map[string][]*AttributeColumn
+	Columns    map[string][]*AttributeColumn
 	columnsKey []string
 }
 
@@ -440,18 +438,18 @@ type GetRowResponse struct {
 }
 
 type Error struct {
-	Code string
+	Code    string
 	Message string
 }
 
 type RowResult struct {
-	TableName string
-	IsSucceed bool
-	Error Error
-	PrimaryKey PrimaryKey
-	Columns    []*AttributeColumn
+	TableName            string
+	IsSucceed            bool
+	Error                Error
+	PrimaryKey           PrimaryKey
+	Columns              []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
-	Index int32
+	Index                int32
 }
 
 type RowChange interface {
@@ -465,46 +463,46 @@ type BatchGetRowResponse struct {
 	TableToRowsResult map[string][]RowResult
 }
 
-type BatchWriteRowRequest struct{
+type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
 }
 
-type BatchWriteRowResponse struct{
+type BatchWriteRowResponse struct {
 	TableToRowsResult map[string][]RowResult
 }
 
 type Direction int32
 
 const (
-	FORWARD           Direction = 0
-	BACKWARD          Direction = 1
+	FORWARD  Direction = 0
+	BACKWARD Direction = 1
 )
 
-type RangeRowQueryCriteria struct{
-	TableName    string
+type RangeRowQueryCriteria struct {
+	TableName       string
 	StartPrimaryKey *PrimaryKey
-	EndPrimaryKey *PrimaryKey
-	ColumnsToGet []string
-	MaxVersion   int32
-	TimeRange    *TimeRange
-	Filter       ColumnFilter
-	Direction    Direction
-	Limit        int32
+	EndPrimaryKey   *PrimaryKey
+	ColumnsToGet    []string
+	MaxVersion      int32
+	TimeRange       *TimeRange
+	Filter          ColumnFilter
+	Direction       Direction
+	Limit           int32
 }
 
 type GetRangeRequest struct {
 	RangeRowQueryCriteria *RangeRowQueryCriteria
 }
 
-type Row struct{
-	PrimaryKey           *PrimaryKey
-	Columns              []*AttributeColumn
+type Row struct {
+	PrimaryKey *PrimaryKey
+	Columns    []*AttributeColumn
 }
 
 type GetRangeResponse struct {
-	Rows []*Row
+	Rows                 []*Row
 	ConsumedCapacityUnit *ConsumedCapacityUnit
-	NextStartPrimaryKey *PrimaryKey
+	NextStartPrimaryKey  *PrimaryKey
 }
 
 type ListStreamRequest struct {
@@ -512,8 +510,8 @@ type ListStreamRequest struct {
 }
 
 type Stream struct {
-	Id *StreamId
-	TableName *string
+	Id           *StreamId
+	TableName    *string
 	CreationTime int64
 }
 
@@ -522,36 +520,36 @@ type ListStreamResponse struct {
 }
 
 type StreamSpecification struct {
-	EnableStream bool
+	EnableStream   bool
 	ExpirationTime int32 // must be positive. in hours
 }
 
 type StreamDetails struct {
-	EnableStream bool
-	StreamId *StreamId // nil when stream is disabled.
-	ExpirationTime int32 // in hours
-	LastEnableTime int64 // the last time stream is enabled, in usec
+	EnableStream   bool
+	StreamId       *StreamId // nil when stream is disabled.
+	ExpirationTime int32     // in hours
+	LastEnableTime int64     // the last time stream is enabled, in usec
 }
 
 type DescribeStreamRequest struct {
-	StreamId *StreamId // required
-	InclusiveStartShardId *ShardId // optional
-	ShardLimit *int32 // optional
+	StreamId              *StreamId // required
+	InclusiveStartShardId *ShardId  // optional
+	ShardLimit            *int32    // optional
 }
 
 type DescribeStreamResponse struct {
-	StreamId *StreamId // required
-	ExpirationTime int32 // in hours
-	TableName *string // required
-	CreationTime int64 // in usec
-	Status StreamStatus // required
-	Shards []*StreamShard
-	NextShardId *ShardId // optional. nil means "no more shards"
+	StreamId       *StreamId    // required
+	ExpirationTime int32        // in hours
+	TableName      *string      // required
+	CreationTime   int64        // in usec
+	Status         StreamStatus // required
+	Shards         []*StreamShard
+	NextShardId    *ShardId // optional. nil means "no more shards"
 }
 
 type GetShardIteratorRequest struct {
 	StreamId *StreamId // required
-	ShardId *ShardId // required
+	ShardId  *ShardId  // required
 }
 
 type GetShardIteratorResponse struct {
@@ -560,14 +558,13 @@ type GetShardIteratorResponse struct {
 
 type GetStreamRecordRequest struct {
 	ShardIterator *ShardIterator // required
-	Limit *int32 // optional. max records which will reside in response
+	Limit         *int32         // optional. max records which will reside in response
 }
 
 type GetStreamRecordResponse struct {
-	Records []*StreamRecord
+	Records           []*StreamRecord
 	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
 }
-
 
 type ComputeSplitPointsBySizeRequest struct {
 	TableName string
@@ -576,19 +573,20 @@ type ComputeSplitPointsBySizeRequest struct {
 
 type ComputeSplitPointsBySizeResponse struct {
 	SchemaEntry []*PrimaryKeySchema
-	Splits []*Split
+	Splits      []*Split
 }
 
 type Split struct {
 	LowerBound *PrimaryKey
 	UpperBound *PrimaryKey
-	Location string
+	Location   string
 }
 
 type StreamId string
 type ShardId string
 type ShardIterator string
 type StreamStatus int
+
 const (
 	SS_Enabling StreamStatus = iota
 	SS_Active
@@ -600,16 +598,16 @@ const (
  * After merging, the newly generated shard have both FatherShard and MotherShard.
  */
 type StreamShard struct {
-	SelfShard *ShardId // required
+	SelfShard   *ShardId // required
 	FatherShard *ShardId // optional
 	MotherShard *ShardId // optional
 }
 
 type StreamRecord struct {
-	Type ActionType
-	Info *RecordSequenceInfo // required
-	PrimaryKey *PrimaryKey // required
-	Columns []*RecordColumn
+	Type       ActionType
+	Info       *RecordSequenceInfo // required
+	PrimaryKey *PrimaryKey         // required
+	Columns    []*RecordColumn
 }
 
 func (this *StreamRecord) String() string {
@@ -622,6 +620,7 @@ func (this *StreamRecord) String() string {
 }
 
 type ActionType int
+
 const (
 	AT_Put ActionType = iota
 	AT_Update
@@ -642,9 +641,9 @@ func (this ActionType) String() string {
 }
 
 type RecordSequenceInfo struct {
-	Epoch int32
+	Epoch     int32
 	Timestamp int64
-	RowIndex int32
+	RowIndex  int32
 }
 
 func (this *RecordSequenceInfo) String() string {
@@ -656,10 +655,10 @@ func (this *RecordSequenceInfo) String() string {
 }
 
 type RecordColumn struct {
-	Type RecordColumnType
-	Name *string // required
-	Value interface{} // optional. present when Type is RCT_Put
-	Timestamp *int64 // optional, in msec. present when Type is RCT_Put or RCT_DeleteOneVersion
+	Type      RecordColumnType
+	Name      *string     // required
+	Value     interface{} // optional. present when Type is RCT_Put
+	Timestamp *int64      // optional, in msec. present when Type is RCT_Put or RCT_DeleteOneVersion
 }
 
 func (this *RecordColumn) String() string {
@@ -680,6 +679,7 @@ func (this *RecordColumn) String() string {
 }
 
 type RecordColumnType int
+
 const (
 	RCT_Put RecordColumnType = iota
 	RCT_DeleteOneVersion

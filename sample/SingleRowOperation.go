@@ -33,7 +33,7 @@ func PutRowSample(client *tablestore.TableStoreClient, tableName string) {
 func GetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("begin to get row")
 	getRowRequest := new(tablestore.GetRowRequest)
-	criteria := new(tablestore.SingleRowQueryCriteria);
+	criteria := new(tablestore.SingleRowQueryCriteria)
 	putPk := new(tablestore.PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", "pk1value1")
 	putPk.AddPrimaryKeyColumn("pk2", int64(2))
@@ -47,11 +47,11 @@ func GetRowSample(client *tablestore.TableStoreClient, tableName string) {
 
 	colmap := getResp.GetColumnMap()
 
-	fmt.Println("length is ",len(colmap.Columns))
+	fmt.Println("length is ", len(colmap.Columns))
 	if err != nil {
 		fmt.Println("getrow failed with error:", err)
 	} else {
-		fmt.Println("get row col0 result is ",getResp.Columns[0].ColumnName, getResp.Columns[0].Value,)
+		fmt.Println("get row col0 result is ", getResp.Columns[0].ColumnName, getResp.Columns[0].Value)
 	}
 }
 
@@ -69,7 +69,6 @@ func DeleteRowSample(client *tablestore.TableStoreClient, tableName string) {
 	clCondition1 := tablestore.NewSingleColumnCondition("col2", tablestore.CT_EQUAL, int64(3))
 	deleteRowReq.DeleteRowChange.SetColumnCondition(clCondition1)
 	_, err := client.DeleteRow(deleteRowReq)
-
 
 	if err != nil {
 		fmt.Println("getrow failed with error:", err)

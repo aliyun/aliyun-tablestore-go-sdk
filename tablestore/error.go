@@ -12,27 +12,27 @@ var (
 		return errors.New("[tablestore] table name: \"" + name + "\" too long")
 	}
 
-	errInvalidPartitionType = errors.New("[tablestore] invalid partition key")
-	errMissPrimaryKey = errors.New("[tablestore] missing primary key")
-	errPrimaryKeyTooMuch = errors.New("[tablestore] primary key too much")
-	errMultiDeleteRowsTooMuch = errors.New("[tablestore] multi delete rows too much")
+	errInvalidPartitionType    = errors.New("[tablestore] invalid partition key")
+	errMissPrimaryKey          = errors.New("[tablestore] missing primary key")
+	errPrimaryKeyTooMuch       = errors.New("[tablestore] primary key too much")
+	errMultiDeleteRowsTooMuch  = errors.New("[tablestore] multi delete rows too much")
 	errCreateTableNoPrimaryKey = errors.New("[tablestore] create table no primary key")
-	errUnexpectIoEnd = errors.New("[tablestore] unexpect io end")
-	errTag = errors.New("[tablestore] unexpect tag")
-	errNoChecksum = errors.New("[tablestore] expect checksum")
-	errChecksum = errors.New("[tablestore] checksum failed")
-	errInvalidInput = errors.New("[tablestore] invalid input")
+	errUnexpectIoEnd           = errors.New("[tablestore] unexpect io end")
+	errTag                     = errors.New("[tablestore] unexpect tag")
+	errNoChecksum              = errors.New("[tablestore] expect checksum")
+	errChecksum                = errors.New("[tablestore] checksum failed")
+	errInvalidInput            = errors.New("[tablestore] invalid input")
 )
 
 const (
-	ROW_OPERATION_CONFLICT = "OTSRowOperationConflict"
-	NOT_ENOUGH_CAPACITY_UNIT = "OTSNotEnoughCapacityUnit";
-	TABLE_NOT_READY = "OTSTableNotReady";
-	PARTITION_UNAVAILABLE = "OTSPartitionUnavailable";
-	SERVER_BUSY = "OTSServerBusy";
-	QUOTA_EXHAUSTED = "OTSQuotaExhausted";
+	ROW_OPERATION_CONFLICT   = "OTSRowOperationConflict"
+	NOT_ENOUGH_CAPACITY_UNIT = "OTSNotEnoughCapacityUnit"
+	TABLE_NOT_READY          = "OTSTableNotReady"
+	PARTITION_UNAVAILABLE    = "OTSPartitionUnavailable"
+	SERVER_BUSY              = "OTSServerBusy"
+	QUOTA_EXHAUSTED          = "OTSQuotaExhausted"
 
-	STORAGE_TIMEOUT = "OTSTimeout";
-	SERVER_UNAVAILABLE = "OTSServerUnavailable";
-	INTERNAL_SERVER_ERROR = "OTSInternalServerError";
+	STORAGE_TIMEOUT       = "OTSTimeout"
+	SERVER_UNAVAILABLE    = "OTSServerUnavailable"
+	INTERNAL_SERVER_ERROR = "OTSInternalServerError"
 )

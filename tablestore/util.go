@@ -1,41 +1,41 @@
 package tablestore
 
 import (
-	"math"
-	"io"
 	"bytes"
-	"reflect"
-	"github.com/golang/protobuf/proto"
-	"net/http"
 	"fmt"
-	"io/ioutil"
-	"sort"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/golang/protobuf/proto"
+	"io"
+	"io/ioutil"
+	"math"
+	"net/http"
+	"reflect"
+	"sort"
 )
 
 const (
-	maxTableNameLength = 100
+	maxTableNameLength  = 100
 	maxPrimaryKeyLength = 255
-	maxPrimaryKeyNum = 4
-	maxMultiDeleteRows = 100
+	maxPrimaryKeyNum    = 4
+	maxMultiDeleteRows  = 100
 )
 
 type ColumnType int32
 
 const (
-	ColumnType_STRING ColumnType = 1
+	ColumnType_STRING  ColumnType = 1
 	ColumnType_INTEGER ColumnType = 2
 	ColumnType_BOOLEAN ColumnType = 3
-	ColumnType_DOUBLE ColumnType = 4
-	ColumnType_BINARY ColumnType = 5
+	ColumnType_DOUBLE  ColumnType = 4
+	ColumnType_BINARY  ColumnType = 5
 )
 
 const (
-	Version = "1.0"
-	ApiVersion = "2015-12-31"
-	xOtsDateFormat = "2006-01-02T15:04:05.123Z"
+	Version          = "1.0"
+	ApiVersion       = "2015-12-31"
+	xOtsDateFormat   = "2006-01-02T15:04:05.123Z"
 	xOtsInstanceName = "x-ots-instancename"
-	xOtsRequestId = "x-ots-requestid"
+	xOtsRequestId    = "x-ots-requestid"
 )
 
 type ColumnValue struct {
@@ -55,14 +55,14 @@ func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	case ColumnType_STRING:
 		v := cv.Value.(string)
 
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE + 1 + len(v))) // length + type + value
+		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
 		writeRawByte(w, VT_STRING)
 		writeRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, []byte(v))
 
 	case ColumnType_INTEGER:
 		v := cv.Value.(int64)
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_64_SIZE + 1))
+		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_64_SIZE+1))
 		writeRawByte(w, VT_INTEGER)
 		writeRawLittleEndian64(w, v)
 	case ColumnType_BOOLEAN:
@@ -74,14 +74,14 @@ func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	case ColumnType_DOUBLE:
 		v := cv.Value.(float64)
 
-		writeRawLittleEndian32(w, LITTLE_ENDIAN_64_SIZE + 1)
+		writeRawLittleEndian32(w, LITTLE_ENDIAN_64_SIZE+1)
 		writeRawByte(w, VT_DOUBLE)
 		writeDouble(w, v)
 
 	case ColumnType_BINARY:
 		v := cv.Value.([]byte)
 
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE + 1 + len(v))) // length + type + value
+		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
 		writeRawByte(w, VT_BLOB)
 		writeRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, v)
@@ -127,7 +127,7 @@ func (cv *ColumnValue) writeCellValueWithoutLengthPrefix() []byte {
 
 func (cv *ColumnValue) getCheckSum(crc byte) byte {
 	if cv == nil {
-		return crc8Byte(crc, VT_AUTO_INCREMENT);
+		return crc8Byte(crc, VT_AUTO_INCREMENT)
 	}
 
 	switch cv.Type {
@@ -384,7 +384,7 @@ func (pk *PrimaryKey) Build(isDelete bool) []byte {
 	rowChecksum := byte(0x0)
 	var cellChecksum byte
 
-	for _, column := range (pk.PrimaryKeys) {
+	for _, column := range pk.PrimaryKeys {
 		primaryKeyColumn := NewPrimaryKeyColumn([]byte(column.ColumnName), column.Value, column.PrimaryKeyOption)
 
 		cellChecksum = crc8Bytes(byte(0x0), []byte(primaryKeyColumn.Name))
@@ -421,18 +421,18 @@ type RowUpdateChange struct {
 
 func (rpc *RowPutChange) Build() []byte {
 	pkCells := make([]*PlainBufferCell, len(rpc.primaryKey))
-	for i, pkc := range (rpc.primaryKey) {
+	for i, pkc := range rpc.primaryKey {
 		pkCells[i] = pkc.toPlainBufferCell()
 	}
 
 	cells := make([]*PlainBufferCell, len(rpc.columnsToPut))
-	for i, c := range (rpc.columnsToPut) {
+	for i, c := range rpc.columnsToPut {
 		cells[i] = c.toPlainBufferCell(false)
 	}
 
 	row := &PlainBufferRow{
 		primaryKey: pkCells,
-		cells: cells}
+		cells:      cells}
 	var b bytes.Buffer
 	row.writeRowWithHeader(&b)
 
@@ -441,18 +441,18 @@ func (rpc *RowPutChange) Build() []byte {
 
 func (ruc *RowUpdateChange) Build() []byte {
 	pkCells := make([]*PlainBufferCell, len(ruc.primaryKey))
-	for i, pkc := range (ruc.primaryKey) {
+	for i, pkc := range ruc.primaryKey {
 		pkCells[i] = pkc.toPlainBufferCell()
 	}
 
 	cells := make([]*PlainBufferCell, len(ruc.columnsToUpdate))
-	for i, c := range (ruc.columnsToUpdate) {
+	for i, c := range ruc.columnsToUpdate {
 		cells[i] = c.toPlainBufferCell(c.IgnoreValue)
 	}
 
 	row := &PlainBufferRow{
 		primaryKey: pkCells,
-		cells: cells}
+		cells:      cells}
 	var b bytes.Buffer
 	row.writeRowWithHeader(&b)
 
@@ -510,7 +510,7 @@ func NewCompositeFilter(filters []ColumnFilter, lo LogicalOperator) *otsprotocol
 	ccvfilter := new(otsprotocol.CompositeColumnValueFilter)
 	combinator := lo.ConvertToPbLoType()
 	ccvfilter.Combinator = &combinator
-	for _, cf := range (filters) {
+	for _, cf := range filters {
 		filter := cf.ToFilter()
 		ccvfilter.SubFilters = append(ccvfilter.SubFilters, filter)
 	}
@@ -561,12 +561,12 @@ func getRequestId(response *http.Response) string {
 func buildRowPutChange(primarykey *PrimaryKey, columns []AttributeColumn) *RowPutChange {
 	row := new(RowPutChange)
 	row.primaryKey = make([]*PrimaryKeyColumnInner, len(primarykey.PrimaryKeys))
-	for i, p := range (primarykey.PrimaryKeys) {
+	for i, p := range primarykey.PrimaryKeys {
 		row.primaryKey[i] = NewPrimaryKeyColumn([]byte(p.ColumnName), p.Value, p.PrimaryKeyOption)
 	}
 
 	row.columnsToPut = make([]*Column, len(columns))
-	for i, p := range (columns) {
+	for i, p := range columns {
 		row.columnsToPut[i] = NewColumn([]byte(p.ColumnName), p.Value)
 		if p.Timestamp != 0 {
 			row.columnsToPut[i].HasTimestamp = true
@@ -580,12 +580,12 @@ func buildRowPutChange(primarykey *PrimaryKey, columns []AttributeColumn) *RowPu
 func buildRowUpdateChange(primarykey *PrimaryKey, columns []ColumnToUpdate) *RowUpdateChange {
 	row := new(RowUpdateChange)
 	row.primaryKey = make([]*PrimaryKeyColumnInner, len(primarykey.PrimaryKeys))
-	for i, p := range (primarykey.PrimaryKeys) {
+	for i, p := range primarykey.PrimaryKeys {
 		row.primaryKey[i] = NewPrimaryKeyColumn([]byte(p.ColumnName), p.Value, p.PrimaryKeyOption)
 	}
 
 	row.columnsToUpdate = make([]*Column, len(columns))
-	for i, p := range (columns) {
+	for i, p := range columns {
 		row.columnsToUpdate[i] = NewColumn([]byte(p.ColumnName), p.Value)
 		row.columnsToUpdate[i].HasTimestamp = p.HasTimestamp
 		row.columnsToUpdate[i].HasType = p.HasType
@@ -614,13 +614,13 @@ func (condition *RowCondition) buildCondition() *otsprotocol.RowExistenceExpecta
 // value only support int64,string,[]byte or you will get panic
 func buildPrimaryKey(primaryKeyName string, value interface{}) *PrimaryKeyColumn {
 	// Todo: validate the input
-	return &PrimaryKeyColumn{ColumnName: primaryKeyName, Value:value, PrimaryKeyOption: NONE}
+	return &PrimaryKeyColumn{ColumnName: primaryKeyName, Value: value, PrimaryKeyOption: NONE}
 }
 
 // value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumn(columnName string, value interface{}) {
 	// Todo: validate the input
-	column := &AttributeColumn{ColumnName: columnName, Value:value}
+	column := &AttributeColumn{ColumnName: columnName, Value: value}
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 
@@ -631,7 +631,7 @@ func (rowchange *PutRowChange) SetReturnPk() {
 // value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
 	// Todo: validate the input
-	column := &AttributeColumn{ColumnName: columnName, Value:value}
+	column := &AttributeColumn{ColumnName: columnName, Value: value}
 	column.Timestamp = timestamp
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
@@ -641,24 +641,24 @@ func (pk *PrimaryKey) AddPrimaryKeyColumn(primaryKeyName string, value interface
 }
 
 func (pk *PrimaryKey) AddPrimaryKeyColumnWithAutoIncrement(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: AUTO_INCREMENT })
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: AUTO_INCREMENT})
 }
 
 func (pk *PrimaryKey) AddPrimaryKeyColumnWithMinValue(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MIN })
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MIN})
 }
 
 // Only used for range query
 func (pk *PrimaryKey) AddPrimaryKeyColumnWithMaxValue(primaryKeyName string) {
-	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MAX })
+	pk.PrimaryKeys = append(pk.PrimaryKeys, &PrimaryKeyColumn{ColumnName: primaryKeyName, PrimaryKeyOption: MAX})
 }
 
 func (rowchange *PutRowChange) SetCondition(rowExistenceExpectation RowExistenceExpectation) {
-	rowchange.Condition = &RowCondition{RowExistenceExpectation:rowExistenceExpectation}
+	rowchange.Condition = &RowCondition{RowExistenceExpectation: rowExistenceExpectation}
 }
 
 func (rowchange *DeleteRowChange) SetCondition(rowExistenceExpectation RowExistenceExpectation) {
-	rowchange.Condition = &RowCondition{RowExistenceExpectation:rowExistenceExpectation}
+	rowchange.Condition = &RowCondition{RowExistenceExpectation: rowExistenceExpectation}
 }
 
 func (Criteria *SingleRowQueryCriteria) SetFilter(filter ColumnFilter) {
@@ -670,7 +670,7 @@ func (Criteria *MultiRowQueryCriteria) SetFilter(filter ColumnFilter) {
 }
 
 func NewSingleColumnCondition(columnName string, comparator ComparatorType, value interface{}) *SingleColumnCondition {
-	return &SingleColumnCondition{ColumnName: &columnName, Comparator: &comparator, ColumnValue:value}
+	return &SingleColumnCondition{ColumnName: &columnName, Comparator: &comparator, ColumnValue: value}
 }
 
 func NewCompositeColumnCondition(lo LogicalOperator) *CompositeColumnValueFilter {
@@ -682,7 +682,7 @@ func (rowchange *PutRowChange) SetColumnCondition(condition ColumnFilter) {
 }
 
 func (rowchange *UpdateRowChange) SetCondition(rowExistenceExpectation RowExistenceExpectation) {
-	rowchange.Condition = &RowCondition{RowExistenceExpectation:rowExistenceExpectation}
+	rowchange.Condition = &RowCondition{RowExistenceExpectation: rowExistenceExpectation}
 }
 
 func (rowchange *UpdateRowChange) SetColumnCondition(condition ColumnFilter) {
@@ -694,11 +694,11 @@ func (rowchange *DeleteRowChange) SetColumnCondition(condition ColumnFilter) {
 }
 
 func (meta *TableMeta) AddPrimaryKeyColumn(name string, keyType PrimaryKeyType) {
-	meta.SchemaEntry = append(meta.SchemaEntry, &PrimaryKeySchema{Name:&name, Type: &keyType})
+	meta.SchemaEntry = append(meta.SchemaEntry, &PrimaryKeySchema{Name: &name, Type: &keyType})
 }
 
 func (meta *TableMeta) AddPrimaryKeyColumnOption(name string, keyType PrimaryKeyType, keyOption PrimaryKeyOption) {
-	meta.SchemaEntry = append(meta.SchemaEntry, &PrimaryKeySchema{Name:&name, Type: &keyType, Option: &keyOption})
+	meta.SchemaEntry = append(meta.SchemaEntry, &PrimaryKeySchema{Name: &name, Type: &keyType, Option: &keyOption})
 }
 
 // value only support int64,string,bool,float64,[]byte. other type will get panic
@@ -804,7 +804,7 @@ func (columnMap *ColumnMap) GetRange(start int, count int) ([]*AttributeColumn, 
 	columns := []*AttributeColumn{}
 
 	end := start + count
-	if (len(columnMap.columnsKey) < end ) {
+	if len(columnMap.columnsKey) < end {
 		return nil, fmt.Errorf("invalid arugment")
 	}
 
@@ -828,7 +828,7 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 		response.columnMap = &ColumnMap{}
 		response.columnMap.Columns = make(map[string][]*AttributeColumn)
 
-		if (len(response.Columns) == 0) {
+		if len(response.Columns) == 0 {
 			return response.columnMap
 		} else {
 			for _, column := range response.Columns {
@@ -854,4 +854,3 @@ func Assert(cond bool, msg string) {
 		panic(msg)
 	}
 }
-

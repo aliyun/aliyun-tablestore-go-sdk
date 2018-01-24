@@ -1,17 +1,17 @@
 package tablestore
 
 import (
-	"testing"
-	. "gopkg.in/check.v1"
 	"fmt"
-	"os"
-	"strconv"
-	"strings"
-	"runtime"
-	"time"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	. "gopkg.in/check.v1"
 	"math/rand"
 	"net/http"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"os"
+	"runtime"
+	"strconv"
+	"strings"
+	"testing"
+	"time"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -42,7 +42,7 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 
 	tableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
 	defaultTableName = tableNamePrefix + defaultTableName
-	rangeQueryTableName =  tableNamePrefix + rangeQueryTableName
+	rangeQueryTableName = tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
 	PrepareTable2(rangeQueryTableName)
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
@@ -181,7 +181,7 @@ func (s *TableStoreSuite) TestListTable(c *C) {
 	listtables, error := client.ListTable()
 	c.Check(error, Equals, nil)
 	defaultTableExist := false
-	for _, table := range (listtables.TableNames) {
+	for _, table := range listtables.TableNames {
 		fmt.Println(table)
 		if table == defaultTableName {
 			defaultTableExist = true
@@ -245,7 +245,7 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		putRowChange := new(PutRowChange)
 		putRowChange.TableName = tableName
 		putPk := new(PrimaryKey)
-		putPk.AddPrimaryKeyColumn("pk1", "key" + strconv.Itoa(i))
+		putPk.AddPrimaryKeyColumn("pk1", "key"+strconv.Itoa(i))
 		putPk.AddPrimaryKeyColumnWithAutoIncrement("pk2")
 		putRowChange.PrimaryKey = putPk
 		putRowChange.AddColumn("col1", "col1data1")
@@ -257,7 +257,7 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		c.Check(error, Equals, nil)
 		c.Check(len(response.PrimaryKey.PrimaryKeys), Equals, 2)
 		c.Check(response.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
-		c.Check(response.PrimaryKey.PrimaryKeys[0].Value, Equals,  "key" + strconv.Itoa(i))
+		c.Check(response.PrimaryKey.PrimaryKeys[0].Value, Equals, "key"+strconv.Itoa(i))
 		c.Check(response.PrimaryKey.PrimaryKeys[1].ColumnName, Equals, "pk2")
 		c.Check(response.PrimaryKey.PrimaryKeys[1].Value.(int64) > 0, Equals, true)
 
@@ -292,7 +292,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(error, Equals, nil)
 
 	getRowRequest := new(GetRowRequest)
-	criteria := new(SingleRowQueryCriteria);
+	criteria := new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -325,7 +325,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(mapData.Columns["col5"][0].Value, Equals, int64(50))
 	c.Check(mapData.Columns["col6"][0].Value, Equals, int64(60))
 
-	sortedColumn, error := mapData.GetRange(2,2)
+	sortedColumn, error := mapData.GetRange(2, 2)
 	c.Check(error, Equals, nil)
 	c.Check(len(sortedColumn), Equals, 2)
 	c.Check(sortedColumn[0], Equals, mapData.Columns["col3"][0])
@@ -334,11 +334,11 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	mapData2 := getResp.GetColumnMap()
 	c.Check(mapData2.Columns["col1"][0].Value, Equals, "col1data1")
 
-	_, error = mapData.GetRange(2,10)
+	_, error = mapData.GetRange(2, 10)
 	c.Check(error, NotNil)
 	// Test add column to get
 	getRowRequest = new(GetRowRequest)
-	criteria = new(SingleRowQueryCriteria);
+	criteria = new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -356,7 +356,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(error, NotNil)
 
 	getRowRequest = new(GetRowRequest)
-	criteria = new(SingleRowQueryCriteria);
+	criteria = new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -366,7 +366,7 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	notExistPk := new(PrimaryKey)
 	notExistPk.AddPrimaryKeyColumn("pk1", "notexistpk")
 	getRowRequest = new(GetRowRequest)
-	criteria = new(SingleRowQueryCriteria);
+	criteria = new(SingleRowQueryCriteria)
 
 	criteria.PrimaryKey = notExistPk
 	getRowRequest.SingleRowQueryCriteria = criteria
@@ -444,7 +444,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", "testtskey1")
 	putRowChange.PrimaryKey = putPk
-	timeNow :=time.Now().Unix() * 1000
+	timeNow := time.Now().Unix() * 1000
 	putRowChange.AddColumnWithTimestamp("col1", "col1data1", timeNow)
 	putRowChange.AddColumn("col2", int64(100))
 	putRowChange.AddColumn("col3", float64(2.1))
@@ -457,7 +457,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(error, Equals, nil)
 
 	getRowRequest := new(GetRowRequest)
-	criteria := new(SingleRowQueryCriteria);
+	criteria := new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -571,7 +571,7 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	cf2.AddFilter(cf3)
 
 	getRowRequest := new(GetRowRequest)
-	criteria := new(SingleRowQueryCriteria);
+	criteria := new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -598,7 +598,7 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
 
 	getRowRequest = new(GetRowRequest)
-	criteria = new(SingleRowQueryCriteria);
+	criteria = new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -613,9 +613,8 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	c.Check(getResp, NotNil)
 	c.Check(len(getResp.Columns), Equals, 3)
 
-
 	getRowRequest = new(GetRowRequest)
-	criteria = new(SingleRowQueryCriteria);
+	criteria = new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -666,7 +665,7 @@ func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	c.Check(error, Equals, nil)
 
 	getRowRequest := new(GetRowRequest)
-	criteria := new(SingleRowQueryCriteria);
+	criteria := new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
@@ -734,7 +733,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
@@ -753,7 +752,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 		mqCriteria.AddColumnToGet("col1")
 	}
 	timeNow := time.Now().Unix() * 1000
-	mqCriteria.TimeRange = &TimeRange{Start: timeNow - 10000, End : timeNow + 10000}
+	mqCriteria.TimeRange = &TimeRange{Start: timeNow - 10000, End: timeNow + 10000}
 	mqCriteria.TableName = defaultTableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 	batchGetResponse, error = client.BatchGetRow(batchGetReq)
@@ -761,7 +760,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
@@ -779,7 +778,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 		pkToGet.AddPrimaryKeyColumn("pk1", key)
 		mqCriteria.AddRow(pkToGet)
 	}
-	mqCriteria.TimeRange = &TimeRange{Start: timeNow + 10000, End : timeNow + 20000}
+	mqCriteria.TimeRange = &TimeRange{Start: timeNow + 10000, End: timeNow + 20000}
 	mqCriteria.TableName = defaultTableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 	batchGetResponse, error = client.BatchGetRow(batchGetReq)
@@ -788,7 +787,7 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
@@ -837,7 +836,7 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	for index, rowToCheck := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
 		c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
@@ -873,8 +872,8 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	c.Check(len(batchGetResponse.TableToRowsResult), Equals, 1)
 	c.Check(len(batchGetResponse.TableToRowsResult[mqCriteria.TableName]), Equals, rowCount)
 
-	count :=0
-	for index, rowToCheck := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+	count := 0
+	for index, rowToCheck := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, mqCriteria.TableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
@@ -925,7 +924,7 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	c.Check(error, Equals, nil)
 	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
 
-	for index, rowToCheck := range (batchWriteResponse.TableToRowsResult[defaultTableName]) {
+	for index, rowToCheck := range batchWriteResponse.TableToRowsResult[defaultTableName] {
 		c.Check(rowToCheck.Index, Equals, int32(index))
 		c.Check(rowToCheck.TableName, Equals, defaultTableName)
 		c.Check(rowToCheck.IsSucceed, Equals, true)
@@ -953,9 +952,9 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	start := 1
 	end := 8
 	startPK := new(PrimaryKey)
-	startPK.AddPrimaryKeyColumn("pk1", "getrange" + strconv.Itoa(start))
+	startPK.AddPrimaryKeyColumn("pk1", "getrange"+strconv.Itoa(start))
 	endPK := new(PrimaryKey)
-	endPK.AddPrimaryKeyColumn("pk1", "getrange" + strconv.Itoa(end))
+	endPK.AddPrimaryKeyColumn("pk1", "getrange"+strconv.Itoa(end))
 	rangeRowQueryCriteria.StartPrimaryKey = startPK
 	rangeRowQueryCriteria.EndPrimaryKey = endPK
 	rangeRowQueryCriteria.Direction = FORWARD
@@ -1024,9 +1023,9 @@ func (s *TableStoreSuite) TestGetRangeWithPagination(c *C) {
 	end := 8
 	var limit int32 = 3
 	startPK := new(PrimaryKey)
-	startPK.AddPrimaryKeyColumn("pk1", "testrangequery" + strconv.Itoa(start))
+	startPK.AddPrimaryKeyColumn("pk1", "testrangequery"+strconv.Itoa(start))
 	endPK := new(PrimaryKey)
-	endPK.AddPrimaryKeyColumn("pk1", "testrangequery" + strconv.Itoa(end))
+	endPK.AddPrimaryKeyColumn("pk1", "testrangequery"+strconv.Itoa(end))
 	rangeRowQueryCriteria.StartPrimaryKey = startPK
 	rangeRowQueryCriteria.EndPrimaryKey = endPK
 	rangeRowQueryCriteria.Direction = FORWARD
@@ -1051,7 +1050,7 @@ func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
 	for i := 0; i < rowCount; i++ {
 		key := "zgetrangetest" + strconv.Itoa(i)
 		value := "value" + strconv.Itoa(i)
-		PrepareDataInRangeTableWithTimestamp("pk1",key, value, timeNow)
+		PrepareDataInRangeTableWithTimestamp("pk1", key, value, timeNow)
 	}
 
 	for i := 0; i < rowCount; i++ {
@@ -1081,8 +1080,8 @@ func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
 	rangeRowQueryCriteria.Direction = FORWARD
 	rangeRowQueryCriteria.MaxVersion = 1
 	filter := NewCompositeColumnCondition(LogicalOperator(LO_AND))
-	filter1:= NewSingleColumnCondition("pk2", ComparatorType(CT_GREATER_EQUAL), "pk3")
-	filter2:= NewSingleColumnCondition("pk2", ComparatorType(CT_LESS_EQUAL), "pk3")
+	filter1 := NewSingleColumnCondition("pk2", ComparatorType(CT_GREATER_EQUAL), "pk3")
+	filter2 := NewSingleColumnCondition("pk2", ComparatorType(CT_LESS_EQUAL), "pk3")
 	filter.AddFilter(filter2)
 	filter.AddFilter(filter1)
 	rangeRowQueryCriteria.Filter = filter
@@ -1131,7 +1130,7 @@ func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
 func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	fmt.Println("TestPutRowsWorkload started")
 
-	start:= time.Now().UnixNano()
+	start := time.Now().UnixNano()
 
 	isFinished := make(chan bool)
 	totalCount := 100
@@ -1140,11 +1139,11 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 		go func(index int) {
 			for j := 0; j < 100; j++ {
 				currentIndex := index + j
-				rowToPut1 := CreatePutRowChange("workloadtestkey" + strconv.Itoa(currentIndex), "perfdata1")
+				rowToPut1 := CreatePutRowChange("workloadtestkey"+strconv.Itoa(currentIndex), "perfdata1")
 				putRowRequest := new(PutRowRequest)
 				putRowRequest.PutRowChange = rowToPut1
 				_, error := client.PutRow(putRowRequest)
-				if error !=nil {
+				if error != nil {
 					fmt.Println("put row error", error)
 				}
 				c.Check(error, IsNil)
@@ -1163,7 +1162,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	for _ = range isFinished {
 		count++
 		fmt.Println("catched count is:", count)
-		if count >=totalCount {
+		if count >= totalCount {
 			close(isFinished)
 		}
 	}
@@ -1172,7 +1171,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 
 	totalCost := (end - start) / 1000000
 	fmt.Println("total cost:", totalCost)
-	c.Check(totalCost < 30 * 1000, Equals, true)
+	c.Check(totalCost < 30*1000, Equals, true)
 
 	time.Sleep(time.Millisecond * 20)
 	fmt.Println("TestPutRowsWorkload finished")
@@ -1237,7 +1236,7 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	tableName = tableNamePrefix + "tablenotexist"
 	deleteReq := new(DeleteTableRequest)
 	deleteReq.TableName = tableName
-	_,err = client.DeleteTable(deleteReq)
+	_, err = client.DeleteTable(deleteReq)
 	c.Check(err, NotNil)
 
 	_, err = invalidClient.ListTable()
@@ -1254,7 +1253,6 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	_, error = invalidClient.UpdateTable(updateTableReq)
 	c.Assert(error, NotNil)
 
-
 	describeTableReq := new(DescribeTableRequest)
 	describeTableReq.TableName = defaultTableName
 	_, error = invalidClient.DescribeTable(describeTableReq)
@@ -1267,7 +1265,7 @@ func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
 		return &mockHttpClient{}
 	}
 
-	tempClient := NewClientWithConfig("test","a","b","c","d", NewDefaultTableStoreConfig())
+	tempClient := NewClientWithConfig("test", "a", "b", "c", "d", NewDefaultTableStoreConfig())
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -1279,7 +1277,7 @@ func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
 	putRowChange.AddColumn("col3", float64(2.1))
 	putRowChange.SetCondition(RowExistenceExpectation_EXPECT_NOT_EXIST)
 	putRowRequest.PutRowChange = putRowChange
-	data :=tempClient.httpClient.(*mockHttpClient)
+	data := tempClient.httpClient.(*mockHttpClient)
 
 	data.error = fmt.Errorf("test")
 	_, error := tempClient.PutRow(putRowRequest)
@@ -1318,31 +1316,31 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 	result := otshead.search("zz")
 	c.Check(result, IsNil)
 
-	tempClient := NewClient("a","b","c", "d", SetSth())
+	tempClient := NewClient("a", "b", "c", "d", SetSth())
 	c.Check(tempClient, NotNil)
 	config := NewDefaultTableStoreConfig()
-	tempClient = NewClientWithConfig("a","b","c", "d", "e", config)
+	tempClient = NewClientWithConfig("a", "b", "c", "d", "e", config)
 	c.Check(tempClient, NotNil)
 
 	errorCode := INTERNAL_SERVER_ERROR
 	tsClient := client.(*TableStoreClient)
-	value := getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value := getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second*1), 10, getRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = ROW_OPERATION_CONFLICT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, putRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri, 500)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri, 500)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second * 1), MaxRetryInterval, getRowUri, 500)
+	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri, 500)
 	c.Check(value == MaxRetryInterval, Equals, true)
 
 	getResp := &GetRowResponse{}
@@ -1350,9 +1348,9 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 	c.Check(colMap, NotNil)
 
 	getResp = &GetRowResponse{}
-	col1 := &AttributeColumn{ColumnName:"col1", Value:"value1"}
-	col2 := &AttributeColumn{ColumnName:"col1", Value:"value2"}
-	col3 := &AttributeColumn{ColumnName:"col2", Value:"value3"}
+	col1 := &AttributeColumn{ColumnName: "col1", Value: "value1"}
+	col2 := &AttributeColumn{ColumnName: "col1", Value: "value2"}
+	col3 := &AttributeColumn{ColumnName: "col2", Value: "value3"}
 
 	getResp.Columns = append(getResp.Columns, col1)
 	getResp.Columns = append(getResp.Columns, col2)
@@ -1377,7 +1375,7 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 	c.Check(resp2.GetColumnMap(), IsNil)
 }
 
-func SetSth() ClientOption{
+func SetSth() ClientOption {
 	return func(client *TableStoreClient) {
 		fmt.Println(client.accessKeyId)
 	}
@@ -1395,9 +1393,9 @@ func CreatePutRowChange(pkValue, colValue string) *PutRowChange {
 }
 
 type mockHttpClient struct {
-	response *http.Response
-	error error
-	httpClient      *http.Client
+	response   *http.Response
+	error      error
+	httpClient *http.Client
 }
 
 func (mockHttpClient *mockHttpClient) Do(req *http.Request) (*http.Response, error) {
@@ -1408,8 +1406,8 @@ func (mockHttpClient *mockHttpClient) New(client *http.Client) {
 	mockHttpClient.httpClient = client
 }
 
-
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
 func randStringRunes(n int) string {
 	random := rand.New(rand.NewSource(time.Now().Unix()))
 
@@ -1506,7 +1504,7 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	}
 	{
 		resp, err := client.UpdateTable(&UpdateTableRequest{
-			TableName: tableName,
+			TableName:  tableName,
 			StreamSpec: &StreamSpecification{EnableStream: true, ExpirationTime: 24}})
 		c.Assert(err, IsNil)
 		c.Assert(resp.StreamDetails, NotNil)
@@ -1548,7 +1546,7 @@ func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
 		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
 
 		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
-		
+
 		_, err := client.CreateTable(&req)
 		c.Assert(err, IsNil)
 	}
@@ -1580,7 +1578,7 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		req.ReservedThroughput = &ReservedThroughput{Readcap: 0, Writecap: 0}
 
 		req.StreamSpec = &StreamSpecification{EnableStream: true, ExpirationTime: 24}
-		
+
 		_, err := client.CreateTable(&req)
 		c.Assert(err, IsNil)
 	}
@@ -1615,7 +1613,7 @@ func (s *TableStoreSuite) TestStream(c *C) {
 	{
 		resp, err := client.GetShardIterator(&GetShardIteratorRequest{
 			StreamId: streamId,
-			ShardId: shardId})
+			ShardId:  shardId})
 		c.Assert(err, IsNil)
 		c.Assert(resp.ShardIterator, NotNil)
 		iter = resp.ShardIterator
@@ -1780,4 +1778,3 @@ func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamR
 	}
 	return iter, records
 }
-

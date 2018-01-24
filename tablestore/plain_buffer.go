@@ -1,47 +1,47 @@
 package tablestore
 
 import (
-	"io"
-	"fmt"
-	"math"
 	"bytes"
 	"encoding/binary"
+	"fmt"
+	"io"
+	"math"
 )
 
 const (
-	HEADER = 0x75;
+	HEADER = 0x75
 
 	// tag type
-	TAG_ROW_PK = 0x1;
-	TAG_ROW_DATA = 0x2;
-	TAG_CELL = 0x3;
-	TAG_CELL_NAME = 0x4;
-	TAG_CELL_VALUE = 0x5;
-	TAG_CELL_TYPE = 0x6;
-	TAG_CELL_TIMESTAMP = 0x7;
-	TAG_DELETE_ROW_MARKER = 0x8;
-	TAG_ROW_CHECKSUM = 0x9;
-	TAG_CELL_CHECKSUM = 0x0A;
-	TAG_EXTENSION = 0x0B;
-	TAG_SEQ_INFO = 0x0C;
-	TAG_SEQ_INFO_EPOCH = 0x0D;
-	TAG_SEQ_INFO_TS = 0x0E;
-	TAG_SEQ_INFO_ROW_INDEX = 0x0F;
+	TAG_ROW_PK             = 0x1
+	TAG_ROW_DATA           = 0x2
+	TAG_CELL               = 0x3
+	TAG_CELL_NAME          = 0x4
+	TAG_CELL_VALUE         = 0x5
+	TAG_CELL_TYPE          = 0x6
+	TAG_CELL_TIMESTAMP     = 0x7
+	TAG_DELETE_ROW_MARKER  = 0x8
+	TAG_ROW_CHECKSUM       = 0x9
+	TAG_CELL_CHECKSUM      = 0x0A
+	TAG_EXTENSION          = 0x0B
+	TAG_SEQ_INFO           = 0x0C
+	TAG_SEQ_INFO_EPOCH     = 0x0D
+	TAG_SEQ_INFO_TS        = 0x0E
+	TAG_SEQ_INFO_ROW_INDEX = 0x0F
 
 	// cell op type
-	DELETE_ALL_VERSION = 0x1;
-	DELETE_ONE_VERSION = 0x3;
+	DELETE_ALL_VERSION = 0x1
+	DELETE_ONE_VERSION = 0x3
 
 	// variant type
-	VT_INTEGER = 0x0;
-	VT_DOUBLE = 0x1;
-	VT_BOOLEAN = 0x2;
-	VT_STRING = 0x3;
+	VT_INTEGER = 0x0
+	VT_DOUBLE  = 0x1
+	VT_BOOLEAN = 0x2
+	VT_STRING  = 0x3
 
 	//public final static byte VT_NULL = 0x6;
-	VT_BLOB = 0x7;
-	VT_INF_MIN = 0x9;
-	VT_INF_MAX = 0xa;
+	VT_BLOB           = 0x7
+	VT_INF_MIN        = 0x9
+	VT_INF_MAX        = 0xa
 	VT_AUTO_INCREMENT = 0xb
 
 	LITTLE_ENDIAN_32_SIZE = 4
@@ -62,38 +62,38 @@ func init() {
 				x = (x << 1) ^ 0
 			}
 		}
-		crc8Table[i] = x;
+		crc8Table[i] = x
 	}
 }
 
 func crc8Byte(crc, in byte) byte {
-	return crc8Table[(crc ^ in) & 0xff]
+	return crc8Table[(crc^in)&0xff]
 }
 
 func crc8Int32(crc byte, in int32) byte {
 	for i := 0; i < 4; i++ {
 		crc = crc8Byte(crc, byte((in & 0xff)))
-		in >>= 8;
+		in >>= 8
 	}
 
-	return crc;
+	return crc
 }
 
 func crc8Int64(crc byte, in int64) byte {
 	for i := 0; i < 8; i++ {
 		crc = crc8Byte(crc, byte((in & 0xff)))
-		in >>= 8;
+		in >>= 8
 	}
 
-	return crc;
+	return crc
 }
 
 func crc8Bytes(crc byte, in []byte) byte {
 	for i := 0; i < len(in); i++ {
-		crc = crc8Byte(crc, in[i]);
+		crc = crc8Byte(crc, in[i])
 	}
 
-	return crc;
+	return crc
 }
 
 func writeRawByte(w io.Writer, value byte) {
@@ -147,7 +147,7 @@ func writeTag(w io.Writer, tag byte) {
 }
 
 func writeCellName(w io.Writer, name []byte) {
-	writeTag(w, TAG_CELL_NAME);
+	writeTag(w, TAG_CELL_NAME)
 	writeRawLittleEndian32(w, int32(len(name)))
 	writeBytes(w, name)
 }
@@ -184,7 +184,7 @@ func (cell *PlainBufferCell) writeCell(w io.Writer) {
 }
 
 func (cell *PlainBufferCell) getCheckSum(crc byte) byte {
-	crc = crc8Bytes(crc, cell.cellName);
+	crc = crc8Bytes(crc, cell.cellName)
 	if cell.ignoreValue == false {
 		crc = cell.cellValue.getCheckSum(crc)
 	}
@@ -199,22 +199,22 @@ func (cell *PlainBufferCell) getCheckSum(crc byte) byte {
 }
 
 type PlainBufferRow struct {
-	primaryKey []*PlainBufferCell
-	cells []*PlainBufferCell
+	primaryKey      []*PlainBufferCell
+	cells           []*PlainBufferCell
 	hasDeleteMarker bool
-	extension *RecordSequenceInfo // optional
+	extension       *RecordSequenceInfo // optional
 }
 
 func (row *PlainBufferRow) writeRow(w io.Writer) {
 	/* pk */
 	writeTag(w, TAG_ROW_PK)
-	for _, pk := range (row.primaryKey) {
+	for _, pk := range row.primaryKey {
 		pk.writeCell(w)
 	}
 
 	if len(row.cells) > 0 {
 		writeTag(w, TAG_ROW_DATA)
-		for _, cell := range (row.cells) {
+		for _, cell := range row.cells {
 			cell.writeCell(w)
 		}
 	}
@@ -229,12 +229,12 @@ func (row *PlainBufferRow) writeRowWithHeader(w io.Writer) {
 }
 
 func (row *PlainBufferRow) getCheckSum(crc byte) byte {
-	for _, cell := range (row.primaryKey) {
+	for _, cell := range row.primaryKey {
 		crcCell := cell.getCheckSum(byte(0x0))
 		crc = crc8Byte(crc, crcCell)
 	}
 
-	for _, cell := range (row.cells) {
+	for _, cell := range row.cells {
 		crcCell := cell.getCheckSum(byte(0x0))
 		crc = crc8Byte(crc, crcCell)
 	}
@@ -390,7 +390,7 @@ func readRow(r *bytes.Reader) *PlainBufferRow {
 	row := new(PlainBufferRow)
 	row.primaryKey = readRowPk(r)
 	tag := readTag(r)
-	
+
 	if tag == TAG_ROW_DATA {
 		row.cells = readRowData(r)
 		tag = readTag(r)
@@ -463,11 +463,10 @@ func readRowExtension(r *bytes.Reader) *RecordSequenceInfo {
 		panic(errTag)
 	}
 	rowIndex := readRawLittleEndian32(r)
-	
+
 	ext := RecordSequenceInfo{}
 	ext.Epoch = epoch
 	ext.Timestamp = ts
 	ext.RowIndex = rowIndex
 	return &ext
 }
-

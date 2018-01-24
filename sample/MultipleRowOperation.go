@@ -54,7 +54,6 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	mqCriteria.TableName = tableName
 	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
 
-
 	/*condition := tablestore.NewSingleColumnCondition("col1", tablestore.CT_GREATER_THAN, int64(0))
 	mqCriteria.Filter = condition*/
 
@@ -63,7 +62,7 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	if err != nil {
 		fmt.Println("batachget failed with error:", err)
 	} else {
-		for _, row := range (batchGetResponse.TableToRowsResult[mqCriteria.TableName]) {
+		for _, row := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
 			if row.PrimaryKey.PrimaryKeys != nil {
 				fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 			} else {
@@ -98,13 +97,13 @@ func GetRangeSample(client *tablestore.TableStoreClient, tableName string) {
 
 	getRangeResp, err := client.GetRange(getRangeRequest)
 
-	fmt.Println("get range result is " ,getRangeResp)
+	fmt.Println("get range result is ", getRangeResp)
 
-	for ; ; {
+	for {
 		if err != nil {
 			fmt.Println("get range failed with error:", err)
 		}
-		if (len(getRangeResp.Rows) > 0) {
+		if len(getRangeResp.Rows) > 0 {
 			for _, row := range getRangeResp.Rows {
 				fmt.Println("range get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 			}
