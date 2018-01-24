@@ -113,7 +113,7 @@ func DescribeTableSample(client *tablestore.TableStoreClient, tableName string) 
 }
 
 func ComputeSplitPointsBySize(client *tablestore.TableStoreClient, tableName string){
-	req := &tablestore.ComputeSplitPointsBySizeRequest{TableName: "table1", SplitSize: int64(1)}
+	req := &tablestore.ComputeSplitPointsBySizeRequest{TableName: tableName, SplitSize: int64(1)}
 	va, err := client.ComputeSplitPointsBySize(req)
 	if err != nil {
 		fmt.Println(err)

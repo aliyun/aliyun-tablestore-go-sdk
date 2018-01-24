@@ -1020,13 +1020,19 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 			nowPk.AddPrimaryKeyColumn(string(pk.cellName), pk.cellValue.Value)
 		}
 
+		if len(pbResp.Schema) > 1 {
+			for i := 1; i< len(pbResp.Schema); i++{
+				nowPk.AddPrimaryKeyColumnWithMinValue(*pbResp.Schema[i].Name)
+			}
+		}
+
 		newSplit := &Split{LowerBound: lastPk, UpperBound: nowPk}
 		resp.Splits = append(resp.Splits, newSplit)
 		lastPk = nowPk
 
 	}
 
-	newSplit := &Split{LowerBound: lastPk, UpperBound: nowPk}
+	newSplit := &Split{LowerBound: lastPk, UpperBound: endPk}
 	resp.Splits = append(resp.Splits, newSplit)
 
 	index:=0

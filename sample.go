@@ -7,10 +7,10 @@ import (
 
 func main() {
 	// Replace the endpoint info
-	endpoint := os.Getenv("TS_TEST_ENDPOINT")
-	instanceName := os.Getenv("TS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("TS_TEST_KEYID")
-	accessKeySecret := os.Getenv("TS_TEST_SECRET")
+	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
+	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
+	accessKeyId := os.Getenv("OTS_TEST_KEYID")
+	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
 	client := tablestore.NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	// Table operation
@@ -35,4 +35,8 @@ func main() {
 
 	// Stream sample
 	sample.GetStreamRecordSample(client, "streamtable1")
+
+	// computeSplitpoint
+	sample.ComputeSplitPointsBySize(client, "sampletable")
+
 }
