@@ -548,14 +548,11 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byt
 }
 
 func getRequestId(response *http.Response) string {
-	if response == nil {
+	if response == nil || response.Header == nil{
 		return ""
 	}
-	if id, ok := response.Header[xOtsRequestId]; ok {
-		return id[0]
-	} else {
-		return ""
-	}
+
+	return response.Header.Get(xOtsRequestId)
 }
 
 func buildRowPutChange(primarykey *PrimaryKey, columns []AttributeColumn) *RowPutChange {

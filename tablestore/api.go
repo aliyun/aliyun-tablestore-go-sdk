@@ -93,7 +93,7 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 }
 
 // 请求服务端
-func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, resp proto.Message) error {
+func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo) error {
 	end := time.Now().Add(tableStoreClient.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", tableStoreClient.endPoint, uri)
 	/* request body */
@@ -111,10 +111,12 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	var value int64
 	var i uint
 	var respBody []byte
+	var requestId string
 	for i = 0; ; i++ {
 		var statusCode int
-		var requestId string
+
 		respBody, err, statusCode, requestId = tableStoreClient.doRequest(url, uri, body, resp)
+		responseInfo.RequestId = requestId
 
 		if err == nil {
 			break
@@ -285,15 +287,22 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 
 	if request.StreamSpec != nil {
-		ss := otsprotocol.StreamSpecification{
-			EnableStream:   &request.StreamSpec.EnableStream,
-			ExpirationTime: &request.StreamSpec.ExpirationTime}
+		var ss otsprotocol.StreamSpecification
+		if request.StreamSpec.EnableStream {
+			ss = otsprotocol.StreamSpecification{
+				EnableStream:   &request.StreamSpec.EnableStream,
+				ExpirationTime: &request.StreamSpec.ExpirationTime}
+		} else {
+			ss = otsprotocol.StreamSpecification{
+				EnableStream:   &request.StreamSpec.EnableStream}
+		}
+
 		req.StreamSpec = &ss
 	}
 
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
-	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
@@ -307,12 +316,12 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 // @return Void. 无返回值。
 func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error) {
 	resp := new(otsprotocol.ListTableResponse)
-
-	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp); err != nil {
-		return &ListTableResponse{}, err
+	response := &ListTableResponse{}
+	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp, &response.ResponseInfo); err != nil {
+		return response, err
 	}
 
-	response := &ListTableResponse{resp.TableNames}
+	response.TableNames = resp.TableNames
 	return response, nil
 }
 
@@ -326,7 +335,7 @@ func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableReques
 	req.TableName = proto.String(request.TableName)
 
 	response := &DeleteTableResponse{}
-	if err := tableStoreClient.doRequestWithRetry(deleteTableUri, req, nil); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteTableUri, req, nil, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -340,12 +349,13 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	req.TableName = proto.String(request.TableName)
 
 	resp := new(otsprotocol.DescribeTableResponse)
+	response := new(DescribeTableResponse)
 
-	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp, &response.ResponseInfo); err != nil {
 		return &DescribeTableResponse{}, err
 	}
 
-	response := new(DescribeTableResponse)
+
 	response.ReservedThroughput = &ReservedThroughput{Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)), Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 
 	responseTableMeta := new(TableMeta)
@@ -405,12 +415,12 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	}
 
 	resp := new(otsprotocol.UpdateTableResponse)
+	response := new(UpdateTableResponse)
 
-	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := new(UpdateTableResponse)
 	response.ReservedThroughput = &ReservedThroughput{
 		Readcap:  int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)),
 		Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
@@ -464,12 +474,12 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 	req.Condition = condition
 
 	resp := new(otsprotocol.PutRowResponse)
-
-	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp); err != nil {
+	response := &PutRowResponse{}
+	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := &PutRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	response.ConsumedCapacityUnit = &ConsumedCapacityUnit{}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 
@@ -496,12 +506,12 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 	req.Condition = request.DeleteRowChange.getCondition()
 	req.PrimaryKey = request.DeleteRowChange.PrimaryKey.Build(true)
 	resp := new(otsprotocol.DeleteRowResponse)
-
-	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp); err != nil {
+	response := &DeleteRowResponse{}
+	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := &DeleteRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	response.ConsumedCapacityUnit = &ConsumedCapacityUnit{}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 	return response, nil
@@ -545,11 +555,14 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		req.Filter = request.SingleRowQueryCriteria.Filter.Serialize()
 	}
 
-	if err := tableStoreClient.doRequestWithRetry(getRowUri, req, resp); err != nil {
+	response := &GetRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	if err := tableStoreClient.doRequestWithRetry(getRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := &GetRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
+	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+
 	if len(resp.Row) == 0 {
 		return response, nil
 	}
@@ -569,8 +582,6 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		response.Columns = append(response.Columns, dataColumn)
 	}
 
-	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
-	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 	return response, nil
 }
 
@@ -584,11 +595,11 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	req.Condition = request.UpdateRowChange.getCondition()
 	req.RowChange = request.UpdateRowChange.Serialize()
 
-	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp); err != nil {
+	response := &UpdateRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := &UpdateRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 	return response, nil
@@ -634,11 +645,10 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	req.Tables = tablesInBatch
 	resp := new(otsprotocol.BatchGetRowResponse)
 
-	if err := tableStoreClient.doRequestWithRetry(batchGetRowUri, req, resp); err != nil {
+	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
+	if err := tableStoreClient.doRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
-
-	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
 	for _, table := range resp.Tables {
 		index := int32(0)
@@ -702,12 +712,11 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	req.Tables = tablesInBatch
 
 	resp := new(otsprotocol.BatchWriteRowResponse)
+	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
-	if err := tableStoreClient.doRequestWithRetry(batchWriteRowUri, req, resp); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(batchWriteRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
-
-	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
 	for _, table := range resp.Tables {
 		index := int32(0)
@@ -782,12 +791,11 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 	req.ExclusiveEndPrimaryKey = request.RangeRowQueryCriteria.EndPrimaryKey.Build(false)
 
 	resp := new(otsprotocol.GetRangeResponse)
-
-	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp); err != nil {
+	response := &GetRangeResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	response := &GetRangeResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
 	if len(resp.NextStartPrimaryKey) != 0 {
@@ -839,11 +847,11 @@ func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamR
 	pbReq.TableName = req.TableName
 
 	pbResp := otsprotocol.ListStreamResponse{}
-	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp); err != nil {
+	resp := ListStreamResponse{}
+	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	resp := ListStreamResponse{}
 	streams := make([]Stream, len(pbResp.Streams))
 	for i, pbStream := range pbResp.Streams {
 		streams[i] = Stream{
@@ -863,11 +871,11 @@ func (client *TableStoreClient) DescribeStream(req *DescribeStreamRequest) (*Des
 		pbReq.ShardLimit = req.ShardLimit
 	}
 	pbResp := otsprotocol.DescribeStreamResponse{}
-	if err := client.doRequestWithRetry(describeStreamUri, pbReq, &pbResp); err != nil {
+	resp := DescribeStreamResponse{}
+	if err := client.doRequestWithRetry(describeStreamUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	resp := DescribeStreamResponse{}
 	resp.StreamId = (*StreamId)(pbResp.StreamId)
 	resp.ExpirationTime = *pbResp.ExpirationTime
 	resp.TableName = pbResp.TableName
@@ -897,12 +905,12 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 		ShardId:  (*string)(req.ShardId)}
 
 	pbResp := otsprotocol.GetShardIteratorResponse{}
-	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp); err != nil {
+	resp := GetShardIteratorResponse{}
+	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	resp := GetShardIteratorResponse{
-		ShardIterator: (*ShardIterator)(pbResp.ShardIterator)}
+	resp.ShardIterator = (*ShardIterator)(pbResp.ShardIterator)
 	return &resp, nil
 }
 
@@ -914,11 +922,11 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 	}
 
 	pbResp := otsprotocol.GetStreamRecordResponse{}
-	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp); err != nil {
+	resp := GetStreamRecordResponse{}
+	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	resp := GetStreamRecordResponse{}
 	if pbResp.NextShardIterator != nil {
 		resp.NextShardIterator = (*ShardIterator)(pbResp.NextShardIterator)
 	}
@@ -993,11 +1001,11 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 	}
 
 	pbResp := otsprotocol.ComputeSplitPointsBySizeResponse{}
-	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp); err != nil {
+	resp := ComputeSplitPointsBySizeResponse{}
+	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
 
-	resp := ComputeSplitPointsBySizeResponse{}
 	fmt.Println(len(pbResp.SplitPoints))
 	fmt.Println(len(pbResp.Locations))
 

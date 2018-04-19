@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	//"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 )
 
 // @class TableStoreClient
@@ -80,10 +81,16 @@ type CreateTableRequest struct {
 	StreamSpec         *StreamSpecification
 }
 
+type ResponseInfo struct {
+	RequestId string
+}
+
 type CreateTableResponse struct {
+	ResponseInfo
 }
 
 type DeleteTableResponse struct {
+	ResponseInfo
 }
 
 type TableMeta struct {
@@ -111,6 +118,7 @@ type ReservedThroughput struct {
 
 type ListTableResponse struct {
 	TableNames []string
+	ResponseInfo
 }
 
 type DeleteTableRequest struct {
@@ -126,6 +134,7 @@ type DescribeTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamDetails      *StreamDetails
+	ResponseInfo
 }
 
 type UpdateTableRequest struct {
@@ -139,6 +148,7 @@ type UpdateTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamDetails      *StreamDetails
+	ResponseInfo
 }
 
 type ConsumedCapacityUnit struct {
@@ -149,14 +159,17 @@ type ConsumedCapacityUnit struct {
 type PutRowResponse struct {
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	PrimaryKey           PrimaryKey
+	ResponseInfo
 }
 
 type DeleteRowResponse struct {
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+	ResponseInfo
 }
 
 type UpdateRowResponse struct {
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+	ResponseInfo
 }
 
 type PrimaryKeyType int32
@@ -336,6 +349,20 @@ func (pageFilter *PaginationFilter) Serialize() []byte {
 	return result
 }
 
+func NewTableOptionWithMaxVersion (maxVersion int) *TableOption{
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = maxVersion
+	return tableOption
+}
+
+func NewTableOption (timeToAlive int,  maxVersion int) *TableOption{
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = timeToAlive
+	tableOption.MaxVersion = maxVersion
+	return tableOption
+}
+
 type RowCondition struct {
 	RowExistenceExpectation RowExistenceExpectation
 	ColumnCondition         ColumnFilter
@@ -435,6 +462,7 @@ type GetRowResponse struct {
 	Columns              []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	columnMap            *ColumnMap
+	ResponseInfo
 }
 
 type Error struct {
@@ -461,6 +489,7 @@ type RowChange interface {
 
 type BatchGetRowResponse struct {
 	TableToRowsResult map[string][]RowResult
+	ResponseInfo
 }
 
 type BatchWriteRowRequest struct {
@@ -469,6 +498,7 @@ type BatchWriteRowRequest struct {
 
 type BatchWriteRowResponse struct {
 	TableToRowsResult map[string][]RowResult
+	ResponseInfo
 }
 
 type Direction int32
@@ -503,6 +533,7 @@ type GetRangeResponse struct {
 	Rows                 []*Row
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	NextStartPrimaryKey  *PrimaryKey
+	ResponseInfo
 }
 
 type ListStreamRequest struct {
@@ -517,6 +548,7 @@ type Stream struct {
 
 type ListStreamResponse struct {
 	Streams []Stream
+	ResponseInfo
 }
 
 type StreamSpecification struct {
@@ -545,6 +577,7 @@ type DescribeStreamResponse struct {
 	Status         StreamStatus // required
 	Shards         []*StreamShard
 	NextShardId    *ShardId // optional. nil means "no more shards"
+	ResponseInfo
 }
 
 type GetShardIteratorRequest struct {
@@ -554,6 +587,7 @@ type GetShardIteratorRequest struct {
 
 type GetShardIteratorResponse struct {
 	ShardIterator *ShardIterator // required
+	ResponseInfo
 }
 
 type GetStreamRecordRequest struct {
@@ -564,6 +598,7 @@ type GetStreamRecordRequest struct {
 type GetStreamRecordResponse struct {
 	Records           []*StreamRecord
 	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
+	ResponseInfo
 }
 
 type ComputeSplitPointsBySizeRequest struct {
@@ -574,6 +609,7 @@ type ComputeSplitPointsBySizeRequest struct {
 type ComputeSplitPointsBySizeResponse struct {
 	SchemaEntry []*PrimaryKeySchema
 	Splits      []*Split
+	ResponseInfo
 }
 
 type Split struct {
