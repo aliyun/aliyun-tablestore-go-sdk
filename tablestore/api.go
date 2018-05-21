@@ -72,11 +72,16 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 		config = NewDefaultTableStoreConfig()
 	}
 	tableStoreClient.config = config
-	tableStoreTransportProxy := &http.Transport{
-		MaxIdleConnsPerHost: config.MaxIdleConnections,
-		Dial: (&net.Dialer{
-			Timeout: config.HTTPTimeout.ConnectionTimeout,
-		}).Dial,
+	var tableStoreTransportProxy http.RoundTripper
+	if config.Transport != nil {
+		tableStoreTransportProxy = config.Transport
+	} else {
+		tableStoreTransportProxy = &http.Transport{
+			MaxIdleConnsPerHost: config.MaxIdleConnections,
+			Dial: (&net.Dialer{
+				Timeout: config.HTTPTimeout.ConnectionTimeout,
+			}).Dial,
+		}
 	}
 
 	tableStoreClient.httpClient = currentGetHttpClientFunc()
@@ -294,7 +299,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 				ExpirationTime: &request.StreamSpec.ExpirationTime}
 		} else {
 			ss = otsprotocol.StreamSpecification{
-				EnableStream:   &request.StreamSpec.EnableStream}
+				EnableStream: &request.StreamSpec.EnableStream}
 		}
 
 		req.StreamSpec = &ss
@@ -354,7 +359,6 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp, &response.ResponseInfo); err != nil {
 		return &DescribeTableResponse{}, err
 	}
-
 
 	response.ReservedThroughput = &ReservedThroughput{Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)), Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 
@@ -904,7 +908,7 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 		StreamId: (*string)(req.StreamId),
 		ShardId:  (*string)(req.ShardId)}
 
-	if req.Timestamp  != nil {
+	if req.Timestamp != nil {
 		pbReq.Timestamp = req.Timestamp
 	}
 
