@@ -527,6 +527,7 @@ type GetRangeRequest struct {
 type Row struct {
 	PrimaryKey *PrimaryKey
 	Columns    []*AttributeColumn
+	columnMap  *ColumnMap
 }
 
 type GetRangeResponse struct {
