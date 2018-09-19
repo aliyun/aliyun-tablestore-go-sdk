@@ -33,6 +33,11 @@ const (
 	getShardIteratorUri                = "/GetShardIterator"
 	getStreamRecordUri                 = "/GetStreamRecord"
 	computeSplitPointsBySizeRequestUri = "/ComputeSplitPointsBySize"
+	searchUri                          = "/Search"
+	createSearchIndexUri               = "/CreateSearchIndex"
+	listSearchIndexUri                 = "/ListSearchIndex"
+	deleteSearchIndexUri               = "/DeleteSearchIndex"
+	describeSearchIndexUri             = "/DescribeSearchIndex"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -294,7 +299,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 				ExpirationTime: &request.StreamSpec.ExpirationTime}
 		} else {
 			ss = otsprotocol.StreamSpecification{
-				EnableStream:   &request.StreamSpec.EnableStream}
+				EnableStream: &request.StreamSpec.EnableStream}
 		}
 
 		req.StreamSpec = &ss
@@ -354,7 +359,6 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp, &response.ResponseInfo); err != nil {
 		return &DescribeTableResponse{}, err
 	}
-
 
 	response.ReservedThroughput = &ReservedThroughput{Readcap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)), Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 
@@ -904,7 +908,7 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 		StreamId: (*string)(req.StreamId),
 		ShardId:  (*string)(req.ShardId)}
 
-	if req.Timestamp  != nil {
+	if req.Timestamp != nil {
 		pbReq.Timestamp = req.Timestamp
 	}
 
