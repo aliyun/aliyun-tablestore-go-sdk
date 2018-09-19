@@ -349,14 +349,14 @@ func (pageFilter *PaginationFilter) Serialize() []byte {
 	return result
 }
 
-func NewTableOptionWithMaxVersion (maxVersion int) *TableOption{
+func NewTableOptionWithMaxVersion(maxVersion int) *TableOption {
 	tableOption := new(TableOption)
 	tableOption.TimeToAlive = -1
 	tableOption.MaxVersion = maxVersion
 	return tableOption
 }
 
-func NewTableOption (timeToAlive int,  maxVersion int) *TableOption{
+func NewTableOption(timeToAlive int, maxVersion int) *TableOption {
 	tableOption := new(TableOption)
 	tableOption.TimeToAlive = timeToAlive
 	tableOption.MaxVersion = maxVersion
@@ -581,8 +581,8 @@ type DescribeStreamResponse struct {
 }
 
 type GetShardIteratorRequest struct {
-	StreamId *StreamId // required
-	ShardId  *ShardId  // required
+	StreamId  *StreamId // required
+	ShardId   *ShardId  // required
 	Timestamp *int64
 }
 

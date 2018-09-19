@@ -548,7 +548,7 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byt
 }
 
 func getRequestId(response *http.Response) string {
-	if response == nil || response.Header == nil{
+	if response == nil || response.Header == nil {
 		return ""
 	}
 
