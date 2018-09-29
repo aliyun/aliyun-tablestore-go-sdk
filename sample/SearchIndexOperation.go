@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
-	"github.com/gin-gonic/gin/json"
+	"encoding/json"
 	"github.com/golang/protobuf/proto"
 )
 
