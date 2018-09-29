@@ -49,8 +49,9 @@ func (im *IM) GetSyncMessage(member string, lastRead int64) ([]*timeline.Entry, 
 		return nil, err
 	}
 	iterator := receiver.Scan(&timeline.ScanParameter{
-		From:        math.MaxInt64,
-		To:          lastRead,
+		From:        lastRead,
+		To:          math.MaxInt64,
+		IsForward:   true,
 		MaxCount:    100,
 		BufChanSize: 10,
 	})

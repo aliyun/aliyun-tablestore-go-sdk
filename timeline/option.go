@@ -50,6 +50,9 @@ func (b *StoreOption) prepare() error {
 	if b.TTL > 0 && b.TTL < MinTTL {
 		b.TTL = MinTTL
 	}
+	if b.TTL == 0 {
+		b.TTL = -1
+	}
 	if b.Throughput == nil {
 		b.Throughput = new(tablestore.ReservedThroughput)
 	}
