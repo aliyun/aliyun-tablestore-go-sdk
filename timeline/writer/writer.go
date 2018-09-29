@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	defaultConcurrent    = 100
+	defaultConcurrent    = 300
 	defaultFlushInterval = 30 * time.Millisecond
 	defaultRetryTimeout  = 5 * time.Second
 )
@@ -139,12 +139,23 @@ func (w *BatchWriter) asyncDispatcher(input <-chan *batchAddContext, output chan
 			if i == limit {
 				send = true
 			}
-		case <-w.flushCh:
-			if i != 0 {
-				send = true
-			}
 		case <-w.ctx.Done():
 			return
+		default:
+			select {
+			case req := <-input:
+				batch[req.change.GetTableName()] = append(batch[req.change.GetTableName()], req)
+				i++
+				if i == limit {
+					send = true
+				}
+			case <-w.flushCh:
+				if i != 0 {
+					send = true
+				}
+			case <-w.ctx.Done():
+				return
+			}
 		}
 		if send {
 			select {
