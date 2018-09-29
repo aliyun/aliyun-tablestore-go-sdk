@@ -278,12 +278,26 @@ type ColumnFilter interface {
 	ToFilter() *otsprotocol.Filter
 }
 
+type VariantType int32
+const (
+	Variant_INTEGER  VariantType = 0;
+	Variant_DOUBLE  VariantType = 1;
+	//VT_BOOLEAN = 2;
+	Variant_STRING VariantType = 3;
+)
+
+type ValueTransferRule struct {
+   Regex string
+   Cast_type VariantType
+}
+
 type SingleColumnCondition struct {
 	Comparator        *ComparatorType
 	ColumnName        *string
 	ColumnValue       interface{} //[]byte
 	FilterIfMissing   bool
 	LatestVersionOnly bool
+	TransferRule      *ValueTransferRule
 }
 
 type ReturnType int32

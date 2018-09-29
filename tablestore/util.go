@@ -492,6 +492,23 @@ func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 	}
 }
 
+func ConvertToPbCastType(variantType VariantType) *otsprotocol.VariantType {
+	switch variantType {
+		case Variant_INTEGER:
+			return otsprotocol.VariantType_VT_INTEGER.Enum()
+		case Variant_DOUBLE:
+			return otsprotocol.VariantType_VT_DOUBLE.Enum()
+		case Variant_STRING:
+			return otsprotocol.VariantType_VT_STRING.Enum()
+		default:
+			panic("invalid VariantType")
+	}
+}
+
+func NewValueTransferRule(regex string, vt VariantType) *ValueTransferRule{
+	return &ValueTransferRule{Regex: regex, Cast_type: vt}
+}
+
 func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.SingleColumnValueFilter {
 	filter := new(otsprotocol.SingleColumnValueFilter)
 
@@ -502,7 +519,9 @@ func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.S
 	filter.ColumnValue = col.toPlainBufferCell(false).cellValue.writeCellValueWithoutLengthPrefix()
 	filter.FilterIfMissing = proto.Bool(condition.FilterIfMissing)
 	filter.LatestVersionOnly = proto.Bool(condition.LatestVersionOnly)
-
+	if condition.TransferRule != nil {
+		filter.ValueTransRule = &otsprotocol.ValueTransferRule{ Regex: proto.String(condition.TransferRule.Regex), CastType: ConvertToPbCastType(condition.TransferRule.Cast_type) }
+	}
 	return filter
 }
 
