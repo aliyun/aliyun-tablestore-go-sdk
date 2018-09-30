@@ -33,10 +33,7 @@ $ go run main.go feed.go
 
 **GO VERSION:** 1.10.3 linux/amd64
 
-**TableStore Instance:** SSD High-performance instance
-
 **Timeline Message Size:** almost 220 bytes
-
 
 * on TableStore SSD High-performance instance
 ```
