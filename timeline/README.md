@@ -38,6 +38,7 @@ $ go run main.go feed.go
 **Timeline Message Size:** almost 220 bytes
 
 
+* on TableStore SSD High-performance instance
 ```
 $ cd timeline
 $ go test -bench=. -benchtime=10s -test.cpu=12
@@ -48,4 +49,17 @@ BenchmarkTmLine_BatchStore_Concurrent-12                       	   10000	   1737
 BenchmarkTmLine_BatchStore_WriteSpread-12                      	     100	 127729883 ns/op
 BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost-12    	     200	  80166859 ns/op
 PASS
+```
+
+* on TableStore Capacity instance
+
+```
+$ cd timeline
+$ go test -bench=. -benchtime=10s -test.cpu=12
+goos: linux
+goarch: amd64
+pkg: github.com/aliyun/aliyun-tablestore-go-sdk/timeline
+BenchmarkTmLine_BatchStore_Concurrent-12                       	   10000	   1791522 ns/op
+BenchmarkTmLine_BatchStore_WriteSpread-12                      	     100	 124597783 ns/op
+BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost-12    	     200	  83780501 ns/op
 ```
