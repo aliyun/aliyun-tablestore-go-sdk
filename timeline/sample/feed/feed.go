@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
 	"math"
 )
 
@@ -78,7 +79,7 @@ func (f *Feed) Post(activity timeline.Message) ([]string, error) {
 	failedId := make([]string, 0)
 	for _, result := range fanResult {
 		if result.Err != nil {
-			failedId = append(failedId, result.Result.(string))
+			failedId = append(failedId, result.Result.(*writer.BatchAddResult).Id)
 		}
 	}
 	return failedId, nil

@@ -76,12 +76,13 @@ func (s *DefaultStore) Store(id string, cols ColumnMap) (int64, error) {
 }
 
 func (s *DefaultStore) BatchStore(id string, cols ColumnMap) *promise.Future {
-	f := promise.NewFuture(func() (interface{}, error) {
-		change := toPutChange(id, cols, &s.opt)
-		innerF := s.api.BatchAdd(change)
-		_, err := innerF.Get()
-		return id, err
-	})
+	f := promise.NewFuture()
+	change := toPutChange(id, cols, &s.opt)
+	ctx := writer.NewBatchAdd(id, change, f)
+	err := s.api.BatchAdd(ctx)
+	if err != nil {
+		f.Set(nil, err)
+	}
 	return f
 }
 

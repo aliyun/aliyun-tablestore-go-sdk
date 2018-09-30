@@ -78,6 +78,31 @@ func BenchmarkTmLine_BatchStore_WriteSpread(b *testing.B) {
 	}
 }
 
+func BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost(b *testing.B) {
+	option := initStoreOptionFromEnv(b.Name())
+	store, err := NewDefaultStore(*option)
+	if err != nil {
+		b.Fatal(err)
+	}
+	defer store.Close()
+	defer deleteTable(store.(*DefaultStore), b.Name())
+
+	for i := 0; i < b.N; i++ {
+		message := randomMessage(200)
+		numOfWrite := 10000
+		for i := 0; i < numOfWrite; i++ {
+			tmLine, err := NewTmLine(fmt.Sprintf("%d", i), DefaultStreamAdapter, store)
+			if err != nil {
+				b.Error(err)
+			}
+			_, err = tmLine.BatchStore(message)
+			if err != nil {
+				b.Error(err)
+			}
+		}
+	}
+}
+
 func initStoreOptionFromEnv(table string) *StoreOption {
 	return &StoreOption{
 		Endpoint:  os.Getenv("OTS_TEST_ENDPOINT"),

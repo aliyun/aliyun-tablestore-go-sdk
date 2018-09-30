@@ -20,32 +20,35 @@ type Config struct {
 	RetryTimeout  time.Duration
 }
 
-type batchAddContext struct {
+type BatchAddContext struct {
+	id     string
 	change tablestore.RowChange
-	done   chan *batchAddResult
-	resp   *batchAddResult
+	done   *promise.Future
 
+	resp    *BatchAddResult
 	start   time.Time
 	retries int
 }
 
-type batchAddResult struct {
-	value tablestore.RowResult
-	err   error
+type BatchAddResult struct {
+	Id    string
+	Value tablestore.RowResult
+	Err   error
 }
 
-func newBatchAdd(change tablestore.RowChange) *batchAddContext {
-	return &batchAddContext{
-		start:  time.Now(),
+func NewBatchAdd(id string, change tablestore.RowChange, future *promise.Future) *BatchAddContext {
+	return &BatchAddContext{
+		id:     id,
 		change: change,
-		done:   make(chan *batchAddResult, 1),
+		done:   future,
+		start:  time.Now(),
 	}
 }
 
 type BatchWriter struct {
 	tablestore.TableStoreApi
 
-	inputCh      chan *batchAddContext
+	inputCh      chan *BatchAddContext
 	flushCh      chan struct{}
 	retryTimeout time.Duration
 
@@ -61,9 +64,9 @@ func NewBatchWriter(client tablestore.TableStoreApi, conf *Config) *BatchWriter 
 			RetryTimeout:  defaultRetryTimeout,
 		}
 	}
-	asyncDIn := make(chan *batchAddContext)
-	uploaderIn := make(chan map[string][]*batchAddContext)
-	reducerIn := make(chan *batchAddContext)
+	asyncDIn := make(chan *BatchAddContext, 1000)
+	uploaderIn := make(chan map[string][]*BatchAddContext)
+	reducerIn := make(chan *BatchAddContext, 1000)
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &BatchWriter{
 		TableStoreApi: client,
@@ -87,18 +90,13 @@ func NewBatchWriter(client tablestore.TableStoreApi, conf *Config) *BatchWriter 
 	return w
 }
 
-func (w *BatchWriter) BatchAdd(change tablestore.RowChange) *promise.Future {
-	f := promise.NewFuture(func() (interface{}, error) {
-		req := newBatchAdd(change)
-		select {
-		case w.inputCh <- req:
-			ret := <-req.done
-			return ret.value, ret.err
-		case <-w.ctx.Done():
-			return nil, w.ctx.Err()
-		}
-	})
-	return f
+func (w *BatchWriter) BatchAdd(ctx *BatchAddContext) error {
+	select {
+	case w.inputCh <- ctx:
+		return nil
+	case <-w.ctx.Done():
+		return w.ctx.Err()
+	}
 }
 
 func (w *BatchWriter) Flush() error {
@@ -126,9 +124,9 @@ func (w *BatchWriter) tickFlush(ticker *time.Ticker) {
 	}
 }
 
-func (w *BatchWriter) asyncDispatcher(input <-chan *batchAddContext, output chan<- map[string][]*batchAddContext) {
+func (w *BatchWriter) asyncDispatcher(input <-chan *BatchAddContext, output chan<- map[string][]*BatchAddContext) {
 	limit := 200
-	batch := make(map[string][]*batchAddContext)
+	batch := make(map[string][]*BatchAddContext)
 	i := 0
 	for {
 		send := false
@@ -160,7 +158,7 @@ func (w *BatchWriter) asyncDispatcher(input <-chan *batchAddContext, output chan
 		if send {
 			select {
 			case output <- batch:
-				batch = make(map[string][]*batchAddContext)
+				batch = make(map[string][]*BatchAddContext)
 				i = 0
 			case <-w.ctx.Done():
 				return
@@ -169,9 +167,9 @@ func (w *BatchWriter) asyncDispatcher(input <-chan *batchAddContext, output chan
 	}
 }
 
-func (w *BatchWriter) uploader(input <-chan map[string][]*batchAddContext, output chan<- *batchAddContext) {
+func (w *BatchWriter) uploader(input <-chan map[string][]*BatchAddContext, output chan<- *BatchAddContext) {
 	for {
-		var reqMap map[string][]*batchAddContext
+		var reqMap map[string][]*BatchAddContext
 		select {
 		case reqMap = <-input:
 			otsReq := new(tablestore.BatchWriteRowRequest)
@@ -184,17 +182,17 @@ func (w *BatchWriter) uploader(input <-chan map[string][]*batchAddContext, outpu
 			if err != nil {
 				for _, reqSlice := range reqMap {
 					for _, req := range reqSlice {
-						req.resp = &batchAddResult{err: err}
+						req.resp = &BatchAddResult{Err: err}
 					}
 				}
 			} else {
 				for _, results := range otsResp.TableToRowsResult {
 					for _, result := range results {
 						if result.IsSucceed {
-							reqMap[result.TableName][result.Index].resp = &batchAddResult{value: result}
+							reqMap[result.TableName][result.Index].resp = &BatchAddResult{Value: result}
 						} else {
-							reqMap[result.TableName][result.Index].resp = &batchAddResult{
-								err: fmt.Errorf("%s: %s", result.Error.Code, result.Error.Message),
+							reqMap[result.TableName][result.Index].resp = &BatchAddResult{
+								Err: fmt.Errorf("%s: %s", result.Error.Code, result.Error.Message),
 							}
 						}
 					}
@@ -215,13 +213,13 @@ func (w *BatchWriter) uploader(input <-chan map[string][]*batchAddContext, outpu
 	}
 }
 
-func (w *BatchWriter) reducer(input <-chan *batchAddContext) {
+func (w *BatchWriter) reducer(input <-chan *BatchAddContext) {
 	for {
 		writeBack := false
-		var req *batchAddContext
+		var req *BatchAddContext
 		select {
 		case req = <-input:
-			if req.resp.err == nil {
+			if req.resp.Err == nil {
 				writeBack = true
 			} else {
 				dur := defaultBackoff.backoff(req.retries)
@@ -237,12 +235,12 @@ func (w *BatchWriter) reducer(input <-chan *batchAddContext) {
 			return
 		}
 		if writeBack {
-			req.done <- req.resp
+			req.done.Set(req.resp, req.resp.Err)
 		}
 	}
 }
 
-func (w *BatchWriter) backoffRetry(req *batchAddContext, backoffDur time.Duration) {
+func (w *BatchWriter) backoffRetry(req *BatchAddContext, backoffDur time.Duration) {
 	time.Sleep(backoffDur)
 	select {
 	case w.inputCh <- req:

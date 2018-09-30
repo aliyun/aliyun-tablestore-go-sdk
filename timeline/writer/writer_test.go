@@ -33,8 +33,13 @@ func BenchmarkBatchWriter_BatchAdd_Concurrent(b *testing.B) {
 	b.RunParallel(func(pb *testing.PB) {
 		change := randomAutoIncPutChange(testTable, 200)
 		for pb.Next() {
-			future := writer.BatchAdd(change)
-			_, err := future.Get()
+			f := promise.NewFuture()
+			ctx := NewBatchAdd("id", change, f)
+			err := writer.BatchAdd(ctx)
+			if err != nil {
+				b.Error(err)
+			}
+			_, err = f.Get()
 			if err != nil {
 				b.Error(err)
 			}
@@ -57,10 +62,15 @@ func BenchmarkBatchWriter_BatchAdd_WriteSpread(b *testing.B) {
 
 	for i := 0; i < b.N; i++ {
 		change := randomAutoIncPutChange(testTable, 200)
+		f := promise.NewFuture()
+		ctx := NewBatchAdd("id", change, f)
 		numOfWrite := 10000
 		futures := make([]*promise.Future, numOfWrite)
 		for i := 0; i < numOfWrite; i++ {
-			f := writer.BatchAdd(change)
+			err := writer.BatchAdd(ctx)
+			if err != nil {
+				b.Error(err)
+			}
 			futures[i] = f
 		}
 		fanFuture := promise.FanIn(futures...)
@@ -70,7 +80,7 @@ func BenchmarkBatchWriter_BatchAdd_WriteSpread(b *testing.B) {
 		}
 		for _, ret := range fails {
 			if ret.Err != nil {
-				b.Error(err)
+				b.Error(ret.Err)
 			}
 		}
 	}
@@ -105,7 +115,11 @@ func prepareAutoIncTable(name string) error {
 		ReservedThroughput: new(tablestore.ReservedThroughput),
 	}
 	_, err := testTableStoreApi.CreateTable(req)
-	return err
+	if err != nil {
+		return err
+	}
+	time.Sleep(2 * time.Second)
+	return nil
 }
 
 func randomAutoIncPutChange(table string, msgLength int) *tablestore.PutRowChange {
