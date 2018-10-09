@@ -509,6 +509,10 @@ func NewValueTransferRule(regex string, vt VariantType) *ValueTransferRule{
 	return &ValueTransferRule{Regex: regex, Cast_type: vt}
 }
 
+func NewSingleColumnValueRegexFilter(columnName string, comparator ComparatorType, rule *ValueTransferRule, value interface{}) *SingleColumnCondition {
+	return &SingleColumnCondition{ColumnName: &columnName, Comparator: &comparator, ColumnValue: value, TransferRule: rule}
+}
+
 func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.SingleColumnValueFilter {
 	filter := new(otsprotocol.SingleColumnValueFilter)
 
