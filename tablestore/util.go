@@ -481,6 +481,21 @@ func (comparatorType *ComparatorType) ConvertToPbComparatorType() otsprotocol.Co
 	}
 }
 
+func (columnType DefinedColumnType) ConvertToPbDefinedColumnType() otsprotocol.DefinedColumnType {
+	switch columnType {
+		case DefinedColumn_INTEGER:
+			return otsprotocol.DefinedColumnType_DCT_INTEGER
+		case DefinedColumn_DOUBLE:
+			return otsprotocol.DefinedColumnType_DCT_DOUBLE
+		case DefinedColumn_BOOLEAN:
+			return otsprotocol.DefinedColumnType_DCT_BOOLEAN
+		case DefinedColumn_STRING:
+			return otsprotocol.DefinedColumnType_DCT_STRING
+		default:
+			return otsprotocol.DefinedColumnType_DCT_BLOB
+	}
+}
+
 func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 	switch *loType {
 	case LO_NOT:
@@ -866,11 +881,61 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 			return response.columnMap
 		}
 	}
-
 }
 
 func Assert(cond bool, msg string) {
 	if !cond {
 		panic(msg)
 	}
+}
+
+func (meta *TableMeta) AddDefinedColumn(name string, definedType DefinedColumnType) {
+	meta.DefinedColumns = append(meta.DefinedColumns, &DefinedColumnSchema{Name: name, ColumnType: definedType})
+}
+
+func (meta *IndexMeta) AddDefinedColumn(name string) {
+	meta.DefinedColumns = append(meta.DefinedColumns, name)
+}
+
+func (meta *IndexMeta) AddPrimaryKeyColumn(name string) {
+	meta.Primarykey = append(meta.Primarykey, name)
+}
+
+func (request *CreateTableRequest) AddIndexMeta(meta *IndexMeta) {
+	request.IndexMetas = append(request.IndexMetas, meta)
+}
+
+func (meta *IndexMeta) ConvertToPbIndexMeta() *otsprotocol.IndexMeta {
+	return &otsprotocol.IndexMeta {
+		Name: &meta.IndexName,
+		PrimaryKey:  meta.Primarykey,
+		DefinedColumn:  meta.DefinedColumns,
+		IndexUpdateMode:  otsprotocol.IndexUpdateMode_IUM_ASYNC_INDEX.Enum(),
+		IndexType:        otsprotocol.IndexType_IT_GLOBAL_INDEX.Enum(),
+	}
+}
+
+func ConvertPbIndexTypeToIndexType(indexType *otsprotocol.IndexType) IndexType {
+	switch *indexType {
+	case otsprotocol.IndexType_IT_GLOBAL_INDEX:
+		return IT_GLOBAL_INDEX
+	default:
+		return IT_LOCAL_INDEX
+	}
+}
+func ConvertPbIndexMetaToIndexMeta(meta *otsprotocol.IndexMeta) *IndexMeta {
+	indexmeta := &IndexMeta {
+		IndexName: *meta.Name,
+		IndexType: ConvertPbIndexTypeToIndexType(meta.IndexType),
+	}
+
+	for _, pk := range meta.PrimaryKey {
+		indexmeta.Primarykey = append(indexmeta.Primarykey, pk)
+	}
+
+	for _, col := range meta.DefinedColumn {
+		indexmeta.DefinedColumns = append(indexmeta.DefinedColumns, col)
+	}
+
+	return indexmeta
 }

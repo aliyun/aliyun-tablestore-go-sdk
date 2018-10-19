@@ -45,6 +45,8 @@ message TableOptions {
 message TableMeta {
     required string table_name = 1;
     repeated PrimaryKeySchema primary_key = 2;
+    repeated DefinedColumnSchema defined_column = 3;
+    repeated IndexMeta index_meta = 4;
 }
 
 /**
@@ -122,6 +124,7 @@ message CreateTableRequest {
     optional TableOptions table_options = 3;
     repeated PartitionRange partitions = 4;
     optional StreamSpecification stream_spec = 5;
+    repeated IndexMeta index_metas = 7;
 }
 
 message CreateTableResponse {
@@ -157,6 +160,7 @@ message DescribeTableResponse {
     required TableStatus table_status = 4;
     optional StreamDetails stream_details = 5;
     repeated bytes shard_splits = 6;
+    repeated IndexMeta index_metas = 8;
 }
 /* ########################################################################################################### */
 
@@ -523,3 +527,53 @@ message ComputeSplitPointsBySizeResponse {
      repeated SplitLocation locations = 4;
 }
 /* -------------------------------------- */
+
+enum DefinedColumnType {
+    DCT_INTEGER = 1;
+    DCT_DOUBLE = 2;
+    DCT_BOOLEAN = 3;
+    DCT_STRING = 4;
+    // field 5 is reserved for date type, not supported yet
+    // field 6 is reserved for decimal type, not supported yet
+    DCT_BLOB = 7;
+}
+
+message DefinedColumnSchema {
+    required string name = 1;
+    required DefinedColumnType type = 2;
+}
+
+enum IndexUpdateMode {
+    IUM_ASYNC_INDEX = 0;
+    IUM_SYNC_INDEX = 1;
+}
+
+enum IndexType {
+    IT_GLOBAL_INDEX = 0;
+    IT_LOCAL_INDEX = 1;
+}
+
+message IndexMeta {
+    required string name = 1;
+    repeated string primary_key = 2;
+    repeated string defined_column = 3;
+    required IndexUpdateMode index_update_mode = 4;
+    required IndexType index_type = 5;
+}
+
+message CreateIndexRequest {
+    required string main_table_name = 1;
+    required IndexMeta index_meta = 2;
+    optional bool include_base_data = 3;
+}
+
+message CreateIndexResponse {
+}
+
+message DropIndexRequest {
+    required string main_table_name = 1;
+    required string index_name = 2;
+}
+
+message DropIndexResponse {
+}

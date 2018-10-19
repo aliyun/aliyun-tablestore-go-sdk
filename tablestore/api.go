@@ -38,6 +38,9 @@ const (
 	listSearchIndexUri                 = "/ListSearchIndex"
 	deleteSearchIndexUri               = "/DeleteSearchIndex"
 	describeSearchIndexUri             = "/DescribeSearchIndex"
+
+	createIndexUri                     = "/CreateIndex"
+	dropIndexUri                       = "/DropIndex"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -272,6 +275,18 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableMeta = new(otsprotocol.TableMeta)
 	req.TableMeta.TableName = proto.String(request.TableMeta.TableName)
 
+	if len(request.TableMeta.DefinedColumns) > 0 {
+		for _, value := range request.TableMeta.DefinedColumns {
+			req.TableMeta.DefinedColumn = append(req.TableMeta.DefinedColumn, &otsprotocol.DefinedColumnSchema{Name: &value.Name, Type: value.ColumnType.ConvertToPbDefinedColumnType().Enum() })
+		}
+	}
+
+	if len(request.IndexMetas) > 0 {
+		for _, value := range request.IndexMetas {
+			req.IndexMetas = append(req.IndexMetas, value.ConvertToPbIndexMeta())
+		}
+	}
+
 	for _, key := range request.TableMeta.SchemaEntry {
 		keyType := otsprotocol.PrimaryKeyType(*key.Type)
 		if key.Option != nil {
@@ -308,6 +323,43 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (tableStoreClient *TableStoreClient) CreateIndex(request *CreateIndexRequest) (*CreateIndexResponse, error) {
+	if len(request.MainTableName) > maxTableNameLength {
+		return nil, errTableNameTooLong(request.MainTableName)
+	}
+
+	req := new(otsprotocol.CreateIndexRequest)
+	req.IndexMeta = request.IndexMeta.ConvertToPbIndexMeta()
+	req.IncludeBaseData = proto.Bool(request.IncludeBaseData)
+	req.MainTableName = proto.String(request.MainTableName)
+
+	resp := new(otsprotocol.CreateIndexResponse)
+	response := &CreateIndexResponse{}
+	if err := tableStoreClient.doRequestWithRetry(createIndexUri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (tableStoreClient *TableStoreClient) DeleteIndex(request *DeleteIndexRequest) (*DeleteIndexResponse, error) {
+	if len(request.MainTableName) > maxTableNameLength {
+		return nil, errTableNameTooLong(request.MainTableName)
+	}
+
+	req := new(otsprotocol.DropIndexRequest)
+	req.IndexName = proto.String(request.IndexName)
+	req.MainTableName = proto.String(request.MainTableName)
+
+	resp := new(otsprotocol.DropIndexResponse)
+	response := &DeleteIndexResponse{}
+	if err := tableStoreClient.doRequestWithRetry(dropIndexUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
@@ -387,6 +439,10 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	} else {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: false}
+	}
+
+	for _, meta := range resp.IndexMetas {
+		response.IndexMetas = append(response.IndexMetas, ConvertPbIndexMetaToIndexMeta(meta))
 	}
 
 	return response, nil

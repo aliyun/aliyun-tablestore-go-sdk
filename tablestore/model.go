@@ -79,6 +79,18 @@ type CreateTableRequest struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamSpec         *StreamSpecification
+	IndexMetas 		   []*IndexMeta
+}
+
+type CreateIndexRequest struct {
+	MainTableName      string
+	IndexMeta          *IndexMeta
+	IncludeBaseData    bool
+}
+
+type DeleteIndexRequest struct {
+	MainTableName      string
+	IndexName          string
 }
 
 type ResponseInfo struct {
@@ -89,6 +101,14 @@ type CreateTableResponse struct {
 	ResponseInfo
 }
 
+type CreateIndexResponse struct {
+	ResponseInfo
+}
+
+type DeleteIndexResponse struct {
+	ResponseInfo
+}
+
 type DeleteTableResponse struct {
 	ResponseInfo
 }
@@ -96,6 +116,7 @@ type DeleteTableResponse struct {
 type TableMeta struct {
 	TableName   string
 	SchemaEntry []*PrimaryKeySchema
+	DefinedColumns []*DefinedColumnSchema
 }
 
 type PrimaryKeySchema struct {
@@ -134,6 +155,7 @@ type DescribeTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamDetails      *StreamDetails
+	IndexMetas 		   []*IndexMeta
 	ResponseInfo
 }
 
@@ -735,4 +757,50 @@ const (
 	RCT_Put RecordColumnType = iota
 	RCT_DeleteOneVersion
 	RCT_DeleteAllVersions
+)
+
+type IndexMeta struct {
+	IndexName string
+	Primarykey []string
+	DefinedColumns []string
+	IndexType IndexType
+}
+
+type DefinedColumnSchema struct {
+	Name string
+	ColumnType DefinedColumnType
+}
+
+type IndexType int32
+const (
+	IT_GLOBAL_INDEX IndexType = 1
+	IT_LOCAL_INDEX IndexType = 2
+)
+
+type DefinedColumnType int32
+const (
+	/**
+	 * 64位整数。
+	 */
+	DefinedColumn_INTEGER DefinedColumnType = 1
+
+	/**
+	 * 浮点数。
+	 */
+	DefinedColumn_DOUBLE DefinedColumnType = 2
+
+	/**
+	 * 布尔值。
+	 */
+	DefinedColumn_BOOLEAN DefinedColumnType = 3
+
+	/**
+	 * 字符串。
+	 */
+	DefinedColumn_STRING DefinedColumnType = 4
+
+	/**
+	 * BINARY。
+	 */
+	DefinedColumn_BINARY DefinedColumnType = 5
 )

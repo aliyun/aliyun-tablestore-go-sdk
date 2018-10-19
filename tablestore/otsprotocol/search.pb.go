@@ -118,6 +118,12 @@ It has these top-level messages:
 	GetStreamRecordResponse
 	ComputeSplitPointsBySizeRequest
 	ComputeSplitPointsBySizeResponse
+	DefinedColumnSchema
+	IndexMeta
+	CreateIndexRequest
+	CreateIndexResponse
+	DropIndexRequest
+	DropIndexResponse
 */
 package otsprotocol
 
