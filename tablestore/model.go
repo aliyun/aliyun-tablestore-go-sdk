@@ -25,9 +25,9 @@ type TableStoreClient struct {
 	accessKeySecret string
 	securityToken   string
 
-	httpClient IHttpClient
-	config     *TableStoreConfig
-	random     *rand.Rand
+	httpClient      IHttpClient
+	config          *TableStoreConfig
+	random          *rand.Rand
 }
 
 type ClientOption func(*TableStoreClient)
@@ -79,18 +79,18 @@ type CreateTableRequest struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamSpec         *StreamSpecification
-	IndexMetas 		   []*IndexMeta
+	IndexMetas         []*IndexMeta
 }
 
 type CreateIndexRequest struct {
-	MainTableName      string
-	IndexMeta          *IndexMeta
-	IncludeBaseData    bool
+	MainTableName   string
+	IndexMeta       *IndexMeta
+	IncludeBaseData bool
 }
 
 type DeleteIndexRequest struct {
-	MainTableName      string
-	IndexName          string
+	MainTableName string
+	IndexName     string
 }
 
 type ResponseInfo struct {
@@ -114,8 +114,8 @@ type DeleteTableResponse struct {
 }
 
 type TableMeta struct {
-	TableName   string
-	SchemaEntry []*PrimaryKeySchema
+	TableName      string
+	SchemaEntry    []*PrimaryKeySchema
 	DefinedColumns []*DefinedColumnSchema
 }
 
@@ -155,7 +155,7 @@ type DescribeTableResponse struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamDetails      *StreamDetails
-	IndexMetas 		   []*IndexMeta
+	IndexMetas         []*IndexMeta
 	ResponseInfo
 }
 
@@ -198,22 +198,22 @@ type PrimaryKeyType int32
 
 const (
 	PrimaryKeyType_INTEGER PrimaryKeyType = 1
-	PrimaryKeyType_STRING  PrimaryKeyType = 2
-	PrimaryKeyType_BINARY  PrimaryKeyType = 3
+	PrimaryKeyType_STRING PrimaryKeyType = 2
+	PrimaryKeyType_BINARY PrimaryKeyType = 3
 )
 
 const (
 	DefaultRetryInterval = 10
-	MaxRetryInterval     = 320
+	MaxRetryInterval = 320
 )
 
 type PrimaryKeyOption int32
 
 const (
-	NONE           PrimaryKeyOption = 0
+	NONE PrimaryKeyOption = 0
 	AUTO_INCREMENT PrimaryKeyOption = 1
-	MIN            PrimaryKeyOption = 2
-	MAX            PrimaryKeyOption = 3
+	MIN PrimaryKeyOption = 2
+	MAX PrimaryKeyOption = 3
 )
 
 type PrimaryKeyColumn struct {
@@ -263,20 +263,20 @@ type ColumnToUpdate struct {
 type RowExistenceExpectation int
 
 const (
-	RowExistenceExpectation_IGNORE           RowExistenceExpectation = 0
-	RowExistenceExpectation_EXPECT_EXIST     RowExistenceExpectation = 1
+	RowExistenceExpectation_IGNORE RowExistenceExpectation = 0
+	RowExistenceExpectation_EXPECT_EXIST RowExistenceExpectation = 1
 	RowExistenceExpectation_EXPECT_NOT_EXIST RowExistenceExpectation = 2
 )
 
 type ComparatorType int32
 
 const (
-	CT_EQUAL         ComparatorType = 1
-	CT_NOT_EQUAL     ComparatorType = 2
-	CT_GREATER_THAN  ComparatorType = 3
+	CT_EQUAL ComparatorType = 1
+	CT_NOT_EQUAL ComparatorType = 2
+	CT_GREATER_THAN ComparatorType = 3
 	CT_GREATER_EQUAL ComparatorType = 4
-	CT_LESS_THAN     ComparatorType = 5
-	CT_LESS_EQUAL    ComparatorType = 6
+	CT_LESS_THAN ComparatorType = 5
+	CT_LESS_EQUAL ComparatorType = 6
 )
 
 type LogicalOperator int32
@@ -284,15 +284,15 @@ type LogicalOperator int32
 const (
 	LO_NOT LogicalOperator = 1
 	LO_AND LogicalOperator = 2
-	LO_OR  LogicalOperator = 3
+	LO_OR LogicalOperator = 3
 )
 
 type FilterType int32
 
 const (
-	FT_SINGLE_COLUMN_VALUE    FilterType = 1
+	FT_SINGLE_COLUMN_VALUE FilterType = 1
 	FT_COMPOSITE_COLUMN_VALUE FilterType = 2
-	FT_COLUMN_PAGINATION      FilterType = 3
+	FT_COLUMN_PAGINATION FilterType = 3
 )
 
 type ColumnFilter interface {
@@ -301,16 +301,17 @@ type ColumnFilter interface {
 }
 
 type VariantType int32
+
 const (
-	Variant_INTEGER  VariantType = 0;
-	Variant_DOUBLE  VariantType = 1;
+	Variant_INTEGER VariantType = 0;
+	Variant_DOUBLE VariantType = 1;
 	//VT_BOOLEAN = 2;
 	Variant_STRING VariantType = 3;
 )
 
 type ValueTransferRule struct {
-   Regex string
-   Cast_type VariantType
+	Regex     string
+	Cast_type VariantType
 }
 
 type SingleColumnCondition struct {
@@ -326,7 +327,7 @@ type ReturnType int32
 
 const (
 	ReturnType_RT_NONE ReturnType = 0
-	ReturnType_RT_PK   ReturnType = 1
+	ReturnType_RT_PK ReturnType = 1
 )
 
 type PaginationFilter struct {
@@ -434,6 +435,7 @@ type SingleRowQueryCriteria struct {
 	TimeRange    *TimeRange
 	Filter       ColumnFilter
 	StartColumn  *string
+	EndColumn    *string
 }
 
 type UpdateRowChange struct {
@@ -453,6 +455,10 @@ func (rowQueryCriteria *SingleRowQueryCriteria) AddColumnToGet(columnName string
 
 func (rowQueryCriteria *SingleRowQueryCriteria) SetStartColumn(columnName string) {
 	rowQueryCriteria.StartColumn = &columnName
+}
+
+func (rowQueryCriteria *SingleRowQueryCriteria) SetEndtColumn(columnName string) {
+	rowQueryCriteria.EndColumn = &columnName
 }
 
 func (rowQueryCriteria *SingleRowQueryCriteria) getColumnsToGet() []string {
@@ -482,6 +488,8 @@ type MultiRowQueryCriteria struct {
 	MaxVersion   int
 	TimeRange    *TimeRange
 	Filter       ColumnFilter
+	StartColumn  *string
+	EndColumn    *string
 }
 
 type BatchGetRowRequest struct {
@@ -540,7 +548,7 @@ type BatchWriteRowResponse struct {
 type Direction int32
 
 const (
-	FORWARD  Direction = 0
+	FORWARD Direction = 0
 	BACKWARD Direction = 1
 )
 
@@ -554,6 +562,8 @@ type RangeRowQueryCriteria struct {
 	Filter          ColumnFilter
 	Direction       Direction
 	Limit           int32
+	StartColumn     *string
+	EndColumn       *string
 }
 
 type GetRangeRequest struct {
@@ -612,7 +622,7 @@ type DescribeStreamResponse struct {
 	CreationTime   int64        // in usec
 	Status         StreamStatus // required
 	Shards         []*StreamShard
-	NextShardId    *ShardId // optional. nil means "no more shards"
+	NextShardId    *ShardId     // optional. nil means "no more shards"
 	ResponseInfo
 }
 
@@ -760,24 +770,26 @@ const (
 )
 
 type IndexMeta struct {
-	IndexName string
-	Primarykey []string
+	IndexName      string
+	Primarykey     []string
 	DefinedColumns []string
-	IndexType IndexType
+	IndexType      IndexType
 }
 
 type DefinedColumnSchema struct {
-	Name string
+	Name       string
 	ColumnType DefinedColumnType
 }
 
 type IndexType int32
+
 const (
 	IT_GLOBAL_INDEX IndexType = 1
 	IT_LOCAL_INDEX IndexType = 2
 )
 
 type DefinedColumnType int32
+
 const (
 	/**
 	 * 64位整数。

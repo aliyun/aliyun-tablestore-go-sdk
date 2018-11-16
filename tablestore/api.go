@@ -601,6 +601,10 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 		req.StartColumn = request.SingleRowQueryCriteria.StartColumn
 	}
 
+	if request.SingleRowQueryCriteria.EndColumn != nil {
+		req.EndColumn = request.SingleRowQueryCriteria.EndColumn
+	}
+
 	if request.SingleRowQueryCriteria.TimeRange != nil {
 		if request.SingleRowQueryCriteria.TimeRange.Specific != 0 {
 			req.TimeRange = &otsprotocol.TimeRange{SpecificTime: proto.Int64(request.SingleRowQueryCriteria.TimeRange.Specific)}
@@ -676,6 +680,14 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 		table := new(otsprotocol.TableInBatchGetRowRequest)
 		table.TableName = proto.String(Criteria.TableName)
 		table.ColumnsToGet = Criteria.ColumnsToGet
+
+		if Criteria.StartColumn != nil {
+			table.StartColumn = Criteria.StartColumn
+		}
+
+		if Criteria.EndColumn != nil {
+			table.EndColumn = Criteria.EndColumn
+		}
 
 		if Criteria.Filter != nil {
 			table.Filter = Criteria.Filter.Serialize()
@@ -845,6 +857,14 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	if request.RangeRowQueryCriteria.Filter != nil {
 		req.Filter = request.RangeRowQueryCriteria.Filter.Serialize()
+	}
+
+	if request.RangeRowQueryCriteria.StartColumn != nil {
+		req.StartColumn = request.RangeRowQueryCriteria.StartColumn
+	}
+
+	if request.RangeRowQueryCriteria.EndColumn != nil {
+		req.EndColumn = request.RangeRowQueryCriteria.EndColumn
 	}
 
 	req.InclusiveStartPrimaryKey = request.RangeRowQueryCriteria.StartPrimaryKey.Build(false)
