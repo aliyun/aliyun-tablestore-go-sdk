@@ -59,6 +59,7 @@ func (s *searchQuery) SetGetTotalCount(getTotalCount bool) *searchQuery {
 
 func (s *searchQuery) SetToken(token []byte) *searchQuery {
 	s.Token = token
+	s.Sort = nil
 	return s
 }
 

@@ -136,7 +136,7 @@ func convertToPbSchema(schema *IndexSchema) (*otsprotocol.IndexSchema, error) {
 	indexSchema := new(otsprotocol.IndexSchema)
 	indexSchema.FieldSchemas = convertFieldSchemaToPBFieldSchema(schema.FieldSchemas)
 	indexSchema.IndexSetting = new(otsprotocol.IndexSetting)
-	var defaultNumberOfShards int32 = 5
+	var defaultNumberOfShards int32 = 1
 	indexSchema.IndexSetting.NumberOfShards = &defaultNumberOfShards
 	if schema.IndexSetting != nil {
 		indexSchema.IndexSetting.RoutingFields = schema.IndexSetting.RoutingFields
