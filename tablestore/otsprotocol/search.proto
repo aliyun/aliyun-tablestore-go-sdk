@@ -16,11 +16,19 @@ enum QueryType {
     GEO_BOUNDING_BOX_QUERY = 12;
     GEO_DISTANCE_QUERY = 13;
     GEO_POLYGON_QUERY = 14;
+    TERMS_QUERY = 15;
+}
+
+enum QueryOperator {
+    OR = 1;
+    AND = 2;
 }
 
 message MatchQuery {
     optional string field_name = 1;
     optional string text = 2;
+    optional int32 minimum_should_match = 3;
+    optional QueryOperator operator = 4;
 }
 
 message MatchPhraseQuery {
@@ -34,6 +42,11 @@ message MatchAllQuery {
 message TermQuery {
     optional string field_name = 1;
     optional bytes term = 2;
+}
+
+message TermsQuery {
+    optional string field_name = 1;
+    repeated bytes terms = 2;
 }
 
 message RangeQuery {
@@ -156,27 +169,29 @@ message GeoDistanceSort {
     optional NestedFilter nested_filter = 6;
 }
 
+message PrimaryKeySort {
+    optional SortOrder order = 1;
+}
+
 message Sorter {
     optional FieldSort field_sort = 1;
     optional GeoDistanceSort geo_distance_sort = 2;
     optional ScoreSort score_sort = 3;
+    optional PrimaryKeySort pk_sort = 4;
 }
 
 message Sort {
     repeated Sorter sorter = 1;
 }
 
-message SearchAfter {
-    repeated bytes values = 1; // variant value
-}
-
 message SearchQuery {
     optional int32 offset = 1;
     optional int32 limit = 2;
-    optional SearchAfter search_after = 3;
     optional Query query = 4;
     optional Collapse collapse = 5;
     optional Sort sort = 6;
+    optional bool getTotalCount = 8;
+    optional bytes token = 9;
 }
 
 enum ColumnReturnType {
@@ -206,6 +221,7 @@ message SearchResponse {
     optional int64 total_hits = 1;
     repeated bytes rows = 2;
     optional bool is_all_succeeded = 3;
+    optional bytes next_token = 6;
 }
 
 /* Create Search Index */
@@ -242,6 +258,7 @@ message FieldSchema {
 message IndexSchema {
     repeated FieldSchema field_schemas = 1;
     optional IndexSetting index_setting = 2;
+    optional Sort index_sort = 3;
 }
 
 message IndexSetting {

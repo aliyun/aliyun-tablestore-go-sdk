@@ -1,10 +1,12 @@
 package tablestore
 
 import (
+	"encoding/json"
+	"errors"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
-	"encoding/json"
 )
 
 type ColumnsToGet struct {
@@ -82,6 +84,7 @@ type SearchResponse struct {
 	TotalCount   int64
 	Rows         []*Row
 	IsAllSuccess bool
+	NextToken    []byte
 	ResponseInfo
 }
 
@@ -95,7 +98,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 
 		if value.Index != nil {
 			field.Index = proto.Bool(*value.Index)
-		} else {
+		} else if value.FieldType != FieldType_NESTED {
 			field.Index = proto.Bool(true)
 		}
 		if value.IndexOptions != nil {
@@ -109,7 +112,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		}
 		if value.Store != nil {
 			field.Store = proto.Bool(*value.Store)
-		} else {
+		} else if value.FieldType != FieldType_NESTED {
 			if *field.FieldType == otsprotocol.FieldType_TEXT {
 				field.Store = proto.Bool(false)
 			} else {
@@ -129,7 +132,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 	return schemas
 }
 
-func convertToPbSchema(schema *IndexSchema) *otsprotocol.IndexSchema {
+func convertToPbSchema(schema *IndexSchema) (*otsprotocol.IndexSchema, error) {
 	indexSchema := new(otsprotocol.IndexSchema)
 	indexSchema.FieldSchemas = convertFieldSchemaToPBFieldSchema(schema.FieldSchemas)
 	indexSchema.IndexSetting = new(otsprotocol.IndexSetting)
@@ -138,10 +141,17 @@ func convertToPbSchema(schema *IndexSchema) *otsprotocol.IndexSchema {
 	if schema.IndexSetting != nil {
 		indexSchema.IndexSetting.RoutingFields = schema.IndexSetting.RoutingFields
 	}
-	return indexSchema
+	if schema.IndexSort != nil {
+		pbSort, err := schema.IndexSort.ProtoBuffer()
+		if err != nil {
+			return nil, err
+		}
+		indexSchema.IndexSort = pbSort
+	}
+	return indexSchema, nil
 }
 
-func parseFieldSchemaFromPbFieldSchema(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldSchema {
+func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldSchema {
 	var schemas []*FieldSchema
 	for _, value := range pbFieldSchemas {
 		field := new(FieldSchema)
@@ -157,26 +167,55 @@ func parseFieldSchemaFromPbFieldSchema(pbFieldSchemas []*otsprotocol.FieldSchema
 		field.Store = value.Store
 		field.IsArray = value.IsArray
 		if field.FieldType == FieldType_NESTED {
-			field.FieldSchemas = parseFieldSchemaFromPbFieldSchema(value.FieldSchemas)
+			field.FieldSchemas = parseFieldSchemaFromPb(value.FieldSchemas)
 		}
 		schemas = append(schemas, field)
 	}
 	return schemas
 }
 
-func parseFromPbSchema(pbSchema *otsprotocol.IndexSchema) *IndexSchema {
+func parseIndexSortFromPb(pbIndexSort *otsprotocol.Sort) (*search.Sort, error) {
+	indexSort := &search.Sort{
+		Sorters: make([]search.Sorter, 0),
+	}
+	for _, sorter := range pbIndexSort.GetSorter() {
+		if sorter.GetFieldSort() != nil {
+			fieldSort := &search.FieldSort{
+				FieldName: *sorter.GetFieldSort().FieldName,
+				Order:     search.ParseSortOrder(sorter.GetFieldSort().Order),
+			}
+			indexSort.Sorters = append(indexSort.Sorters, fieldSort)
+		} else if sorter.GetPkSort() != nil {
+			pkSort := &search.PrimaryKeySort{
+				Order: search.ParseSortOrder(sorter.GetPkSort().Order),
+			}
+			indexSort.Sorters = append(indexSort.Sorters, pkSort)
+		} else {
+			return nil, errors.New("unknown index sort type")
+		}
+	}
+	return indexSort, nil
+}
+
+func parseFromPbSchema(pbSchema *otsprotocol.IndexSchema) (*IndexSchema, error) {
 	schema := &IndexSchema{
 		IndexSetting: &IndexSetting{
 			RoutingFields: pbSchema.IndexSetting.RoutingFields,
 		},
 	}
-	schema.FieldSchemas = parseFieldSchemaFromPbFieldSchema(pbSchema.GetFieldSchemas())
-	return schema
+	schema.FieldSchemas = parseFieldSchemaFromPb(pbSchema.GetFieldSchemas())
+	indexSort, err := parseIndexSortFromPb(pbSchema.GetIndexSort())
+	if err != nil {
+		return nil, err
+	}
+	schema.IndexSort = indexSort
+	return schema, nil
 }
 
 type IndexSchema struct {
 	IndexSetting *IndexSetting
 	FieldSchemas []*FieldSchema
+	IndexSort    *search.Sort
 }
 
 type FieldType int32
@@ -204,7 +243,7 @@ type Analyzer string
 
 const (
 	Analyzer_SingleWord Analyzer = "single_word"
-	Analyzer_MaxWord Analyzer = "max_word"
+	Analyzer_MaxWord    Analyzer = "max_word"
 )
 
 type FieldSchema struct {
@@ -214,7 +253,7 @@ type FieldSchema struct {
 	IndexOptions     *IndexOptions
 	Analyzer         *Analyzer
 	EnableSortAndAgg *bool
-	Store 		 *bool
+	Store            *bool
 	IsArray          *bool
 	FieldSchemas     []*FieldSchema
 }
@@ -222,7 +261,7 @@ type FieldSchema struct {
 func (fs *FieldSchema) String() string {
 	out, err := json.Marshal(fs)
 	if err != nil {
-		panic (err)
+		panic(err)
 	}
 	return string(out)
 }

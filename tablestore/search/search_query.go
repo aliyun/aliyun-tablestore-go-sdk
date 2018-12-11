@@ -10,18 +10,20 @@ type SearchQuery interface {
 }
 
 type searchQuery struct {
-	Offset      int32
-	Limit       int32
-	SearchAfter *SearchAfter
-	Query       Query
-	Collapse    *Collapse
-	Sort        *Sort
+	Offset        int32
+	Limit         int32
+	Query         Query
+	Collapse      *Collapse
+	Sort          *Sort
+	GetTotalCount bool
+	Token         []byte
 }
 
 func NewSearchQuery() *searchQuery {
 	return &searchQuery{
-		Offset: -1,
-		Limit: -1,
+		Offset:        -1,
+		Limit:         -1,
+		GetTotalCount: false,
 	}
 }
 
@@ -32,11 +34,6 @@ func (s *searchQuery) SetOffset(offset int32) *searchQuery {
 
 func (s *searchQuery) SetLimit(limit int32) *searchQuery {
 	s.Limit = limit
-	return s
-}
-
-func (s *searchQuery) SetSearchAfter(searchAfter *SearchAfter) *searchQuery {
-	s.SearchAfter = searchAfter
 	return s
 }
 
@@ -55,6 +52,16 @@ func (s *searchQuery) SetSort(sort *Sort) *searchQuery {
 	return s
 }
 
+func (s *searchQuery) SetGetTotalCount(getTotalCount bool) *searchQuery {
+	s.GetTotalCount = getTotalCount
+	return s
+}
+
+func (s *searchQuery) SetToken(token []byte) *searchQuery {
+	s.Token = token
+	return s
+}
+
 func (s *searchQuery) Serialize() ([]byte, error) {
 	search_query := &otsprotocol.SearchQuery{}
 	if s.Offset >= 0 {
@@ -62,13 +69,6 @@ func (s *searchQuery) Serialize() ([]byte, error) {
 	}
 	if s.Limit >= 0 {
 		search_query.Limit = &s.Limit
-	}
-	if s.SearchAfter != nil {
-		pbSearchAfter, err := s.SearchAfter.ProtoBuffer()
-		if err != nil {
-			return nil, err
-		}
-		search_query.SearchAfter = pbSearchAfter
 	}
 	if s.Query != nil {
 		pbQuery, err := s.Query.ProtoBuffer()
@@ -90,6 +90,10 @@ func (s *searchQuery) Serialize() ([]byte, error) {
 			return nil, err
 		}
 		search_query.Sort = pbSort
+	}
+	search_query.GetTotalCount = &s.GetTotalCount
+	if s.Token != nil && len(s.Token) > 0 {
+		search_query.Token = s.Token
 	}
 	data, err := proto.Marshal(search_query)
 	return data, err

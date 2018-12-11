@@ -26,6 +26,13 @@ type FieldSort struct {
 	NestedFilter *NestedFilter
 }
 
+func NewFieldSort(fieldName string, order SortOrder) *FieldSort {
+	return &FieldSort{
+		FieldName: fieldName,
+		Order:     order.Enum(),
+	}
+}
+
 func (s *FieldSort) ProtoBuffer() (*otsprotocol.Sorter, error) {
 	pbFieldSort := &otsprotocol.FieldSort{
 		FieldName: &s.FieldName,

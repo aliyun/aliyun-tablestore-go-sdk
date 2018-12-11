@@ -20,6 +20,7 @@ const (
 	QueryType_GeoBoundingBoxQuery QueryType = 12
 	QueryType_GeoDistanceQuery    QueryType = 13
 	QueryType_GeoPolygonQuery     QueryType = 14
+	QueryType_TermsQuery          QueryType = 15
 )
 
 func (q QueryType) Enum() *QueryType {
@@ -59,6 +60,8 @@ func (q QueryType) ToPB() *otsprotocol.QueryType {
 		return otsprotocol.QueryType_GEO_DISTANCE_QUERY.Enum()
 	case QueryType_GeoPolygonQuery:
 		return otsprotocol.QueryType_GEO_POLYGON_QUERY.Enum()
+	case QueryType_TermsQuery:
+		return otsprotocol.QueryType_TERMS_QUERY.Enum()
 	default:
 		panic("unexpected")
 	}

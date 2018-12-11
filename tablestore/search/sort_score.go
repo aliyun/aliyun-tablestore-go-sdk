@@ -6,6 +6,12 @@ type ScoreSort struct {
 	Order *SortOrder
 }
 
+func NewScoreSort() *ScoreSort {
+	return &ScoreSort{
+		Order: SortOrder_DESC.Enum(),
+	}
+}
+
 func (s *ScoreSort) ProtoBuffer() (*otsprotocol.Sorter, error) {
 	pbScoreSort := &otsprotocol.ScoreSort{}
 	if s.Order != nil {

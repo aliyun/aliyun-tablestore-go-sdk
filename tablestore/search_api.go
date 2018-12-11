@@ -2,18 +2,22 @@ package tablestore
 
 import (
 	"bytes"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/golang/protobuf/proto"
 	"errors"
 	"fmt"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/golang/protobuf/proto"
 )
 
 func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearchIndexRequest) (*CreateSearchIndexResponse, error) {
 	req := new(otsprotocol.CreateSearchIndexRequest)
 	req.TableName = proto.String(request.TableName)
 	req.IndexName = proto.String(request.IndexName)
-	req.Schema = convertToPbSchema(request.IndexSchema)
-
+	var err error
+	req.Schema, err = convertToPbSchema(request.IndexSchema)
+	if err != nil {
+		return nil, err
+	}
 	resp := new(otsprotocol.CreateSearchIndexRequest)
 	response := &CreateSearchIndexResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
@@ -65,7 +69,11 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 	if err := tableStoreClient.doRequestWithRetry(describeSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
-	response.Schema = parseFromPbSchema(resp.Schema)
+	schema, err := parseFromPbSchema(resp.Schema)
+	if err != nil {
+		return nil, err
+	}
+	response.Schema = schema
 	if resp.SyncStat != nil {
 		response.SyncStat = &SyncStat{
 			CurrentSyncTimestamp: resp.SyncStat.CurrentSyncTimestamp,
@@ -121,5 +129,8 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 	}
 
 	response.IsAllSuccess = *resp.IsAllSucceeded
+	if resp.NextToken != nil && len(resp.NextToken) > 0 {
+		response.NextToken = resp.NextToken
+	}
 	return response, nil
 }

@@ -3,6 +3,7 @@ package search
 import (
 	"errors"
 	"fmt"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
@@ -29,5 +30,18 @@ func (o *SortOrder) ProtoBuffer() (*otsprotocol.SortOrder, error) {
 		return otsprotocol.SortOrder_SORT_ORDER_DESC.Enum(), nil
 	} else {
 		return nil, errors.New("unknown sort order: " + fmt.Sprintf("%#v", *o))
+	}
+}
+
+func ParseSortOrder(order *otsprotocol.SortOrder) *SortOrder {
+	if order == nil {
+		return nil
+	}
+	if *order == otsprotocol.SortOrder_SORT_ORDER_ASC {
+		return SortOrder_ASC.Enum()
+	} else if *order == otsprotocol.SortOrder_SORT_ORDER_DESC {
+		return SortOrder_DESC.Enum()
+	} else {
+		return nil
 	}
 }
