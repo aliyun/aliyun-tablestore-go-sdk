@@ -1,9 +1,10 @@
 package main
 
 import (
+	"os"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/sample"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"os"
 )
 
 func main() {
@@ -35,7 +36,7 @@ func main() {
 	sample.GetRangeSample(client, "sampletable")
 
 	// Stream sample
-	sample.GetStreamRecordSample(client, "streamtable1")
+	// sample.GetStreamRecordSample(client, "streamtable1")
 
 	// computeSplitpoint
 	sample.ComputeSplitPointsBySize(client, "sampletable")
