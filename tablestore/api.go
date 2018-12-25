@@ -41,6 +41,10 @@ const (
 
 	createIndexUri                     = "/CreateIndex"
 	dropIndexUri                       = "/DropIndex"
+
+	createlocaltransactionuri          = "/StartLocalTransaction"
+	committransactionuri               = "/CommitTransaction"
+	aborttransactionuri                = "/AbortTransaction"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -531,6 +535,10 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 		req.ReturnContent = &content
 	}
 
+	if request.PutRowChange.TransactionId != nil {
+		req.TransactionId = request.PutRowChange.TransactionId
+	}
+
 	req.Condition = condition
 
 	resp := new(otsprotocol.PutRowResponse)
@@ -565,6 +573,11 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 	req.TableName = proto.String(request.DeleteRowChange.TableName)
 	req.Condition = request.DeleteRowChange.getCondition()
 	req.PrimaryKey = request.DeleteRowChange.PrimaryKey.Build(true)
+
+	if request.DeleteRowChange.TransactionId != nil {
+		req.TransactionId = request.DeleteRowChange.TransactionId
+	}
+
 	resp := new(otsprotocol.DeleteRowResponse)
 	response := &DeleteRowResponse{}
 	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp, &response.ResponseInfo); err != nil {
@@ -595,6 +608,10 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 
 	if request.SingleRowQueryCriteria.MaxVersion != 0 {
 		req.MaxVersions = proto.Int32(int32(request.SingleRowQueryCriteria.MaxVersion))
+	}
+
+	if request.SingleRowQueryCriteria.TransactionId != nil {
+		req.TransactionId = request.SingleRowQueryCriteria.TransactionId
 	}
 
 	if request.SingleRowQueryCriteria.StartColumn != nil {
@@ -658,6 +675,9 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	req.TableName = proto.String(request.UpdateRowChange.TableName)
 	req.Condition = request.UpdateRowChange.getCondition()
 	req.RowChange = request.UpdateRowChange.Serialize()
+	if request.UpdateRowChange.TransactionId != nil {
+		req.TransactionId = request.UpdateRowChange.TransactionId
+	}
 
 	response := &UpdateRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
 	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp, &response.ResponseInfo); err != nil {
@@ -692,6 +712,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 		if Criteria.Filter != nil {
 			table.Filter = Criteria.Filter.Serialize()
 		}
+
 		if Criteria.MaxVersion != 0 {
 			table.MaxVersions = proto.Int32(int32(Criteria.MaxVersion))
 		}
@@ -835,6 +856,10 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	if request.RangeRowQueryCriteria.MaxVersion != 0 {
 		req.MaxVersions = proto.Int32(request.RangeRowQueryCriteria.MaxVersion)
+	}
+
+	if request.RangeRowQueryCriteria.TransactionId != nil {
+		req.TransactionId = request.RangeRowQueryCriteria.TransactionId
 	}
 
 	if request.RangeRowQueryCriteria.TimeRange != nil {
@@ -1139,4 +1164,48 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 		}
 	}
 	return &resp, nil
+}
+
+func (client *TableStoreClient) StartLocalTransaction(request *StartLocalTransactionRequest) (*StartLocalTransactionResponse, error) {
+	req := new(otsprotocol.StartLocalTransactionRequest)
+	resp := new(otsprotocol.StartLocalTransactionResponse)
+
+	req.TableName = proto.String(request.TableName)
+	req.Key = request.PrimaryKey.Build(false)
+
+	response := &StartLocalTransactionResponse{}
+	if err := client.doRequestWithRetry(createlocaltransactionuri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	response.TransactionId = resp.TransactionId
+	return response, nil
+}
+
+func (client *TableStoreClient) CommitTransaction(request *CommitTransactionRequest) (*CommitTransactionResponse, error) {
+	req := new(otsprotocol.CommitTransactionRequest)
+	resp := new(otsprotocol.CommitTransactionResponse)
+
+	req.TransactionId = request.TransactionId
+
+	response := &CommitTransactionResponse{}
+	if err := client.doRequestWithRetry(committransactionuri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (client *TableStoreClient) AbortTransaction(request *AbortTransactionRequest) (*AbortTransactionResponse, error) {
+	req := new(otsprotocol.AbortTransactionRequest)
+	resp := new(otsprotocol.AbortTransactionResponse)
+
+	req.TransactionId = request.TransactionId
+
+	response := &AbortTransactionResponse{}
+	if err := client.doRequestWithRetry(aborttransactionuri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
 }

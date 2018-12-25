@@ -411,6 +411,7 @@ type PutRowChange struct {
 	Columns    []AttributeColumn
 	Condition  *RowCondition
 	ReturnType ReturnType
+	TransactionId    *string
 }
 
 type PutRowRequest struct {
@@ -421,6 +422,7 @@ type DeleteRowChange struct {
 	TableName  string
 	PrimaryKey *PrimaryKey
 	Condition  *RowCondition
+	TransactionId *string
 }
 
 type DeleteRowRequest struct {
@@ -436,6 +438,7 @@ type SingleRowQueryCriteria struct {
 	Filter       ColumnFilter
 	StartColumn  *string
 	EndColumn    *string
+	TransactionId *string
 }
 
 type UpdateRowChange struct {
@@ -443,6 +446,7 @@ type UpdateRowChange struct {
 	PrimaryKey *PrimaryKey
 	Columns    []ColumnToUpdate
 	Condition  *RowCondition
+	TransactionId *string
 }
 
 type UpdateRowRequest struct {
@@ -564,6 +568,7 @@ type RangeRowQueryCriteria struct {
 	Limit           int32
 	StartColumn     *string
 	EndColumn       *string
+	TransactionId    *string
 }
 
 type GetRangeRequest struct {
@@ -816,3 +821,29 @@ const (
 	 */
 	DefinedColumn_BINARY DefinedColumnType = 5
 )
+
+type StartLocalTransactionRequest struct {
+	PrimaryKey *PrimaryKey
+	TableName string
+}
+
+type StartLocalTransactionResponse struct {
+	TransactionId    *string
+	ResponseInfo
+}
+
+type CommitTransactionRequest struct {
+	TransactionId    *string
+}
+
+type CommitTransactionResponse struct {
+	ResponseInfo
+}
+
+type AbortTransactionRequest struct {
+	TransactionId    *string
+}
+
+type AbortTransactionResponse struct {
+	ResponseInfo
+}

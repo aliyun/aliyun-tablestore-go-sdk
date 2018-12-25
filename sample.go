@@ -41,4 +41,6 @@ func main() {
 	// computeSplitpoint
 	sample.ComputeSplitPointsBySize(client, "sampletable")
 
+	// transaction
+	sample.PutRowWithTxnSample(client, "transtable1")
 }
