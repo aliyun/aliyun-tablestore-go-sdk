@@ -101,6 +101,78 @@ func UpdateRowSample(client *tablestore.TableStoreClient, tableName string) {
 	}
 }
 
+func UpdateRowWithIncrement(client *tablestore.TableStoreClient, tableName string) {
+	fmt.Println("begin to update row")
+	updateRowRequest := new(tablestore.UpdateRowRequest)
+	updateRowChange := new(tablestore.UpdateRowChange)
+	updateRowChange.TableName = tableName
+	updatePk := new(tablestore.PrimaryKey)
+	updatePk.AddPrimaryKeyColumn("pk1", "pk1increment")
+	updatePk.AddPrimaryKeyColumn("pk2", int64(2))
+	updatePk.AddPrimaryKeyColumn("pk3", []byte("pk3"))
+	updateRowChange.PrimaryKey = updatePk
+
+	updateRowChange.PutColumn("col2", int64(50))
+	updateRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+	updateRowRequest.UpdateRowChange = updateRowChange
+	_, err := client.UpdateRow(updateRowRequest)
+
+	if err != nil {
+		fmt.Println("update failed with error:", err)
+		return
+	} else {
+		fmt.Println("update row finished")
+	}
+
+	updateRowRequest = new(tablestore.UpdateRowRequest)
+	updateRowChange = new(tablestore.UpdateRowChange)
+	updateRowChange.TableName = tableName
+	updatePk = new(tablestore.PrimaryKey)
+	updatePk.AddPrimaryKeyColumn("pk1", "pk1increment")
+	updatePk.AddPrimaryKeyColumn("pk2", int64(2))
+	updatePk.AddPrimaryKeyColumn("pk3", []byte("pk3"))
+	updateRowChange.PrimaryKey = updatePk
+
+	updateRowChange.IncrementColumn("col2", int64(10))
+	updateRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+	updateRowRequest.UpdateRowChange = updateRowChange
+	_, err = client.UpdateRow(updateRowRequest)
+	if err != nil {
+		fmt.Println("update failed with error:", err)
+		return
+	} else {
+		fmt.Println("update row finished")
+	}
+
+	updateRowRequest = new(tablestore.UpdateRowRequest)
+	updateRowChange = new(tablestore.UpdateRowChange)
+	updateRowChange.TableName = tableName
+	updatePk = new(tablestore.PrimaryKey)
+	updatePk.AddPrimaryKeyColumn("pk1", "pk1increment")
+	updatePk.AddPrimaryKeyColumn("pk2", int64(2))
+	updatePk.AddPrimaryKeyColumn("pk3", []byte("pk3"))
+	updateRowChange.PrimaryKey = updatePk
+
+	updateRowChange.IncrementColumn("col2", int64(30))
+	updateRowChange.SetReturnIncrementValue()
+	updateRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+	updateRowChange.AppendIncrementColumnToReturn("col2")
+	updateRowRequest.UpdateRowChange = updateRowChange
+
+	resp, err := client.UpdateRow(updateRowRequest)
+	if err != nil {
+		fmt.Println("update failed with error:", err)
+		return
+	} else {
+		fmt.Println("update row finished")
+		fmt.Println(resp)
+		fmt.Println(len(resp.Columns))
+		fmt.Println(resp.Columns[0].ColumnName)
+		fmt.Println(resp.Columns[0].Value)
+		fmt.Println(resp.Columns[0].Timestamp)
+	}
+}
+
 func PutRowWithKeyAutoIncrementSample(client *tablestore.TableStoreClient) {
 	fmt.Println("begin to put row")
 	putRowRequest := new(tablestore.PutRowRequest)

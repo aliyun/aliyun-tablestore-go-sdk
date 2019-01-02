@@ -663,6 +663,14 @@ func (rowchange *PutRowChange) SetReturnPk() {
 	rowchange.ReturnType = ReturnType(ReturnType_RT_PK)
 }
 
+func (rowchange *UpdateRowChange) SetReturnIncrementValue() {
+	rowchange.ReturnType = ReturnType(ReturnType_RT_AFTER_MODIFY)
+}
+
+func (rowchange *UpdateRowChange) AppendIncrementColumnToReturn(name string) {
+	rowchange.ColumnNamesToReturn = append(rowchange.ColumnNamesToReturn, name)
+}
+
 // value only support int64,string,bool,float64,[]byte. other type will get panic
 func (rowchange *PutRowChange) AddColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
 	// Todo: validate the input
@@ -752,6 +760,12 @@ func (rowchange *UpdateRowChange) DeleteColumn(columnName string) {
 func (rowchange *UpdateRowChange) DeleteColumnWithTimestamp(columnName string, timestamp int64) {
 	// Todo: validate the input
 	column := &ColumnToUpdate{ColumnName: columnName, Value: nil, Type: DELETE_ONE_VERSION, HasType: true, HasTimestamp: true, Timestamp: timestamp, IgnoreValue: true}
+	rowchange.Columns = append(rowchange.Columns, *column)
+}
+
+func (rowchange *UpdateRowChange) IncrementColumn(columnName string, value int64) {
+	// Todo: validate the input
+	column := &ColumnToUpdate{ColumnName: columnName, Value: value, Type: INCREMENT, HasType: true, IgnoreValue: false}
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 

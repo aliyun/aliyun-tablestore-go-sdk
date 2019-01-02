@@ -680,8 +680,29 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	}
 
 	response := &UpdateRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+
+	if request.UpdateRowChange.ReturnType == ReturnType_RT_AFTER_MODIFY {
+		content := otsprotocol.ReturnContent{ReturnType: otsprotocol.ReturnType_RT_AFTER_MODIFY.Enum()}
+		for _, column := range request.UpdateRowChange.ColumnNamesToReturn {
+			content.ReturnColumnNames = append(content.ReturnColumnNames, column)
+		}
+		req.ReturnContent = &content
+	}
+
 	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
+	}
+
+	if request.UpdateRowChange.ReturnType == ReturnType_RT_AFTER_MODIFY {
+		plainbufferRow, err := readRowsWithHeader(bytes.NewReader(resp.Row))
+		if err != nil {
+			return response, err
+		}
+		for _, cell := range plainbufferRow[0].cells {
+			fmt.Println(cell.cellName)
+			attribute := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
+			response.Columns = append(response.Columns, attribute)
+		}
 	}
 
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read

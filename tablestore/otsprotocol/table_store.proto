@@ -221,10 +221,12 @@ message TimeRange {
 enum ReturnType {
     RT_NONE = 0;
     RT_PK = 1;
+    RT_AFTER_MODIFY = 2;
 }
 
 message ReturnContent {
     optional ReturnType return_type = 1;
+    repeated string return_column_names = 2;
 }
 
 /**

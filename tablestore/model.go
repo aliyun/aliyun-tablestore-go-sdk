@@ -190,6 +190,7 @@ type DeleteRowResponse struct {
 }
 
 type UpdateRowResponse struct {
+	Columns              []*AttributeColumn
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	ResponseInfo
 }
@@ -328,6 +329,7 @@ type ReturnType int32
 const (
 	ReturnType_RT_NONE ReturnType = 0
 	ReturnType_RT_PK ReturnType = 1
+	ReturnType_RT_AFTER_MODIFY ReturnType = 2
 )
 
 type PaginationFilter struct {
@@ -447,6 +449,8 @@ type UpdateRowChange struct {
 	Columns    []ColumnToUpdate
 	Condition  *RowCondition
 	TransactionId *string
+	ReturnType ReturnType
+	ColumnNamesToReturn    []string
 }
 
 type UpdateRowRequest struct {
