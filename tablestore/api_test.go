@@ -2,7 +2,6 @@ package tablestore
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	. "gopkg.in/check.v1"
 	"math/rand"
 	"net/http"
@@ -12,6 +11,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+	"io"
+	"syscall"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -1324,24 +1325,67 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	errorCode := INTERNAL_SERVER_ERROR
 	tsClient := client.(*TableStoreClient)
-	value := getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 10, time.Now().Add(time.Second*1), 10, getRowUri, 500)
+	value := getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 10, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = ROW_OPERATION_CONFLICT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri, 500)
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri, 500)
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, nil, &otsprotocol.Error{Code: &errorCode, Message: &errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri, 500)
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri)
 	c.Check(value == MaxRetryInterval, Equals, true)
+
+	// stream api
+	errorCode = STORAGE_TIMEOUT
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
+	c.Check(value > 0, Equals, true)
+
+	// 502
+	errorCode = SERVER_UNAVAILABLE
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
+	c.Check(value > 0, Equals, true)
+
+	// 502 write
+	errorCode = SERVER_UNAVAILABLE
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	c.Check(value == 0, Equals, true)
+
+	// 400 normal
+	errorCode = "OTSPermissionDenied"
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	c.Check(value == 0, Equals, true)
+
+	// 400 raw http
+	errorCode = OTS_CLIENT_UNKNOWN
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
+	c.Check(value == 0, Equals, true)
+
+	// storage 503 put
+	errorCode = STORAGE_SERVER_BUSY
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	c.Check(value > 0, Equals, true)
+
+	// storage 503 desc stream
+	errorCode = STORAGE_SERVER_BUSY
+	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, describeStreamUri)
+	c.Check(value > 0, Equals, true)
+
+	// EOF
+	value = getNextPause(tsClient, io.EOF, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	c.Check(value > 0, Equals, true)
+
+	// connection rest
+	value = getNextPause(tsClient, syscall.ECONNRESET, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	c.Check(value > 0, Equals, true)
 
 	getResp := &GetRowResponse{}
 	colMap := getResp.GetColumnMap()

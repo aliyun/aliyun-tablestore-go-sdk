@@ -563,26 +563,53 @@ func NewPaginationFilter(filter *PaginationFilter) *otsprotocol.ColumnPagination
 	return pageFilter
 }
 
-func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byte, error, int, string) {
+func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byte, error, string) {
 	resp, err := otsClient.httpClient.Do(req)
 	if err != nil {
-		if resp != nil {
-			return nil, err, resp.StatusCode, getRequestId(resp)
-		}
-		return nil, err, 0, getRequestId(resp)
+		return nil, err, ""
 	}
 	defer resp.Body.Close()
 
+	reqId := getRequestId(resp)
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return nil, err, resp.StatusCode, getRequestId(resp)
+		return nil, err, reqId
 	}
 
 	if (resp.StatusCode >= 200 && resp.StatusCode < 300) == false {
-		return body, fmt.Errorf("get %s response status is %d", url, resp.StatusCode), resp.StatusCode, getRequestId(resp)
+		var retErr *OtsError
+		perr := new(otsprotocol.Error)
+		errUm := proto.Unmarshal(body, perr)
+		if errUm != nil {
+			retErr = rawHttpToOtsError(resp.StatusCode, body, reqId)
+		} else {
+			retErr = pbErrToOtsError(perr, reqId)
+		}
+		return nil, retErr, reqId
 	}
 
-	return body, nil, resp.StatusCode, getRequestId(resp)
+	return body, nil, reqId
+}
+
+func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
+	oerr := &OtsError{
+		Message: string(body),
+		RequestId: reqId,
+	}
+	if code >= 500 && code < 600 {
+		oerr.Code = SERVER_UNAVAILABLE
+	} else {
+		oerr.Code = OTS_CLIENT_UNKNOWN
+	}
+	return oerr
+}
+
+func pbErrToOtsError(pbErr *otsprotocol.Error, reqId string) *OtsError {
+	return &OtsError{
+		Code:    pbErr.GetCode(),
+		Message: pbErr.GetMessage(),
+		RequestId: reqId,
+	}
 }
 
 func getRequestId(response *http.Response) string {

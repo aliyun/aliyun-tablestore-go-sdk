@@ -11,6 +11,8 @@ import (
 	"net"
 	"net/http"
 	"time"
+	"io"
+	"strings"
 )
 
 const (
@@ -125,30 +127,17 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	var respBody []byte
 	var requestId string
 	for i = 0; ; i++ {
-		var statusCode int
-
-		respBody, err, statusCode, requestId = tableStoreClient.doRequest(url, uri, body, resp)
+		respBody, err, requestId = tableStoreClient.doRequest(url, uri, body, resp)
 		responseInfo.RequestId = requestId
 
 		if err == nil {
 			break
 		} else {
-
-			if len(respBody) <= 0 {
-				return err
-			}
-			e := new(otsprotocol.Error)
-			errn := proto.Unmarshal(respBody, e)
-
-			value = getNextPause(tableStoreClient, errn, e, i, end, value, uri, statusCode)
+			value = getNextPause(tableStoreClient, err, i, end, value, uri)
 
 			// fmt.Println("hit retry", uri, err, *e.Code, value)
 			if value <= 0 {
-				if errn != nil {
-					return fmt.Errorf("decode resp failed: %s: %s: %s %s", errn, err, string(respBody), requestId)
-				} else {
-					return fmt.Errorf("%s %s %s", *e.Code, *e.Message, requestId)
-				}
+				return err
 			}
 
 			time.Sleep(time.Duration(value) * time.Millisecond)
@@ -167,29 +156,42 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	return nil
 }
 
-func getNextPause(tableStoreClient *TableStoreClient, err error, serverError *otsprotocol.Error, count uint, end time.Time, lastInterval int64, action string, statusCode int) int64 {
+func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end time.Time, lastInterval int64, action string) int64 {
 	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
 		return 0
-	} else if err == nil && !shouldRetry(*serverError.Code, *serverError.Message, action, statusCode) {
-		return 0
+	}
+	var retry bool
+	if otsErr, ok := err.(*OtsError); ok {
+		retry = shouldRetry(otsErr.Code, otsErr.Message, action)
 	} else {
+		if err == io.EOF || err == io.ErrUnexpectedEOF || //retry on special net error contains EOF or reset
+			strings.Contains(err.Error(), io.EOF.Error()) ||
+			strings.Contains(err.Error(), "Connection reset by peer") ||
+			strings.Contains(err.Error(), "connection reset by peer") {
+			retry = true
+		} else if nErr, ok := err.(net.Error); ok {
+			retry = nErr.Temporary()
+		}
+	}
+
+	if retry {
 		value := lastInterval*2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
 		if value > MaxRetryInterval {
-			return MaxRetryInterval
+			value =  MaxRetryInterval
 		}
 
 		return value
 	}
+	return 0
 }
 
-func shouldRetry(errorCode string, errorMsg string, action string, httpStatus int) bool {
+func shouldRetry(errorCode string, errorMsg string, action string) bool {
 	if retryNotMatterActions(errorCode, errorMsg) == true {
 		return true
 	}
 
-	serverError := httpStatus >= 500 && httpStatus <= 599
 	if isIdempotent(action) &&
-		(errorCode == STORAGE_TIMEOUT || errorCode == INTERNAL_SERVER_ERROR || errorCode == SERVER_UNAVAILABLE || serverError) {
+		(errorCode == STORAGE_TIMEOUT || errorCode == INTERNAL_SERVER_ERROR || errorCode == SERVER_UNAVAILABLE) {
 		return true
 	}
 	return false
@@ -198,7 +200,7 @@ func shouldRetry(errorCode string, errorMsg string, action string, httpStatus in
 func retryNotMatterActions(errorCode string, errorMsg string) bool {
 	if errorCode == ROW_OPERATION_CONFLICT || errorCode == NOT_ENOUGH_CAPACITY_UNIT ||
 		errorCode == TABLE_NOT_READY || errorCode == PARTITION_UNAVAILABLE ||
-		errorCode == SERVER_BUSY || (errorCode == QUOTA_EXHAUSTED && errorMsg == "Too frequent table operations.") {
+		errorCode == SERVER_BUSY || errorCode == STORAGE_SERVER_BUSY || (errorCode == QUOTA_EXHAUSTED && errorMsg == "Too frequent table operations.") {
 		return true
 	} else {
 		return false
@@ -208,17 +210,18 @@ func retryNotMatterActions(errorCode string, errorMsg string) bool {
 func isIdempotent(action string) bool {
 	if action == batchGetRowUri || action == describeTableUri ||
 		action == getRangeUri || action == getRowUri ||
-		action == listTableUri {
+		action == listTableUri || action == listStreamUri ||
+			action == getStreamRecordUri || action == describeStreamUri {
 		return true
 	} else {
 		return false
 	}
 }
 
-func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, int, string) {
+func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, string) {
 	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
-		return nil, err, 0, ""
+		return nil, err, ""
 	}
 	/* set headers */
 	hreq.Header.Set("User-Agent", userAgent)
@@ -247,7 +250,7 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	sign, err := otshead.signature(uri, "POST", tableStoreClient.accessKeySecret)
 
 	if err != nil {
-		return nil, err, 0, ""
+		return nil, err, ""
 	}
 	hreq.Header.Set(xOtsSignature, sign)
 
