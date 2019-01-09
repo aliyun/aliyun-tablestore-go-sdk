@@ -32,9 +32,9 @@ go get gopkg.in/natefinch/lumberjack.v2
 
 * tunnel type
 
- * TunnelTypeStream:stream data(增量数据流)
- * TunnelTypeBaseData: full data(全量数据流)
- * TunnelTypeBaseStream: full and stream data(先全量后增量数据流)
+  * TunnelTypeStream:stream data(增量数据流)
+  * TunnelTypeBaseData: full data(全量数据流)
+  * TunnelTypeBaseStream: full and stream data(先全量后增量数据流)
 
 * init tunnel client
 
