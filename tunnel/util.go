@@ -49,7 +49,10 @@ func DeserializeRecordFromRawBytes(data []byte, actionType ActionType) (*Record,
 
 	for _, cell := range rows[0].Cells {
 		cellName := (string)(cell.CellName)
-		dataColumn := &RecordColumn{Name: &cellName, Value: cell.CellValue.Value, Timestamp: &cell.CellTimestamp}
+		dataColumn := &RecordColumn{Name: &cellName, Timestamp: &cell.CellTimestamp}
+		if cell.CellValue != nil {
+			dataColumn.Value = cell.CellValue.Value
+		}
 		switch cell.CellType {
 		case protocol.DELETE_ONE_VERSION:
 			dataColumn.Type = RCT_DeleteOneVersion
