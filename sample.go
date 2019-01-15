@@ -15,6 +15,8 @@ func main() {
 	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
 	client := tablestore.NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
+	sample.UpdateRowWithIncrement(client, "sampletable")
+	//return
 	// Table operation
 	sample.CreateTableSample(client, "sampletable")
 	sample.CreateTableKeyAutoIncrementSample(client)
