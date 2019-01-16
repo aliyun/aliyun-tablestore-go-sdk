@@ -15,8 +15,8 @@ var (
 )
 
 var DefaultTunnelConfig = &TunnelConfig{
-	MaxRetryElapsedTime: 45 * time.Second,
-	RequestTimeout:      30 * time.Second,
+	MaxRetryElapsedTime: 75 * time.Second,
+	RequestTimeout:      60 * time.Second,
 	Transport:           http.DefaultTransport,
 }
 
