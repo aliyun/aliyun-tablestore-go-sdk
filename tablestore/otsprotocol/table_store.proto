@@ -474,10 +474,12 @@ message GetShardIteratorRequest {
     required string stream_id = 1;
     required string shard_id = 2;
     optional int64 timestamp = 3;
+    optional string token = 4;
 }
 
 message GetShardIteratorResponse {
     required string shard_iterator = 1;
+    optional string next_token = 2;
 }
 
 message GetStreamRecordRequest {

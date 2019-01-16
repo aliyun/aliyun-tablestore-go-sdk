@@ -5,7 +5,74 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"strconv"
 	"time"
+	"github.com/golang/protobuf/proto"
 )
+
+func GetStreamRecordWithTimestampSample(client *tablestore.TableStoreClient, tableName string) {
+	resp, err := client.ListStream(&tablestore.ListStreamRequest{TableName: &tableName})
+	if err!= nil {
+		fmt.Println("failed to list Stream:", err)
+		return
+	}
+
+	fmt.Printf("%#v\n", resp)
+
+	streamId := resp.Streams[0].Id
+
+	resp2, err := client.DescribeStream(&tablestore.DescribeStreamRequest{StreamId: streamId})
+	fmt.Printf("DescribeStreamResponse: %#v\n", resp)
+	fmt.Printf("StreamShard: %#v\n", resp2.Shards[0])
+	shardId := resp2.Shards[0].SelfShard
+
+	time1:= time.Now().UnixNano() / 1000  - 1000 * 1000 * 3600 * 24
+
+	fmt.Println(time1)
+	resp3, err := client.GetShardIterator(&tablestore.GetShardIteratorRequest{
+		StreamId: streamId,
+		ShardId:  shardId,
+		Timestamp: proto.Int64(time1),
+	})
+	if err != nil {
+		fmt.Println("hit err:", err)
+		return
+	}
+
+	iter := resp3.ShardIterator
+	if resp3.Token != nil {
+		fmt.Println("token is", resp3.Token)
+	} else {
+		iter = resp3.ShardIterator
+		fmt.Println("iterator is", *iter)
+	}
+
+	records := make([]*tablestore.StreamRecord, 0)
+	for {
+		resp, err := client.GetStreamRecord(&tablestore.GetStreamRecordRequest{
+			ShardIterator: iter})
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+		fmt.Printf("#records: %d\n", len(resp.Records))
+		for i, rec := range resp.Records {
+			fmt.Printf("record %d: %s\n", i, rec)
+		}
+		for _, rec := range resp.Records {
+			records = append(records, rec)
+		}
+		nextIter := resp.NextShardIterator
+		if nextIter == nil {
+			fmt.Printf("next iterator: %#v\n", nextIter)
+			break
+		} else {
+			fmt.Printf("next iterator: %#v\n", *nextIter)
+		}
+		if *iter == *nextIter {
+			break
+		}
+		iter = nextIter
+	}
+}
 
 func GetStreamRecordSample(client *tablestore.TableStoreClient, tableName string) {
 	createtableRequest := new(tablestore.CreateTableRequest)

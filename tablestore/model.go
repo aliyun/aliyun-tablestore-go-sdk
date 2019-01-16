@@ -639,10 +639,12 @@ type GetShardIteratorRequest struct {
 	StreamId  *StreamId // required
 	ShardId   *ShardId  // required
 	Timestamp *int64
+	Token     *string
 }
 
 type GetShardIteratorResponse struct {
 	ShardIterator *ShardIterator // required
+	Token         *string
 	ResponseInfo
 }
 

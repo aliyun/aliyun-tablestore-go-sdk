@@ -1037,6 +1037,10 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 		pbReq.Timestamp = req.Timestamp
 	}
 
+	if req.Token != nil {
+		pbReq.Token = req.Token
+	}
+
 	pbResp := otsprotocol.GetShardIteratorResponse{}
 	resp := GetShardIteratorResponse{}
 	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
@@ -1044,6 +1048,7 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 	}
 
 	resp.ShardIterator = (*ShardIterator)(pbResp.ShardIterator)
+	resp.Token = pbResp.NextToken
 	return &resp, nil
 }
 
