@@ -128,9 +128,9 @@ See the sample directory for more details.
 ```go
 var DefaultTunnelConfig = &TunnelConfig{
       //Max backoff retry duration.
-      MaxRetryElapsedTime: 45 * time.Second,
+      MaxRetryElapsedTime: 75 * time.Second,
       //HTTP request timeout.
-      RequestTimeout:      30 * time.Second,
+      RequestTimeout:      60 * time.Second,
       //http.DefaultTransport.
       Transport:           http.DefaultTransport,
 }
