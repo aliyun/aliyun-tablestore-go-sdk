@@ -19,15 +19,17 @@ import (
 // TableStoreClient的功能包括连接OTS服务进行验证、创建/列出/删除表或表组、插入/获取/
 // 删除/更新行数据
 type TableStoreClient struct {
-	endPoint        string
-	instanceName    string
-	accessKeyId     string
-	accessKeySecret string
-	securityToken   string
+	endPoint            string
+	instanceName        string
+	accessKeyId         string
+	accessKeySecret     string
+	securityToken       string
 
-	httpClient      IHttpClient
-	config          *TableStoreConfig
-	random          *rand.Rand
+	httpClient          IHttpClient
+	config              *TableStoreConfig
+	random              *rand.Rand
+
+	CustomizedRetryFunc CustomizedRetryNotMatterActions
 }
 
 type ClientOption func(*TableStoreClient)
