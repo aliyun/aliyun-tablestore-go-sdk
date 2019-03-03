@@ -7,12 +7,12 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"math/rand"
 	"net"
 	"net/http"
-	"time"
-	"io"
 	"strings"
+	"time"
 )
 
 const (
@@ -41,12 +41,12 @@ const (
 	deleteSearchIndexUri               = "/DeleteSearchIndex"
 	describeSearchIndexUri             = "/DescribeSearchIndex"
 
-	createIndexUri                     = "/CreateIndex"
-	dropIndexUri                       = "/DropIndex"
+	createIndexUri = "/CreateIndex"
+	dropIndexUri   = "/DropIndex"
 
-	createlocaltransactionuri          = "/StartLocalTransaction"
-	committransactionuri               = "/CommitTransaction"
-	aborttransactionuri                = "/AbortTransaction"
+	createlocaltransactionuri = "/StartLocalTransaction"
+	committransactionuri      = "/CommitTransaction"
+	aborttransactionuri       = "/AbortTransaction"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -86,11 +86,16 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 		config = NewDefaultTableStoreConfig()
 	}
 	tableStoreClient.config = config
-	tableStoreTransportProxy := &http.Transport{
-		MaxIdleConnsPerHost: config.MaxIdleConnections,
-		Dial: (&net.Dialer{
-			Timeout: config.HTTPTimeout.ConnectionTimeout,
-		}).Dial,
+	var tableStoreTransportProxy http.RoundTripper
+	if config.Transport != nil {
+		tableStoreTransportProxy = config.Transport
+	} else {
+		tableStoreTransportProxy = &http.Transport{
+			MaxIdleConnsPerHost: config.MaxIdleConnections,
+			Dial: (&net.Dialer{
+				Timeout: config.HTTPTimeout.ConnectionTimeout,
+			}).Dial,
+		}
 	}
 
 	tableStoreClient.httpClient = currentGetHttpClientFunc()
@@ -103,6 +108,12 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 
 	tableStoreClient.random = rand.New(rand.NewSource(time.Now().Unix()))
 
+	return tableStoreClient
+}
+
+func NewClientWithExternalHeader(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig, header map[string]string) *TableStoreClient {
+	tableStoreClient := NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret, securityToken, config)
+	tableStoreClient.externalHeader = header
 	return tableStoreClient
 }
 
@@ -177,7 +188,7 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 	if retry {
 		value := lastInterval*2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
 		if value > MaxRetryInterval {
-			value =  MaxRetryInterval
+			value = MaxRetryInterval
 		}
 
 		return value
@@ -211,7 +222,7 @@ func isIdempotent(action string) bool {
 	if action == batchGetRowUri || action == describeTableUri ||
 		action == getRangeUri || action == getRowUri ||
 		action == listTableUri || action == listStreamUri ||
-			action == getStreamRecordUri || action == describeStreamUri {
+		action == getStreamRecordUri || action == describeStreamUri {
 		return true
 	} else {
 		return false
@@ -232,6 +243,9 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	hreq.Header.Set(xOtsApiversion, ApiVersion)
 	hreq.Header.Set(xOtsAccesskeyid, tableStoreClient.accessKeyId)
 	hreq.Header.Set(xOtsInstanceName, tableStoreClient.instanceName)
+	for key, value := range tableStoreClient.externalHeader {
+		hreq.Header[key] = []string{value}
+	}
 
 	md5Byte := md5.Sum(body)
 	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
@@ -247,6 +261,11 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 	}
 	otshead.set(xOtsContentmd5, md5Base64)
 	otshead.set(xOtsInstanceName, tableStoreClient.instanceName)
+	for key, value := range tableStoreClient.externalHeader {
+		if strings.HasPrefix(key, xOtsPrefix) {
+			otshead.set(key, value)
+		}
+	}
 	sign, err := otshead.signature(uri, "POST", tableStoreClient.accessKeySecret)
 
 	if err != nil {
@@ -284,7 +303,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 
 	if len(request.TableMeta.DefinedColumns) > 0 {
 		for _, value := range request.TableMeta.DefinedColumns {
-			req.TableMeta.DefinedColumn = append(req.TableMeta.DefinedColumn, &otsprotocol.DefinedColumnSchema{Name: &value.Name, Type: value.ColumnType.ConvertToPbDefinedColumnType().Enum() })
+			req.TableMeta.DefinedColumn = append(req.TableMeta.DefinedColumn, &otsprotocol.DefinedColumnSchema{Name: &value.Name, Type: value.ColumnType.ConvertToPbDefinedColumnType().Enum()})
 		}
 	}
 
