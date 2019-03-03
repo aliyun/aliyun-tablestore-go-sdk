@@ -88,9 +88,21 @@ type PrimaryKeyColumn struct {
 	Value      interface{}
 }
 
+type SequenceInfo struct {
+	// Epoch of stream log partition
+	Epoch int32
+	// stream log timestamp
+	Timestamp int64
+	// row index of stream log with same log timestamp
+	RowIndex  int32
+}
+
 type Record struct {
 	Type       ActionType
 	Timestamp  int64
+	// SequenceInfo is nil when it is a base data record,
+	// while SequenceInfo is not nil when it is a stream record.
+	SequenceInfo *SequenceInfo
 	PrimaryKey *PrimaryKey // required
 	Columns    []*RecordColumn
 }
