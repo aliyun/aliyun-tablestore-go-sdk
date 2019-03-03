@@ -173,7 +173,7 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 	}
 	var retry bool
 	if otsErr, ok := err.(*OtsError); ok {
-		retry = shouldRetry(otsErr.Code, otsErr.Message, action)
+		retry = shouldRetry(tableStoreClient, otsErr.Code, otsErr.Message, action, otsErr.HttpStatusCode)
 	} else {
 		if err == io.EOF || err == io.ErrUnexpectedEOF || //retry on special net error contains EOF or reset
 			strings.Contains(err.Error(), io.EOF.Error()) ||
@@ -196,7 +196,13 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 	return 0
 }
 
-func shouldRetry(errorCode string, errorMsg string, action string) bool {
+func shouldRetry(tableStoreClient *TableStoreClient, errorCode string, errorMsg string, action string, statusCode int) bool {
+	if tableStoreClient.CustomizedRetryFunc != nil {
+		if  tableStoreClient.CustomizedRetryFunc(errorCode, errorMsg, action, statusCode) == true {
+			return true
+		}
+	}
+
 	if retryNotMatterActions(errorCode, errorMsg) == true {
 		return true
 	}
@@ -207,6 +213,8 @@ func shouldRetry(errorCode string, errorMsg string, action string) bool {
 	}
 	return false
 }
+
+type CustomizedRetryNotMatterActions func(errorCode string, errorMsg string, action string, httpStatus int) bool
 
 func retryNotMatterActions(errorCode string, errorMsg string) bool {
 	if errorCode == ROW_OPERATION_CONFLICT || errorCode == NOT_ENOUGH_CAPACITY_UNIT ||

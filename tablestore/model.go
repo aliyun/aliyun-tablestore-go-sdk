@@ -29,7 +29,8 @@ type TableStoreClient struct {
 	config     *TableStoreConfig
 	random     *rand.Rand
 
-	externalHeader map[string]string
+	externalHeader      map[string]string
+	CustomizedRetryFunc CustomizedRetryNotMatterActions
 }
 
 type ClientOption func(*TableStoreClient)
@@ -275,12 +276,12 @@ const (
 type ComparatorType int32
 
 const (
-	CT_EQUAL         ComparatorType = 1
-	CT_NOT_EQUAL     ComparatorType = 2
-	CT_GREATER_THAN  ComparatorType = 3
+	CT_EQUAL ComparatorType = 1
+	CT_NOT_EQUAL ComparatorType = 2
+	CT_GREATER_THAN ComparatorType = 3
 	CT_GREATER_EQUAL ComparatorType = 4
-	CT_LESS_THAN     ComparatorType = 5
-	CT_LESS_EQUAL    ComparatorType = 6
+	CT_LESS_THAN ComparatorType = 5
+	CT_LESS_EQUAL ComparatorType = 6
 )
 
 type LogicalOperator int32
@@ -288,15 +289,15 @@ type LogicalOperator int32
 const (
 	LO_NOT LogicalOperator = 1
 	LO_AND LogicalOperator = 2
-	LO_OR  LogicalOperator = 3
+	LO_OR LogicalOperator = 3
 )
 
 type FilterType int32
 
 const (
-	FT_SINGLE_COLUMN_VALUE    FilterType = 1
+	FT_SINGLE_COLUMN_VALUE FilterType = 1
 	FT_COMPOSITE_COLUMN_VALUE FilterType = 2
-	FT_COLUMN_PAGINATION      FilterType = 3
+	FT_COLUMN_PAGINATION FilterType = 3
 )
 
 type ColumnFilter interface {
@@ -307,10 +308,10 @@ type ColumnFilter interface {
 type VariantType int32
 
 const (
-	Variant_INTEGER VariantType = 0
-	Variant_DOUBLE  VariantType = 1
+	Variant_INTEGER VariantType = 0;
+	Variant_DOUBLE VariantType = 1;
 	//VT_BOOLEAN = 2;
-	Variant_STRING VariantType = 3
+	Variant_STRING VariantType = 3;
 )
 
 type ValueTransferRule struct {
@@ -330,8 +331,8 @@ type SingleColumnCondition struct {
 type ReturnType int32
 
 const (
-	ReturnType_RT_NONE         ReturnType = 0
-	ReturnType_RT_PK           ReturnType = 1
+	ReturnType_RT_NONE ReturnType = 0
+	ReturnType_RT_PK ReturnType = 1
 	ReturnType_RT_AFTER_MODIFY ReturnType = 2
 )
 
@@ -411,12 +412,12 @@ type RowCondition struct {
 }
 
 type PutRowChange struct {
-	TableName     string
-	PrimaryKey    *PrimaryKey
-	Columns       []AttributeColumn
-	Condition     *RowCondition
-	ReturnType    ReturnType
-	TransactionId *string
+	TableName  string
+	PrimaryKey *PrimaryKey
+	Columns    []AttributeColumn
+	Condition  *RowCondition
+	ReturnType ReturnType
+	TransactionId    *string
 }
 
 type PutRowRequest struct {
@@ -424,9 +425,9 @@ type PutRowRequest struct {
 }
 
 type DeleteRowChange struct {
-	TableName     string
-	PrimaryKey    *PrimaryKey
-	Condition     *RowCondition
+	TableName  string
+	PrimaryKey *PrimaryKey
+	Condition  *RowCondition
 	TransactionId *string
 }
 
@@ -435,25 +436,25 @@ type DeleteRowRequest struct {
 }
 
 type SingleRowQueryCriteria struct {
-	ColumnsToGet  []string
-	TableName     string
-	PrimaryKey    *PrimaryKey
-	MaxVersion    int32
-	TimeRange     *TimeRange
-	Filter        ColumnFilter
-	StartColumn   *string
-	EndColumn     *string
+	ColumnsToGet []string
+	TableName    string
+	PrimaryKey   *PrimaryKey
+	MaxVersion   int32
+	TimeRange    *TimeRange
+	Filter       ColumnFilter
+	StartColumn  *string
+	EndColumn    *string
 	TransactionId *string
 }
 
 type UpdateRowChange struct {
-	TableName           string
-	PrimaryKey          *PrimaryKey
-	Columns             []ColumnToUpdate
-	Condition           *RowCondition
-	TransactionId       *string
-	ReturnType          ReturnType
-	ColumnNamesToReturn []string
+	TableName  string
+	PrimaryKey *PrimaryKey
+	Columns    []ColumnToUpdate
+	Condition  *RowCondition
+	TransactionId *string
+	ReturnType ReturnType
+	ColumnNamesToReturn    []string
 }
 
 type UpdateRowRequest struct {
@@ -559,7 +560,7 @@ type BatchWriteRowResponse struct {
 type Direction int32
 
 const (
-	FORWARD  Direction = 0
+	FORWARD Direction = 0
 	BACKWARD Direction = 1
 )
 
@@ -575,7 +576,7 @@ type RangeRowQueryCriteria struct {
 	Limit           int32
 	StartColumn     *string
 	EndColumn       *string
-	TransactionId   *string
+	TransactionId    *string
 }
 
 type GetRangeRequest struct {
@@ -634,7 +635,7 @@ type DescribeStreamResponse struct {
 	CreationTime   int64        // in usec
 	Status         StreamStatus // required
 	Shards         []*StreamShard
-	NextShardId    *ShardId // optional. nil means "no more shards"
+	NextShardId    *ShardId     // optional. nil means "no more shards"
 	ResponseInfo
 }
 
@@ -799,7 +800,7 @@ type IndexType int32
 
 const (
 	IT_GLOBAL_INDEX IndexType = 1
-	IT_LOCAL_INDEX  IndexType = 2
+	IT_LOCAL_INDEX IndexType = 2
 )
 
 type DefinedColumnType int32
@@ -833,16 +834,16 @@ const (
 
 type StartLocalTransactionRequest struct {
 	PrimaryKey *PrimaryKey
-	TableName  string
+	TableName string
 }
 
 type StartLocalTransactionResponse struct {
-	TransactionId *string
+	TransactionId    *string
 	ResponseInfo
 }
 
 type CommitTransactionRequest struct {
-	TransactionId *string
+	TransactionId    *string
 }
 
 type CommitTransactionResponse struct {
@@ -850,7 +851,7 @@ type CommitTransactionResponse struct {
 }
 
 type AbortTransactionRequest struct {
-	TransactionId *string
+	TransactionId    *string
 }
 
 type AbortTransactionResponse struct {

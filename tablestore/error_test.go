@@ -17,7 +17,7 @@ func TestOtsError_Error(t *testing.T) {
 
 	oldErrStr := fmt.Errorf("%s %s %s", *pbErr.Code, *pbErr.Message, reqId)
 
-	otsErr := pbErrToOtsError(pbErr, reqId)
+	otsErr := pbErrToOtsError(500, pbErr, reqId)
 
 	if otsErr.Error() != oldErrStr.Error() {
 		t.Errorf("error string not equal, old %s new %s", oldErrStr.Error(), otsErr.Error())

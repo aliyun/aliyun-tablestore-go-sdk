@@ -45,6 +45,8 @@ type OtsError struct {
 	Code string
 	Message string
 	RequestId string
+
+	HttpStatusCode int
 }
 
 func (e *OtsError) Error() string {

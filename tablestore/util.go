@@ -583,7 +583,7 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byt
 		if errUm != nil {
 			retErr = rawHttpToOtsError(resp.StatusCode, body, reqId)
 		} else {
-			retErr = pbErrToOtsError(perr, reqId)
+			retErr = pbErrToOtsError(resp.StatusCode, perr, reqId)
 		}
 		return nil, retErr, reqId
 	}
@@ -595,6 +595,7 @@ func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
 	oerr := &OtsError{
 		Message: string(body),
 		RequestId: reqId,
+		HttpStatusCode: code,
 	}
 	if code >= 500 && code < 600 {
 		oerr.Code = SERVER_UNAVAILABLE
@@ -604,11 +605,12 @@ func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
 	return oerr
 }
 
-func pbErrToOtsError(pbErr *otsprotocol.Error, reqId string) *OtsError {
+func pbErrToOtsError(statusCode int, pbErr *otsprotocol.Error, reqId string) *OtsError {
 	return &OtsError{
 		Code:    pbErr.GetCode(),
 		Message: pbErr.GetMessage(),
 		RequestId: reqId,
+		HttpStatusCode : statusCode,
 	}
 }
 
