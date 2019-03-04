@@ -16,6 +16,21 @@ var (
 	backOffMultiplier   = 2.0
 )
 
+func StreamRecordSequenceLess(a, b *SequenceInfo) bool {
+	if a.Epoch < b.Epoch {
+		return true
+	}
+	if a.Epoch == b.Epoch {
+		if a.Timestamp < b.Timestamp {
+			return true
+		}
+		if a.Timestamp == b.Timestamp {
+			return a.RowIndex < b.RowIndex
+		}
+	}
+	return false
+}
+
 func ParseActionType(pbType *protocol.ActionType) (ActionType, error) {
 	switch *pbType {
 	case protocol.ActionType_PUT_ROW:
@@ -45,6 +60,10 @@ func DeserializeRecordFromRawBytes(data []byte, actionType ActionType) (*Record,
 
 	if rows[0].Extension != nil {
 		record.Timestamp = rows[0].Extension.Timestamp
+		record.SequenceInfo = &SequenceInfo{
+			Timestamp: rows[0].Extension.Timestamp,
+			RowIndex:  rows[0].Extension.RowIndex,
+		}
 	}
 
 	for _, cell := range rows[0].Cells {
