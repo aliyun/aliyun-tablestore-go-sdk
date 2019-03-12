@@ -13,12 +13,6 @@ import (
 )
 
 func TestTunnelStateMachine_BatchUpdateStatus(t *testing.T) {
-	//speed up cases
-	oldValue := tickMaxInterval
-	tickMaxInterval = time.Second
-	defer func() {
-		tickMaxInterval = oldValue
-	}()
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	lg, _ := testLogConfig.Build()
@@ -33,9 +27,12 @@ func TestTunnelStateMachine_BatchUpdateStatus(t *testing.T) {
 		}
 		return make([]*Record, 100), "token", "traceId", 1000 * 1024, nil
 	}).AnyTimes()
+	bc := &ChannelBackoffConfig{MaxDelay: time.Second}
+	setDefault(bc)
 	dialer := &channelDialer{
 		api: bypassApi,
 		lg:  lg,
+		bc:  bc,
 	}
 	processor := &SimpleProcessFactory{
 		CpInterval: time.Second,
@@ -223,6 +220,7 @@ func TestTunnelStateMachine_UpdateStatus(t *testing.T) {
 	dialer := &channelDialer{
 		api: bypassApi,
 		lg:  lg,
+		bc:  &DefaultBackoffConfig,
 	}
 	processor := &SimpleProcessFactory{
 		CpInterval: time.Second,

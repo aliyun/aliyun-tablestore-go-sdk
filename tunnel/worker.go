@@ -59,6 +59,7 @@ func newTunnelWorker(tunnelId string, api *TunnelApi, conf *TunnelWorkerConfig) 
 		cloneConf.ChannelDialer = &channelDialer{
 			api: api,
 			lg:  lg,
+			bc:  cloneConf.BackoffConfig,
 		}
 	}
 	return &tunnelWorker{
@@ -86,6 +87,11 @@ func initExceptDialerConfig(conf *TunnelWorkerConfig) {
 	}
 	if conf.LogWriteSyncer == nil {
 		conf.LogWriteSyncer = DefaultSyncer
+	}
+	if conf.BackoffConfig == nil {
+		conf.BackoffConfig = &DefaultBackoffConfig
+	} else {
+		setDefault(conf.BackoffConfig)
 	}
 }
 
