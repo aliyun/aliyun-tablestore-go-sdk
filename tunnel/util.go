@@ -86,9 +86,9 @@ func DeserializeRecordFromRawBytes(data []byte, actionType ActionType) (*Record,
 	return record, nil
 }
 
-func ExponentialBackoff(interval, maxInterval, maxElapsed time.Duration, multiplier, factor float64) *backoff.ExponentialBackOff {
+func ExponentialBackoff(interval, maxInterval, maxElapsed time.Duration, multiplier, jitter float64) *backoff.ExponentialBackOff {
 	b := backoff.NewExponentialBackOff()
-	b.RandomizationFactor = factor
+	b.RandomizationFactor = jitter
 	b.Multiplier = multiplier
 	b.InitialInterval = interval
 	b.MaxInterval = maxInterval

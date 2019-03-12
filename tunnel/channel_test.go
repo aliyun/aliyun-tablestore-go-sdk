@@ -100,12 +100,9 @@ func TestFailConn_Closed(t *testing.T) {
 }
 
 func TestChannelConn_NotifyStatus(t *testing.T) {
-	//speed up cases
-	oldValue := tickMaxInterval
-	tickMaxInterval = time.Second
-	defer func() {
-		tickMaxInterval = oldValue
-	}()
+	bc := &ChannelBackoffConfig{MaxDelay: time.Second}
+	setDefault(bc)
+
 	mockCtrl := gomock.NewController(t)
 	defer mockCtrl.Finish()
 	lg, _ := testLogConfig.Build()
@@ -131,6 +128,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 		dialer := &channelDialer{
 			api: bypassApi,
 			lg:  lg,
+			bc:  bc,
 		}
 
 		for _, test := range cases {
@@ -166,6 +164,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 		dialer := &channelDialer{
 			api: nil,
 			lg:  lg,
+			bc:  bc,
 		}
 
 		for _, test := range cases {
@@ -204,6 +203,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 		dialer := &channelDialer{
 			api: bypassApi,
 			lg:  lg,
+			bc:  bc,
 		}
 
 		for _, test := range cases {
@@ -252,6 +252,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 		dialer := &channelDialer{
 			api: bypassApi,
 			lg:  lg,
+			bc:  bc,
 		}
 
 		for _, test := range cases {
@@ -293,6 +294,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 		dialer := &channelDialer{
 			api: nil,
 			lg:  lg,
+			bc:  bc,
 		}
 
 		for _, test := range cases {
@@ -344,6 +346,7 @@ func TestChannelConn_NotifyStatus_ProcessRecords(t *testing.T) {
 				dialer := &channelDialer{
 					api: test.api,
 					lg:  lg,
+					bc:  &DefaultBackoffConfig,
 				}
 				conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", test.processor, state)
 				conn.NotifyStatus(ToChannelStatus(openState))
@@ -371,6 +374,7 @@ func TestChannelConn_Close(t *testing.T) {
 		dialer := &channelDialer{
 			api: bypassApi,
 			lg:  lg,
+			bc:  &DefaultBackoffConfig,
 		}
 		conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", newTestProcessor(time.Duration(0)), state)
 		conn.NotifyStatus(ToChannelStatus(openState))

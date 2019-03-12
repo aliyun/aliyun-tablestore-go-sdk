@@ -51,6 +51,36 @@ var DefaultSyncer = zapcore.AddSync(&lumberjack.Logger{
 	Compress:   true,
 })
 
+// DefaultBackoffConfig is specified channel worker backoff parameters,
+// decided by table store tunnel service developers.
+var DefaultBackoffConfig = ChannelBackoffConfig{
+	MaxDelay:  5 * time.Second,
+	baseDelay: 20 * time.Millisecond,
+	factor:    5,
+	jitter:    0.25,
+}
+
+// stream type channel worker backoff config
+type ChannelBackoffConfig struct {
+	//MaxDelay is the upper bound of backoff delay.
+	MaxDelay time.Duration
+
+	//blow is not exportable
+	baseDelay time.Duration
+
+	factor float64
+
+	jitter float64
+}
+
+func setDefault(bc *ChannelBackoffConfig) {
+	md := bc.MaxDelay
+	*bc = DefaultBackoffConfig
+	if md > 0 {
+		bc.MaxDelay = md
+	}
+}
+
 type ChannelContext struct {
 	TunnelId  string
 	ClientId  string
@@ -80,6 +110,7 @@ type TunnelWorkerConfig struct {
 
 	LogConfig      *zap.Config
 	LogWriteSyncer zapcore.WriteSyncer
+	BackoffConfig  *ChannelBackoffConfig
 }
 
 // hack replace zap config build core with lumberjack logger

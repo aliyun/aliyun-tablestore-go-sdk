@@ -10,9 +10,6 @@ import (
 )
 
 var (
-	tickMinInterval = 20 * time.Millisecond
-	tickMaxInterval = 5 * time.Second
-
 	pipeChannelSize = 5
 
 	rpoBar     = 500
@@ -96,6 +93,7 @@ type ChannelDialer interface {
 type channelDialer struct {
 	api tunnelDataApi
 	lg  *zap.Logger
+	bc  *ChannelBackoffConfig
 }
 
 func (d *channelDialer) ChannelDial(tunnelId, clientId, channelId, token string, p ChannelProcessor, state *TunnelStateMachine) ChannelConn {
@@ -115,6 +113,7 @@ func (d *channelDialer) ChannelDial(tunnelId, clientId, channelId, token string,
 		p:             p,
 		state:         state,
 		lg:            d.lg,
+		bc:            d.bc,
 		finished:      finish,
 		streamChannel: isStream,
 	}
@@ -147,6 +146,7 @@ type channelConn struct {
 	state        *TunnelStateMachine
 
 	lg *zap.Logger
+	bc *ChannelBackoffConfig
 
 	status   int32
 	finished atomic.Value
@@ -257,7 +257,7 @@ func (c *channelConn) workLoop() {
 func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struct{}) {
 	var bkoff *backoff.ExponentialBackOff
 	if c.streamChannel {
-		bkoff = ExponentialBackoff(tickMinInterval, tickMaxInterval, 0, 5, 0.25)
+		bkoff = ExponentialBackoff(c.bc.baseDelay, c.bc.MaxDelay, 0, c.bc.factor, c.bc.jitter)
 	}
 
 	for {
