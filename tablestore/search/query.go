@@ -21,6 +21,7 @@ const (
 	QueryType_GeoDistanceQuery    QueryType = 13
 	QueryType_GeoPolygonQuery     QueryType = 14
 	QueryType_TermsQuery          QueryType = 15
+	QueryType_ExistsQuery         QueryType = 16
 )
 
 func (q QueryType) Enum() *QueryType {
@@ -62,6 +63,8 @@ func (q QueryType) ToPB() *otsprotocol.QueryType {
 		return otsprotocol.QueryType_GEO_POLYGON_QUERY.Enum()
 	case QueryType_TermsQuery:
 		return otsprotocol.QueryType_TERMS_QUERY.Enum()
+	case QueryType_ExistsQuery:
+		return otsprotocol.QueryType_EXISTS_QUERY.Enum()
 	default:
 		panic("unexpected")
 	}
