@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
@@ -11,15 +12,15 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 )
 
 var (
-	alwaysFailUri = "/tunnel/alwaysFail"
-	badGateWayUri = "/tunnel/badGateway"
-	fail3timesUri = "/tunnel/3timesFail"
-	eof4timesUri  = "/tunnel/4timesEOF"
-	successUri    = "/tunnel/success"
+	alwaysFailUri   = "/tunnel/alwaysFail"
+	badGateWayUri   = "/tunnel/badGateway"
+	fail3timesUri   = "/tunnel/3timesFail"
+	eof4timesUri    = "/tunnel/4timesEOF"
+	successUri      = "/tunnel/success"
+	reflectTokenUri = "/tunnel/reflectToken"
 
 	requestId = "abcd-123"
 )
@@ -131,6 +132,21 @@ func TestDoRequest_PassTraceId(t *testing.T) {
 	c.True(traceId != requestId)
 }
 
+func TestDoRequest_SetToken(t *testing.T) {
+	c := assert.New(t)
+	ts := mockServer()
+	defer ts.Close()
+
+	ep := ts.URL
+	api := NewTunnelApiWithToken(ep, "testInstance", "testAkId", "testAkSec",
+		"testToken", nil)
+
+	cp := new(protocol.GetCheckpointResponse)
+	_, _, err := api.doRequest(reflectTokenUri, nil, cp)
+	c.Nil(err)
+	c.EqualValues(cp.GetCheckpoint(), "testToken")
+}
+
 func mockServer() *httptest.Server {
 	handler := http.NewServeMux()
 	handler.HandleFunc(alwaysFailUri, func(w http.ResponseWriter, r *http.Request) {
@@ -195,6 +211,16 @@ func mockServer() *httptest.Server {
 			w.Header().Set(xOtsRequestId, requestId)
 		}
 		w.Write(nil)
+	})
+	handler.HandleFunc(reflectTokenUri, func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get(xOtsHeaderStsToken)
+		seq := int64(0)
+		//reuse checkpoint response for convenient
+		resp := new(protocol.GetCheckpointResponse)
+		resp.Checkpoint = &token
+		resp.SequenceNumber = &seq
+		buf, _ := proto.Marshal(resp)
+		w.Write(buf)
 	})
 	handler.HandleFunc(getCheckpointUri, func(w http.ResponseWriter, r *http.Request) {
 		var req protocol.GetCheckpointRequest
