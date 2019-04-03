@@ -503,9 +503,13 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	}
 
 	if request.StreamSpec != nil {
-		req.StreamSpec = &otsprotocol.StreamSpecification{
-			EnableStream:   &request.StreamSpec.EnableStream,
-			ExpirationTime: &request.StreamSpec.ExpirationTime}
+		if request.StreamSpec.EnableStream == true {
+			req.StreamSpec = &otsprotocol.StreamSpecification{
+				EnableStream:   &request.StreamSpec.EnableStream,
+				ExpirationTime: &request.StreamSpec.ExpirationTime}
+		} else {
+			req.StreamSpec = &otsprotocol.StreamSpecification{EnableStream:   &request.StreamSpec.EnableStream}
+		}
 	}
 
 	resp := new(otsprotocol.UpdateTableResponse)
