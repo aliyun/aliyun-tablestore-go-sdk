@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
 	"github.com/satori/go.uuid"
@@ -16,7 +17,6 @@ import (
 	"os"
 	"strings"
 	"time"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 )
 
 const (
@@ -61,11 +61,17 @@ type TunnelApi struct {
 }
 
 func NewTunnelApi(endpoint, instanceName, accessKeyId, accessKeySecret string, conf *TunnelConfig) *TunnelApi {
-	tunnelApi := new(TunnelApi)
-	tunnelApi.endpoint = endpoint
-	tunnelApi.instanceName = instanceName
-	tunnelApi.accessKeyId = accessKeyId
-	tunnelApi.accessKeySecret = accessKeySecret
+	return NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, "", conf)
+}
+
+func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, token string, conf *TunnelConfig) *TunnelApi {
+	tunnelApi := &TunnelApi{
+		endpoint:        endpoint,
+		instanceName:    instanceName,
+		accessKeyId:     accessKeyId,
+		accessKeySecret: accessKeySecret,
+		securityToken:   token,
+	}
 	if conf == nil {
 		conf = DefaultTunnelConfig
 	}

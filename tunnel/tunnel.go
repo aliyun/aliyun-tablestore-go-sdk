@@ -19,6 +19,12 @@ func NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey strin
 	}
 }
 
+func NewTunnelClientWithToken(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig) TunnelClient {
+	return &DefaultTunnelClient{
+		api: NewTunnelApiWithToken(endpoint, instanceName, accessId, accessKey, token, conf),
+	}
+}
+
 func (c *DefaultTunnelClient) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelResponse, error) {
 	return c.api.CreateTunnel(req)
 }
