@@ -1219,6 +1219,12 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	tableMeta.AddPrimaryKeyColumn("pk3", PrimaryKeyType_STRING)
 	tableMeta.AddPrimaryKeyColumn("pk4", PrimaryKeyType_STRING)
 	tableMeta.AddPrimaryKeyColumn("pk5", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk6", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk7", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk8", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk9", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk10", PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk11", PrimaryKeyType_STRING)
 
 	_, error = client.CreateTable(createtableRequest)
 	c.Check(error, NotNil)
