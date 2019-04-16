@@ -733,7 +733,6 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 			return response, err
 		}
 		for _, cell := range plainbufferRow[0].cells {
-			fmt.Println(cell.cellName)
 			attribute := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
 			response.Columns = append(response.Columns, attribute)
 		}
@@ -1174,9 +1173,6 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
 	}
-
-	fmt.Println(len(pbResp.SplitPoints))
-	fmt.Println(len(pbResp.Locations))
 
 	beginPk := &PrimaryKey{}
 	endPk := &PrimaryKey{}
