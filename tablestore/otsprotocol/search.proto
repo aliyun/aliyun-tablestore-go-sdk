@@ -17,6 +17,7 @@ enum QueryType {
     GEO_DISTANCE_QUERY = 13;
     GEO_POLYGON_QUERY = 14;
     TERMS_QUERY = 15;
+    EXISTS_QUERY = 16;
 }
 
 enum QueryOperator {
@@ -117,6 +118,10 @@ message GeoDistanceQuery {
 message GeoPolygonQuery {
     optional string field_name = 1;
     repeated string points = 2;
+}
+
+message ExistsQuery {
+    optional string field_name = 1;
 }
 
 message Query {
