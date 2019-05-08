@@ -28,6 +28,10 @@ go get gopkg.in/natefinch/lumberjack.v2
 ```
 
 
+### Document
+
+* [中文文档](https://help.aliyun.com/document_detail/102520.html?spm=a2c4g.11174283.6.766.379b15c3R8lQsh)
+
 ### Quick Start
 
 * tunnel type
@@ -124,9 +128,9 @@ See the sample directory for more details.
 ```go
 var DefaultTunnelConfig = &TunnelConfig{
       //Max backoff retry duration.
-      MaxRetryElapsedTime: 45 * time.Second,
+      MaxRetryElapsedTime: 75 * time.Second,
       //HTTP request timeout.
-      RequestTimeout:      30 * time.Second,
+      RequestTimeout:      60 * time.Second,
       //http.DefaultTransport.
       Transport:           http.DefaultTransport,
 }
