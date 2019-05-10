@@ -340,6 +340,10 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 	req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 
+	if request.TableOption.DeviationCellVersionInSec > 0 {
+		req.TableOptions.DeviationCellVersionInSec = proto.Int64(request.TableOption.DeviationCellVersionInSec)
+	}
+
 	if request.StreamSpec != nil {
 		var ss otsprotocol.StreamSpecification
 		if request.StreamSpec.EnableStream {
@@ -463,7 +467,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 		}
 	}
 	response.TableMeta = responseTableMeta
-	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions)}
+	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions), DeviationCellVersionInSec: *resp.TableOptions.DeviationCellVersionInSec}
 	if resp.StreamDetails != nil && *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
 			EnableStream:   *resp.StreamDetails.EnableStream,
@@ -500,6 +504,10 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		req.TableOptions = new(otsprotocol.TableOptions)
 		req.TableOptions.TimeToLive = proto.Int32(int32(request.TableOption.TimeToAlive))
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
+
+		if request.TableOption.DeviationCellVersionInSec > 0 {
+			req.TableOptions.DeviationCellVersionInSec = proto.Int64(request.TableOption.DeviationCellVersionInSec)
+		}
 	}
 
 	if request.StreamSpec != nil {
@@ -524,7 +532,9 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 	response.TableOption = &TableOption{
 		TimeToAlive: int(*resp.TableOptions.TimeToLive),
-		MaxVersion:  int(*resp.TableOptions.MaxVersions)}
+		MaxVersion:  int(*resp.TableOptions.MaxVersions),
+		DeviationCellVersionInSec: *resp.TableOptions.DeviationCellVersionInSec}
+
 	if *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
 			EnableStream:   *resp.StreamDetails.EnableStream,

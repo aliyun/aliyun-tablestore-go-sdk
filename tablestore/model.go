@@ -135,6 +135,7 @@ type PrimaryKey struct {
 
 type TableOption struct {
 	TimeToAlive, MaxVersion int
+	DeviationCellVersionInSec int64
 }
 
 type ReservedThroughput struct {
