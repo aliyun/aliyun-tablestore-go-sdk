@@ -13,6 +13,10 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"log"
+	"strconv"
+	"io/ioutil"
+	"compress/zlib"
 )
 
 const (
@@ -238,7 +242,43 @@ func isIdempotent(action string) bool {
 }
 
 func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, string) {
-	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
+	var hreq *http.Request
+	var err error
+	otshead := createOtsHeaders(tableStoreClient.accessKeySecret)
+
+	if tableStoreClient.config.EnableRequestCompression {
+		buf := bytes.NewBuffer(nil)
+		flateWrite, err := zlib.NewWriterLevel(buf, zlib.DefaultCompression)
+		if err != nil {
+			log.Fatalln(err)
+		}
+
+		flateWrite.Write(body)
+		flateWrite.Flush()
+		flateWrite.Close()
+
+		data, err := ioutil.ReadAll(buf)
+		if err != nil {
+			return nil, err, ""
+		}
+
+		hreq, err = http.NewRequest("POST", url, bytes.NewBuffer(data))
+		hreq.Header.Set(xOtsRequestCompressType, xOtsCompressType)
+		hreq.Header.Set(xOtsRequestCompressSize, strconv.Itoa(len(body)))
+		otshead.set(xOtsRequestCompressType, xOtsCompressType)
+		otshead.set(xOtsRequestCompressSize, strconv.Itoa(len(body)))
+		md5Byte := md5.Sum(data)
+		md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
+		hreq.Header.Set(xOtsContentmd5, md5Base64)
+		otshead.set(xOtsContentmd5, md5Base64)
+	} else {
+		hreq, err = http.NewRequest("POST", url, bytes.NewBuffer(body))
+		md5Byte := md5.Sum(body)
+		md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
+		hreq.Header.Set(xOtsContentmd5, md5Base64)
+		otshead.set(xOtsContentmd5, md5Base64)
+	}
+
 	if err != nil {
 		return nil, err, ""
 	}
@@ -255,11 +295,6 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 		hreq.Header[key] = []string{value}
 	}
 
-	md5Byte := md5.Sum(body)
-	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
-	hreq.Header.Set(xOtsContentmd5, md5Base64)
-
-	otshead := createOtsHeaders(tableStoreClient.accessKeySecret)
 	otshead.set(xOtsDate, date)
 	otshead.set(xOtsApiversion, ApiVersion)
 	otshead.set(xOtsAccesskeyid, tableStoreClient.accessKeyId)
@@ -267,7 +302,7 @@ func (tableStoreClient *TableStoreClient) doRequest(url string, uri string, body
 		hreq.Header.Set(xOtsHeaderStsToken, tableStoreClient.securityToken)
 		otshead.set(xOtsHeaderStsToken, tableStoreClient.securityToken)
 	}
-	otshead.set(xOtsContentmd5, md5Base64)
+
 	otshead.set(xOtsInstanceName, tableStoreClient.instanceName)
 	for key, value := range tableStoreClient.externalHeader {
 		if strings.HasPrefix(key, xOtsPrefix) {

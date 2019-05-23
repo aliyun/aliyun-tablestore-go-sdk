@@ -64,6 +64,7 @@ type TableStoreConfig struct {
 	HTTPTimeout        HTTPTimeout
 	MaxIdleConnections int
 	Transport          http.RoundTripper
+	EnableRequestCompression bool
 }
 
 func NewDefaultTableStoreConfig() *TableStoreConfig {

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
+	"compress/flate"
 )
 
 const (
@@ -588,6 +589,17 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byt
 		return nil, retErr, reqId
 	}
 
+	if resp.Header.Get(xOtsResponseCompressType) == xOtsCompressType {
+		fmt.Print("compressed")
+		buf := bytes.NewBuffer(body)
+		flateReader := flate.NewReader(buf)
+		defer flateReader.Close()
+		body, err := ioutil.ReadAll(flateReader)
+		if err != nil {
+			return nil, err, reqId
+		}
+		return body, nil, reqId
+	}
 	return body, nil, reqId
 }
 

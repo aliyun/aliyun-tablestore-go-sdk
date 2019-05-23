@@ -27,7 +27,7 @@ const (
 	xOtsRequestId           = "x-ots-requestid"
 	xOtsRequestCompressType = "x-ots-request-compress-type"
 	xOtsRequestCompressSize = "x-ots-request-compress-size"
-	xOtsResponseCompressTye = "x-ots-response-compress-type"
+	xOtsResponseCompressType = "x-ots-response-compress-type"
 	xOtsHeaderTraceID       = "x-ots-trace-id"
 )
 
@@ -53,7 +53,7 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsInstanceName, must: true},
 		&otsHeader{name: xOtsSignature, must: true},
 		&otsHeader{name: xOtsRequestCompressSize, must: false},
-		&otsHeader{name: xOtsResponseCompressTye, must: false},
+		&otsHeader{name: xOtsResponseCompressType, must: false},
 		&otsHeader{name: xOtsRequestCompressType, must: false},
 		&otsHeader{name: xOtsHeaderStsToken, must: false},
 		&otsHeader{name: xOtsHeaderTraceID, must: false},
