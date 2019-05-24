@@ -11,7 +11,7 @@ import (
 	"net/http"
 	"reflect"
 	"sort"
-	"compress/flate"
+	"compress/zlib"
 )
 
 const (
@@ -484,16 +484,16 @@ func (comparatorType *ComparatorType) ConvertToPbComparatorType() otsprotocol.Co
 
 func (columnType DefinedColumnType) ConvertToPbDefinedColumnType() otsprotocol.DefinedColumnType {
 	switch columnType {
-		case DefinedColumn_INTEGER:
-			return otsprotocol.DefinedColumnType_DCT_INTEGER
-		case DefinedColumn_DOUBLE:
-			return otsprotocol.DefinedColumnType_DCT_DOUBLE
-		case DefinedColumn_BOOLEAN:
-			return otsprotocol.DefinedColumnType_DCT_BOOLEAN
-		case DefinedColumn_STRING:
-			return otsprotocol.DefinedColumnType_DCT_STRING
-		default:
-			return otsprotocol.DefinedColumnType_DCT_BLOB
+	case DefinedColumn_INTEGER:
+		return otsprotocol.DefinedColumnType_DCT_INTEGER
+	case DefinedColumn_DOUBLE:
+		return otsprotocol.DefinedColumnType_DCT_DOUBLE
+	case DefinedColumn_BOOLEAN:
+		return otsprotocol.DefinedColumnType_DCT_BOOLEAN
+	case DefinedColumn_STRING:
+		return otsprotocol.DefinedColumnType_DCT_STRING
+	default:
+		return otsprotocol.DefinedColumnType_DCT_BLOB
 	}
 }
 
@@ -510,14 +510,14 @@ func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 
 func ConvertToPbCastType(variantType VariantType) *otsprotocol.VariantType {
 	switch variantType {
-		case Variant_INTEGER:
-			return otsprotocol.VariantType_VT_INTEGER.Enum()
-		case Variant_DOUBLE:
-			return otsprotocol.VariantType_VT_DOUBLE.Enum()
-		case Variant_STRING:
-			return otsprotocol.VariantType_VT_STRING.Enum()
-		default:
-			panic("invalid VariantType")
+	case Variant_INTEGER:
+		return otsprotocol.VariantType_VT_INTEGER.Enum()
+	case Variant_DOUBLE:
+		return otsprotocol.VariantType_VT_DOUBLE.Enum()
+	case Variant_STRING:
+		return otsprotocol.VariantType_VT_STRING.Enum()
+	default:
+		panic("invalid VariantType")
 	}
 }
 
@@ -589,12 +589,15 @@ func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byt
 		return nil, retErr, reqId
 	}
 
-	if resp.Header.Get(xOtsResponseCompressType) == xOtsCompressType {
-		fmt.Print("compressed")
+	if resp.Header.Get(xOtsResponseCompressType) != "" {
 		buf := bytes.NewBuffer(body)
-		flateReader := flate.NewReader(buf)
-		defer flateReader.Close()
-		body, err := ioutil.ReadAll(flateReader)
+		zlibReader, err := zlib.NewReader(buf)
+		defer zlibReader.Close()
+		if err != nil {
+			return nil, err, reqId
+		}
+
+		body, err := ioutil.ReadAll(zlibReader)
 		if err != nil {
 			return nil, err, reqId
 		}
