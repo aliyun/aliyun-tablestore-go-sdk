@@ -69,7 +69,8 @@ func (d *TunnelWorkerDaemon) Close() {
 
 func isTunnelInvalid(err error) bool {
 	if terr, ok := err.(*TunnelError); ok {
-		return terr.Code == ErrCodeParamInvalid || terr.Code == ErrCodeTunnelExpired
+		return terr.Code == ErrCodeParamInvalid || terr.Code == ErrCodeTunnelExpired ||
+			terr.Code == ErrCodePermissionDenied
 	}
 	return false
 }

@@ -5,10 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
 	"time"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 )
 
 var (
@@ -151,4 +151,31 @@ func streamToken(token string) (bool, error) {
 		return false, nil
 	}
 	return true, nil
+}
+
+func parseTunnelStreamConfig(config *StreamTunnelConfig) *protocol.StreamTunnelConfig {
+	if config == nil {
+		return nil
+	}
+	pbConfig := new(protocol.StreamTunnelConfig)
+	if config.StartOffset != 0 {
+		pbConfig.StartOffset = proto.Uint64(config.StartOffset)
+	} else {
+		pbConfig.Flag = config.Flag.Enum()
+	}
+	if config.EndOffset != 0 {
+		pbConfig.EndOffset = proto.Uint64(config.EndOffset)
+	}
+	return pbConfig
+}
+
+func parseProtoTunnelStreamConfig(pbConfig *protocol.StreamTunnelConfig) *StreamTunnelConfig {
+	if pbConfig == nil {
+		return nil
+	}
+	return &StreamTunnelConfig{
+		Flag:        pbConfig.GetFlag(),
+		StartOffset: pbConfig.GetStartOffset(),
+		EndOffset:   pbConfig.GetEndOffset(),
+	}
 }

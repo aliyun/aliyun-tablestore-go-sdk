@@ -2,8 +2,10 @@ package tunnel
 
 import (
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type TunnelType string
@@ -12,18 +14,19 @@ const (
 	TunnelTypeBaseData   TunnelType = "BaseData"
 	TunnelTypeStream     TunnelType = "Stream"
 	TunnelTypeBaseStream TunnelType = "BaseAndStream"
-)
 
-const FinishTag = "finished"
+	FinishTag = "finished"
+)
 
 type ResponseInfo struct {
 	RequestId string
 }
 
 type CreateTunnelRequest struct {
-	TableName  string
-	TunnelName string
-	Type       TunnelType
+	TableName          string
+	TunnelName         string
+	Type               TunnelType
+	StreamTunnelConfig *StreamTunnelConfig
 }
 
 type CreateTunnelResponse struct {
@@ -35,14 +38,23 @@ type ListTunnelRequest struct {
 	TableName string
 }
 
+type StreamTunnelConfig struct {
+	Flag        protocol.StartOffsetFlag
+	StartOffset uint64
+	EndOffset   uint64
+}
+
 type TunnelInfo struct {
-	TunnelId     string
-	TunnelName   string
-	TunnelType   string
-	TableName    string
-	InstanceName string
-	StreamId     string
-	Stage        string
+	TunnelId           string
+	TunnelName         string
+	TunnelType         string
+	TableName          string
+	InstanceName       string
+	StreamId           string
+	Stage              string
+	Expired            bool
+	CreateTime         time.Time
+	StreamTunnelConfig *StreamTunnelConfig
 }
 
 type ListTunnelResponse struct {
@@ -70,6 +82,76 @@ type DescribeTunnelResponse struct {
 	ResponseInfo
 }
 
+type GetRpoRequest struct {
+	TunnelId string
+}
+
+type GetRpoResponse struct {
+	RpoInfos       map[string]map[string]*RpoLatency
+	TunnelRpoInfos map[string]*TunnelRpoLatency
+}
+
+type RpoLatency struct {
+	ChannelTyp ChannelType
+	Status     string
+	TotalCount int64
+	AccessTime int64
+	RpoTime    int64
+}
+
+type TunnelRpoLatency struct {
+	Status     string
+	TotalCount int64
+	AccessTime int64
+	RpoTime    int64
+}
+
+type ScheduleChannel struct {
+	ChannelId     string
+	ChannelStatus protocol.ChannelStatus
+}
+
+func SuspendChannel(channelId string) *ScheduleChannel {
+	return &ScheduleChannel{
+		ChannelId:     channelId,
+		ChannelStatus: protocol.ChannelStatus_CLOSING,
+	}
+}
+
+func TerminateChannel(channelId string) *ScheduleChannel {
+	return &ScheduleChannel{
+		ChannelId:     channelId,
+		ChannelStatus: protocol.ChannelStatus_TERMINATED,
+	}
+}
+
+func ResumeChannel(channelId string) *ScheduleChannel {
+	return OpenChannel(channelId)
+}
+
+func OpenChannel(channelId string) *ScheduleChannel {
+	return &ScheduleChannel{
+		ChannelId:     channelId,
+		ChannelStatus: protocol.ChannelStatus_OPEN,
+	}
+}
+
+type ScheduleRequest struct {
+	TunnelId string
+	Channels []*ScheduleChannel
+}
+
+type ScheduleResponse struct {
+	ResponseInfo
+}
+
+type ChannelType string
+
+const (
+	ChannelType_BaseData ChannelType = "BaseData"
+	ChannelType_Stream   ChannelType = "Stream"
+)
+
 type DeleteTunnelRequest struct {
 	TableName  string
 	TunnelName string
@@ -94,17 +176,17 @@ type SequenceInfo struct {
 	// stream log timestamp
 	Timestamp int64
 	// row index of stream log with same log timestamp
-	RowIndex  int32
+	RowIndex int32
 }
 
 type Record struct {
-	Type       ActionType
-	Timestamp  int64
+	Type      ActionType
+	Timestamp int64
 	// SequenceInfo is nil when it is a base data record,
 	// while SequenceInfo is not nil when it is a stream record.
 	SequenceInfo *SequenceInfo
-	PrimaryKey *PrimaryKey // required
-	Columns    []*RecordColumn
+	PrimaryKey   *PrimaryKey // required
+	Columns      []*RecordColumn
 }
 
 func (r *Record) String() string {
@@ -126,11 +208,11 @@ const (
 func (t ActionType) String() string {
 	switch t {
 	case AT_Put:
-		return "\"PutRow\""
+		return "PutRow"
 	case AT_Update:
-		return "\"UpdateRow\""
+		return "UpdateRow"
 	case AT_Delete:
-		return "\"DeleteRow\""
+		return "DeleteRow"
 	default:
 		panic(fmt.Sprintf("unknown action type: %d", int(t)))
 	}

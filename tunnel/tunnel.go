@@ -19,12 +19,6 @@ func NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey strin
 	}
 }
 
-func NewTunnelClientWithToken(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig) TunnelClient {
-	return &DefaultTunnelClient{
-		api: NewTunnelApiWithToken(endpoint, instanceName, accessId, accessKey, token, conf),
-	}
-}
-
 func (c *DefaultTunnelClient) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelResponse, error) {
 	return c.api.CreateTunnel(req)
 }
@@ -39,6 +33,14 @@ func (c *DefaultTunnelClient) ListTunnel(req *ListTunnelRequest) (*ListTunnelRes
 
 func (c *DefaultTunnelClient) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunnelResponse, error) {
 	return c.api.DescribeTunnel(req)
+}
+
+func (c *DefaultTunnelClient) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {
+	return c.api.GetRpo(req)
+}
+
+func (c *DefaultTunnelClient) Schedule(req *ScheduleRequest) (*ScheduleResponse, error) {
+	return c.api.Schedule(req)
 }
 
 func (c *DefaultTunnelClient) NewTunnelWorker(tunnelId string, workerConfig *TunnelWorkerConfig) (TunnelWorker, error) {
