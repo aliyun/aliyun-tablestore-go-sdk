@@ -41,6 +41,14 @@ func (c *DefaultTunnelClient) DescribeTunnel(req *DescribeTunnelRequest) (*Descr
 	return c.api.DescribeTunnel(req)
 }
 
+func (c *DefaultTunnelClient) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {
+	return c.api.GetRpo(req)
+}
+
+func (c *DefaultTunnelClient) Schedule(req *ScheduleRequest) (*ScheduleResponse, error) {
+	return c.api.Schedule(req)
+}
+
 func (c *DefaultTunnelClient) NewTunnelWorker(tunnelId string, workerConfig *TunnelWorkerConfig) (TunnelWorker, error) {
 	if workerConfig == nil {
 		return nil, &TunnelError{Code: ErrCodeClientError, Message: "TunnelWorkerConfig can not be nil"}

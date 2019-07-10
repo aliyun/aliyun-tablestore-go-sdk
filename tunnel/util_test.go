@@ -1,17 +1,17 @@
 package tunnel
 
 import (
-	"testing"
 	"github.com/smartystreets/goconvey/convey"
+	"testing"
 )
 
 func TestStreamRecordSequenceLess(t *testing.T) {
 	convey.Convey("compare stream record sequence", t, func() {
-		cases := []struct{
-			A *SequenceInfo
-			B *SequenceInfo
+		cases := []struct {
+			A      *SequenceInfo
+			B      *SequenceInfo
 			Expect bool
-		} {
+		}{
 			{
 				&SequenceInfo{0, 100, 0},
 				&SequenceInfo{0, 100, 0},

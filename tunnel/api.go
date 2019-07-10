@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
@@ -34,6 +35,8 @@ const (
 	getCheckpointUri  = "/tunnel/getcheckpoint"
 	readRecordsUri    = "/tunnel/readrecords"
 	checkpointUri     = "/tunnel/checkpoint"
+	getRpoUri         = "/tunnel/getrpo"
+	scheduleUri       = "/tunnel/schedule"
 )
 
 var (
@@ -46,6 +49,8 @@ type TunnelMetaApi interface {
 	ListTunnel(req *ListTunnelRequest) (resp *ListTunnelResponse, err error)
 	DescribeTunnel(req *DescribeTunnelRequest) (resp *DescribeTunnelResponse, err error)
 	DeleteTunnel(req *DeleteTunnelRequest) (resp *DeleteTunnelResponse, err error)
+	GetRpo(req *GetRpoRequest) (resp *GetRpoResponse, err error)
+	Schedule(req *ScheduleRequest) (resp *ScheduleResponse, err error)
 }
 
 type TunnelApi struct {
@@ -214,6 +219,7 @@ func (api *TunnelApi) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelRespo
 	tunnel := new(protocol.Tunnel)
 	tunnel.TableName = &req.TableName
 	tunnel.TunnelName = &req.TunnelName
+	tunnel.StreamTunnelConfig = parseTunnelStreamConfig(req.StreamTunnelConfig)
 	switch req.Type {
 	case TunnelTypeBaseData:
 		tunnel.TunnelType = protocol.TunnelType_BaseData.Enum()
@@ -264,13 +270,16 @@ func (api *TunnelApi) ListTunnel(req *ListTunnelRequest) (*ListTunnelResponse, e
 	tunnels := make([]*TunnelInfo, 0)
 	for _, t := range listTunnelResponse.Tunnels {
 		ti := &TunnelInfo{
-			TunnelId:     *t.TunnelId,
-			TunnelName:   t.GetTunnelName(),
-			TunnelType:   *t.TunnelType,
-			TableName:    *t.TableName,
-			InstanceName: *t.InstanceName,
-			StreamId:     *t.StreamId,
-			Stage:        *t.Stage,
+			TunnelId:           *t.TunnelId,
+			TunnelName:         t.GetTunnelName(),
+			TunnelType:         *t.TunnelType,
+			TableName:          *t.TableName,
+			InstanceName:       *t.InstanceName,
+			StreamId:           *t.StreamId,
+			Stage:              *t.Stage,
+			Expired:            t.GetExpired(),
+			CreateTime:         time.Unix(0, t.GetCreateTime()),
+			StreamTunnelConfig: parseProtoTunnelStreamConfig(t.StreamTunnelConfig),
 		}
 		tunnels = append(tunnels, ti)
 	}
@@ -296,13 +305,16 @@ func (api *TunnelApi) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunne
 		ResponseInfo: ResponseInfo{traceId},
 		TunnelRPO:    describeTunnelResponse.GetTunnelRpo(),
 		Tunnel: &TunnelInfo{
-			TunnelId:     *t.TunnelId,
-			TunnelName:   t.GetTunnelName(),
-			TunnelType:   *t.TunnelType,
-			TableName:    *t.TableName,
-			InstanceName: *t.InstanceName,
-			StreamId:     *t.StreamId,
-			Stage:        *t.Stage,
+			TunnelId:           *t.TunnelId,
+			TunnelName:         t.GetTunnelName(),
+			TunnelType:         *t.TunnelType,
+			TableName:          *t.TableName,
+			InstanceName:       *t.InstanceName,
+			StreamId:           *t.StreamId,
+			Stage:              *t.Stage,
+			Expired:            t.GetExpired(),
+			CreateTime:         time.Unix(0, t.GetCreateTime()),
+			StreamTunnelConfig: parseProtoTunnelStreamConfig(t.StreamTunnelConfig),
 		},
 		Channels: make([]*ChannelInfo, 0),
 	}
@@ -321,6 +333,28 @@ func (api *TunnelApi) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunne
 		}
 		channelInfo.ChannelRPO = c.GetChannelRpo()
 		resp.Channels = append(resp.Channels, channelInfo)
+	}
+	return resp, nil
+}
+
+func (api *TunnelApi) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {
+	getRpoRequest := &protocol.GetRpoRequest{
+		TunnelId: &req.TunnelId,
+	}
+
+	getRpoResponse := new(protocol.GetRpoResponse)
+	_, _, err := api.doRequest(getRpoUri, getRpoRequest, getRpoResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &GetRpoResponse{}
+	if err := json.Unmarshal(getRpoResponse.RpoInfos, &(resp.RpoInfos)); err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(getRpoResponse.TunnelRpoInfos, &(resp.TunnelRpoInfos)); err != nil {
+		return nil, err
 	}
 	return resp, nil
 }
@@ -431,6 +465,28 @@ func (api *TunnelApi) checkpoint(tunnelId, clientId string, channelId string, to
 		return err
 	}
 	return nil
+}
+
+func (api *TunnelApi) Schedule(req *ScheduleRequest) (*ScheduleResponse, error) {
+	scheduleRequest := &protocol.ScheduleRequest{
+		TunnelId: &req.TunnelId,
+	}
+	scheduleRequest.Channels = make([]*protocol.Channel, len(req.Channels))
+	for i, ch := range req.Channels {
+		version := int64(0) // version will not be used, just make proto 2 happy
+		pCh := &protocol.Channel{
+			ChannelId: proto.String(ch.ChannelId),
+			Status:    ch.ChannelStatus.Enum(),
+			Version:   &version,
+		}
+		scheduleRequest.Channels[i] = pCh
+	}
+	scheduleResponse := new(protocol.ScheduleResponse)
+	traceId, _, err := api.doRequest(scheduleUri, scheduleRequest, scheduleResponse)
+	if err != nil {
+		return nil, err
+	}
+	return &ScheduleResponse{ResponseInfo{traceId}}, nil
 }
 
 func shouldRetry(err error) bool {

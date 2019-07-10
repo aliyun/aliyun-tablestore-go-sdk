@@ -36,6 +36,19 @@ func TestTunnelWorkerDaemon_Run(t *testing.T) {
 		convey.So(err.Error(), convey.ShouldEqual, terr.Error())
 	})
 
+	convey.Convey("daemon run tunnel permission denied", t, func() {
+		mockWorker := NewMockTunnelWorker(ctrl)
+		tunnelApi := NewMockTunnelMetaApi(ctrl)
+		tunnelApi.EXPECT().NewTunnelWorker("tunnelId", gomock.Any()).Return(mockWorker, nil).Times(1)
+		terr := &TunnelError{Code: ErrCodePermissionDenied, Message: "not authorised to perform this action"}
+		mockWorker.EXPECT().ConnectAndWorking().Return(terr).Times(1)
+		mockWorker.EXPECT().Shutdown().Times(1)
+
+		d := NewTunnelDaemon(tunnelApi, "tunnelId", nil)
+		err := d.Run()
+		convey.So(err.Error(), convey.ShouldEqual, terr.Error())
+	})
+
 	convey.Convey("daemon run tunnel other error", t, func(c convey.C) {
 		mockWorker := NewMockTunnelWorker(ctrl)
 		tunnelApi := NewMockTunnelMetaApi(ctrl)
