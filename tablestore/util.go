@@ -780,6 +780,14 @@ func (rowchange *UpdateRowChange) PutColumn(columnName string, value interface{}
 	rowchange.Columns = append(rowchange.Columns, *column)
 }
 
+// value only support int64,string,bool,float64,[]byte. other type will get panic
+func (rowchange *UpdateRowChange) PutColumnWithTimestamp(columnName string, value interface{}, timestamp int64) {
+	column := &ColumnToUpdate{ColumnName: columnName, Value: value}
+	column.Timestamp = timestamp
+	column.HasTimestamp = true
+	rowchange.Columns = append(rowchange.Columns, *column)
+}
+
 func (rowchange *UpdateRowChange) DeleteColumn(columnName string) {
 	// Todo: validate the input
 	column := &ColumnToUpdate{ColumnName: columnName, Value: nil, Type: DELETE_ALL_VERSION, HasType: true, IgnoreValue: true}
