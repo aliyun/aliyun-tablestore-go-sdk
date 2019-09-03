@@ -164,6 +164,7 @@ func toRangeCriteria(id string, param *ScanParameter, opt *StoreOption) *tablest
 		ColumnsToGet:    param.ColToGet,
 		Filter:          param.Filter,
 		Direction:       tablestore.FORWARD,
+		Limit:           int32(param.MaxCount),
 	}
 	if param.IsForward == false {
 		criteria.Direction = tablestore.BACKWARD
