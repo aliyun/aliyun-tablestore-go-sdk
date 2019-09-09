@@ -944,6 +944,14 @@ func (meta *IndexMeta) AddPrimaryKeyColumn(name string) {
 	meta.Primarykey = append(meta.Primarykey, name)
 }
 
+func (meta *IndexMeta) SetAsGlobalIndex() {
+	meta.IndexType = IT_GLOBAL_INDEX
+}
+
+func (meta *IndexMeta) SetAsLocalIndex() {
+	meta.IndexType = IT_LOCAL_INDEX
+}
+
 func (request *CreateTableRequest) AddIndexMeta(meta *IndexMeta) {
 	request.IndexMetas = append(request.IndexMetas, meta)
 }
@@ -953,8 +961,26 @@ func (meta *IndexMeta) ConvertToPbIndexMeta() *otsprotocol.IndexMeta {
 		Name: &meta.IndexName,
 		PrimaryKey:  meta.Primarykey,
 		DefinedColumn:  meta.DefinedColumns,
-		IndexUpdateMode:  otsprotocol.IndexUpdateMode_IUM_ASYNC_INDEX.Enum(),
-		IndexType:        otsprotocol.IndexType_IT_GLOBAL_INDEX.Enum(),
+		IndexUpdateMode:  ConvertIndexTypeToPBIndexUpdateMode(meta.IndexType).Enum(),
+		IndexType:        ConvertIndexTypeToPBIndexType(meta.IndexType).Enum(),
+	}
+}
+
+func ConvertIndexTypeToPBIndexType(indexType IndexType) otsprotocol.IndexType {
+	switch indexType {
+	case IT_LOCAL_INDEX:
+		return otsprotocol.IndexType_IT_LOCAL_INDEX
+	default:
+		return otsprotocol.IndexType_IT_GLOBAL_INDEX
+	}
+}
+
+func ConvertIndexTypeToPBIndexUpdateMode(indexType IndexType) otsprotocol.IndexUpdateMode {
+	switch indexType {
+	case IT_LOCAL_INDEX:
+		return otsprotocol.IndexUpdateMode_IUM_SYNC_INDEX
+	default:
+		return otsprotocol.IndexUpdateMode_IUM_ASYNC_INDEX
 	}
 }
 
