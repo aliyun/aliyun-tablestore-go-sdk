@@ -800,8 +800,8 @@ type DefinedColumnSchema struct {
 type IndexType int32
 
 const (
-	IT_GLOBAL_INDEX IndexType = 1
-	IT_LOCAL_INDEX IndexType = 2
+	IT_GLOBAL_INDEX IndexType = 0
+	IT_LOCAL_INDEX IndexType = 1
 )
 
 type DefinedColumnType int32
