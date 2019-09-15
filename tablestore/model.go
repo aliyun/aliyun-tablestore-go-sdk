@@ -178,6 +178,24 @@ type UpdateTableResponse struct {
 	ResponseInfo
 }
 
+type AddDefinedColumnRequest struct {
+	TableName          string
+	DefinedColumns 	   []*DefinedColumnSchema
+}
+
+type DeleteDefinedColumnRequest struct {
+	TableName          string
+	DefinedColumns     []string
+}
+
+type AddDefinedColumnResponse struct {
+	ResponseInfo
+}
+
+type DeleteDefinedColumnResponse struct {
+	ResponseInfo
+}
+
 type ConsumedCapacityUnit struct {
 	Read  int32
 	Write int32

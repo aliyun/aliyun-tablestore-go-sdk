@@ -45,4 +45,7 @@ func main() {
 
 	// transaction
 	sample.PutRowWithTxnSample(client, "transtable1")
+
+	// globalindex
+	sample.CreateTableWithGlobalIndexSample(client, "globalindex1")
 }

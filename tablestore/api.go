@@ -47,6 +47,9 @@ const (
 	createlocaltransactionuri = "/StartLocalTransaction"
 	committransactionuri      = "/CommitTransaction"
 	aborttransactionuri       = "/AbortTransaction"
+
+	adddefinedcolumnuri = "/AddDefinedColumn";
+	deletedefinedcolumnuri = "/DeleteDefinedColumn";
 )
 
 // Constructor: to create the client of TableStore service.
@@ -544,6 +547,42 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	} else {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: false}
+	}
+	return response, nil
+}
+
+func (tableStoreClient *TableStoreClient) AddDefinedColumn(request *AddDefinedColumnRequest) (*AddDefinedColumnResponse, error) {
+	req := new(otsprotocol.AddDefinedColumnRequest)
+	req.TableName = proto.String(request.TableName)
+
+	if len(request.DefinedColumns) > 0 {
+		for _, value := range request.DefinedColumns {
+			req.Columns = append(req.Columns, &otsprotocol.DefinedColumnSchema{Name: &value.Name, Type: value.ColumnType.ConvertToPbDefinedColumnType().Enum()})
+		}
+	}
+
+	resp := new(otsprotocol.AddDefinedColumnResponse)
+	response := &AddDefinedColumnResponse{}
+	if err := tableStoreClient.doRequestWithRetry(adddefinedcolumnuri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (tableStoreClient *TableStoreClient) DeleteDefinedColumn(request *DeleteDefinedColumnRequest) (*DeleteDefinedColumnResponse, error) {
+	req := new(otsprotocol.DeleteDefinedColumnRequest)
+	req.TableName = proto.String(request.TableName)
+
+	if len(request.DefinedColumns) > 0 {
+		for _, value := range request.DefinedColumns {
+			req.Columns = append(req.Columns, value)
+		}
+	}
+
+	resp := new(otsprotocol.DeleteDefinedColumnResponse)
+	response := &DeleteDefinedColumnResponse{}
+	if err := tableStoreClient.doRequestWithRetry(deletedefinedcolumnuri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
 	}
 	return response, nil
 }

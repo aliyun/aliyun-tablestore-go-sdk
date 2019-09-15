@@ -68,6 +68,24 @@ func CreateTableWithGlobalIndexSample(client *tablestore.TableStoreClient, table
 	if err != nil {
 		fmt.Println("failed to update table with error:", err)
 	} else {
+		fmt.Println("DescribeTableSample. indexinfo:", describ.IndexMetas[0], len(describ.IndexMetas))
+	}
+
+	addColumnsReq := new(tablestore.AddDefinedColumnRequest)
+	addColumnsReq.TableName = tableName
+	addColumnsReq.AddDefinedColumn("definedcol3", tablestore.DefinedColumn_INTEGER)
+
+	_, err = client.AddDefinedColumn(addColumnsReq)
+	if err != nil {
+		fmt.Println("failed to add defined column with error:", err)
+	}
+
+	describeTableReq.TableName = tableName
+	describ, err = client.DescribeTable(describeTableReq)
+
+	if err != nil {
+		fmt.Println("failed to describe table with error:", err)
+	} else {
 		fmt.Println("DescribeTableSample finished. indexinfo:", describ.IndexMetas[0], len(describ.IndexMetas))
 	}
 }

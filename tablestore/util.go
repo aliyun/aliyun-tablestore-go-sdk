@@ -1008,3 +1008,7 @@ func ConvertPbIndexMetaToIndexMeta(meta *otsprotocol.IndexMeta) *IndexMeta {
 
 	return indexmeta
 }
+
+func (request *AddDefinedColumnRequest) AddDefinedColumn(name string, definedType DefinedColumnType) {
+	request.DefinedColumns = append(request.DefinedColumns, &DefinedColumnSchema{Name: name, ColumnType: definedType})
+}

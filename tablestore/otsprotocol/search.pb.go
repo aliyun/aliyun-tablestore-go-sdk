@@ -126,6 +126,10 @@ It has these top-level messages:
 	CreateIndexResponse
 	DropIndexRequest
 	DropIndexResponse
+	AddDefinedColumnRequest
+	AddDefinedColumnResponse
+	DeleteDefinedColumnRequest
+	DeleteDefinedColumnResponse
 	StartLocalTransactionRequest
 	StartLocalTransactionResponse
 	CommitTransactionRequest
