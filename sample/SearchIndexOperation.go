@@ -7,6 +7,7 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
+	"time"
 )
 
 /**
@@ -690,5 +691,253 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 		}
 		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
+	}
+}
+
+/**
+ *创建一个SearchIndex，为TEXT类型索引列自定义分词器
+ */
+func Analysis(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to create table:", tableName)
+	createtableRequest := new(tablestore.CreateTableRequest)
+
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	_, err := client.CreateTable(createtableRequest)
+	if err != nil {
+		fmt.Println("Failed to create table with error:", err)
+	} else {
+		fmt.Println("Create table finished")
+	}
+
+	fmt.Println("Begin to create index:", indexName)
+	request := &tablestore.CreateSearchIndexRequest{}
+	request.TableName = tableName // 设置表名
+	request.IndexName = indexName // 设置索引名
+
+	schemas := []*tablestore.FieldSchema{}
+
+	analyzer1 := tablestore.Analyzer_SingleWord
+	analyzerParam1 := tablestore.SingleWordAnalyzerParameter{
+		CaseSensitive:	proto.Bool(true),
+		DelimitWord:	proto.Bool(true),
+	}
+	field1 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_SingleWord"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		Analyzer:         &analyzer1,                      // 设置分词器
+		AnalyzerParameter: analyzerParam1,                 // 设置分词器参数(可选)
+	}
+
+	analyzer2 := tablestore.Analyzer_MaxWord
+	field2 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_MaxWord"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		Analyzer:         &analyzer2,                      // 设置分词器
+	}
+
+	analyzer3 := tablestore.Analyzer_MinWord
+	field3 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_MinWord"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		Analyzer:         &analyzer3,                      // 设置分词器
+	}
+
+	analyzer4 := tablestore.Analyzer_Split
+	analyzerParam4 := tablestore.SplitAnalyzerParameter{Delimiter:proto.String("-")}
+	field4 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Split"),    // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		Analyzer:         &analyzer4,                      // 设置分词器
+		AnalyzerParameter: analyzerParam4,                 // 设置分词器参数(可选)
+	}
+
+	analyzer5 := tablestore.Analyzer_Fuzzy
+	analyzerParam5 := tablestore.FuzzyAnalyzerParameter{
+		MinChars: 1,
+		MaxChars: 4,
+	}
+	field5 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Fuzzy"),    // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		Analyzer:         &analyzer5,                      // 设置分词器
+		AnalyzerParameter: analyzerParam5,                 // 设置分词器参数(可选)
+	}
+
+	schemas = append(schemas, field1, field2, field3, field4, field5)
+
+	request.IndexSchema = &tablestore.IndexSchema{
+		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+	}
+	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	if err != nil {
+		fmt.Println("error :", err)
+		return
+	}
+	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+
+	// write data
+	putRowRequest := new(tablestore.PutRowRequest)
+	putRowChange := new(tablestore.PutRowChange)
+	putRowChange.TableName = tableName
+	putPk := new(tablestore.PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", "pk1_value")
+
+	putRowChange.PrimaryKey = putPk
+	putRowChange.AddColumn("Col_SingleWord", "中华人民共和国国歌 People's Republic of China")
+	putRowChange.AddColumn("Col_MaxWord", "中华人民共和国国歌 People's Republic of China")
+	putRowChange.AddColumn("Col_MinWord", "中华人民共和国国歌 People's Republic of China")
+	putRowChange.AddColumn("Col_Split", "2019-05-01")
+	putRowChange.AddColumn("Col_Fuzzy", "老王是个工程师")
+	putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, err2 := client.PutRow(putRowRequest)
+
+	if err2 != nil {
+		fmt.Println("putrow failed with error:", err2)
+	}
+
+	// wait a while
+	time.Sleep(time.Duration(30) * time.Second)
+
+	// search
+	{
+		searchRequest := &tablestore.SearchRequest{}
+		searchRequest.SetTableName(tableName)
+		searchRequest.SetIndexName(indexName)
+		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query.FieldName = "Col_SingleWord" // 设置要匹配的字段
+		query.Text = "歌"                   // 设置要匹配的值
+		searchQuery := search.NewSearchQuery()
+		searchQuery.SetQuery(query)
+		searchRequest.SetSearchQuery(searchQuery)
+
+		// 设置返回所有列
+		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+			ReturnAll: true,
+		})
+		searchResponse, err := client.Search(searchRequest)
+		if err != nil {
+			fmt.Printf("%#v", err)
+			return
+		}
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("RowCount: ", len(searchResponse.Rows))
+		for _, row := range searchResponse.Rows {
+			jsonBody, err := json.Marshal(row)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("Row: ", string(jsonBody))
+		}
+	}
+
+	{
+		searchRequest := &tablestore.SearchRequest{}
+		searchRequest.SetTableName(tableName)
+		searchRequest.SetIndexName(indexName)
+		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query.FieldName = "Col_MaxWord" // 设置要匹配的字段
+		query.Text = "中华人民共和国"        // 设置要匹配的值
+		searchQuery := search.NewSearchQuery()
+		searchQuery.SetQuery(query)
+		searchRequest.SetSearchQuery(searchQuery)
+
+		// 设置返回所有列
+		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+			ReturnAll: true,
+		})
+		searchResponse, err := client.Search(searchRequest)
+		if err != nil {
+			fmt.Printf("%#v", err)
+			return
+		}
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("RowCount: ", len(searchResponse.Rows))
+		for _, row := range searchResponse.Rows {
+			jsonBody, err := json.Marshal(row)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("Row: ", string(jsonBody))
+		}
+	}
+
+	{
+		searchRequest := &tablestore.SearchRequest{}
+		searchRequest.SetTableName(tableName)
+		searchRequest.SetIndexName(indexName)
+		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query.FieldName = "Col_Split" // 设置要匹配的字段
+		query.Text = "2019"        // 设置要匹配的值
+		searchQuery := search.NewSearchQuery()
+		searchQuery.SetQuery(query)
+		searchRequest.SetSearchQuery(searchQuery)
+
+		// 设置返回所有列
+		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+			ReturnAll: true,
+		})
+		searchResponse, err := client.Search(searchRequest)
+		if err != nil {
+			fmt.Printf("%#v", err)
+			return
+		}
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("RowCount: ", len(searchResponse.Rows))
+		for _, row := range searchResponse.Rows {
+			jsonBody, err := json.Marshal(row)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("Row: ", string(jsonBody))
+		}
+	}
+
+	{
+		searchRequest := &tablestore.SearchRequest{}
+		searchRequest.SetTableName(tableName)
+		searchRequest.SetIndexName(indexName)
+		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query.FieldName = "Col_Fuzzy" // 设置要匹配的字段
+		query.Text = "程"        // 设置要匹配的值
+		searchQuery := search.NewSearchQuery()
+		searchQuery.SetQuery(query)
+		searchRequest.SetSearchQuery(searchQuery)
+
+		// 设置返回所有列
+		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+			ReturnAll: true,
+		})
+		searchResponse, err := client.Search(searchRequest)
+		if err != nil {
+			fmt.Printf("%#v", err)
+			return
+		}
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("RowCount: ", len(searchResponse.Rows))
+		for _, row := range searchResponse.Rows {
+			jsonBody, err := json.Marshal(row)
+			if err != nil {
+				panic(err)
+			}
+			fmt.Println("Row: ", string(jsonBody))
+		}
 	}
 }
