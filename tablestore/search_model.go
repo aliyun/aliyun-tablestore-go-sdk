@@ -106,9 +106,44 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		}
 		if value.Analyzer != nil {
 			field.Analyzer = proto.String(string(*value.Analyzer))
+
+			if value.AnalyzerParameter != nil {
+				if *value.Analyzer == Analyzer_SingleWord {
+					param := &otsprotocol.SingleWordAnalyzerParameter{}
+					if value.AnalyzerParameter.(SingleWordAnalyzerParameter).CaseSensitive != nil {
+						param.CaseSensitive = proto.Bool(*value.AnalyzerParameter.(SingleWordAnalyzerParameter).CaseSensitive)
+					}
+					if value.AnalyzerParameter.(SingleWordAnalyzerParameter).DelimitWord != nil {
+						param.DelimitWord = proto.Bool(*value.AnalyzerParameter.(SingleWordAnalyzerParameter).DelimitWord)
+					}
+					if paramBytes, err := proto.Marshal(param); err == nil {
+						field.AnalyzerParameter = paramBytes
+					}
+				} else if *value.Analyzer == Analyzer_Split {
+					param := &otsprotocol.SplitAnalyzerParameter {}
+					if value.AnalyzerParameter.(SplitAnalyzerParameter).Delimiter != nil {
+						param.Delimiter = proto.String(*value.AnalyzerParameter.(SplitAnalyzerParameter).Delimiter)
+					}
+					if paramBytes, err := proto.Marshal(param); err == nil {
+						field.AnalyzerParameter = paramBytes
+					}
+				} else if *value.Analyzer == Analyzer_Fuzzy {
+					fuzzyParam := value.AnalyzerParameter.(FuzzyAnalyzerParameter)
+					param := &otsprotocol.FuzzyAnalyzerParameter {}
+					if fuzzyParam.MaxChars != 0 {
+						param.MaxChars = proto.Int32(fuzzyParam.MaxChars)
+					}
+					if fuzzyParam.MinChars != 0 {
+						param.MinChars = proto.Int32(fuzzyParam.MinChars)
+					}
+					if paramBytes, err := proto.Marshal(param); err == nil {
+						field.AnalyzerParameter = paramBytes
+					}
+				}
+			}
 		}
 		if value.EnableSortAndAgg != nil {
-			field.DocValues = proto.Bool(*value.EnableSortAndAgg)
+			field.SortAndAgg = proto.Bool(*value.EnableSortAndAgg)
 		}
 		if value.Store != nil {
 			field.Store = proto.Bool(*value.Store)
@@ -163,7 +198,41 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 			field.IndexOptions = &indexOption
 		}
 		field.Analyzer = (*Analyzer)(value.Analyzer)
-		field.EnableSortAndAgg = value.DocValues
+		if field.Analyzer != nil && *field.Analyzer == Analyzer_SingleWord && value.AnalyzerParameter != nil {
+			param := new(otsprotocol.SingleWordAnalyzerParameter)
+			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
+				p := SingleWordAnalyzerParameter {}
+				if param.CaseSensitive != nil {
+					p.CaseSensitive = proto.Bool(*param.CaseSensitive)
+				}
+				if param.DelimitWord != nil {
+					p.DelimitWord = proto.Bool(*param.DelimitWord)
+				}
+				field.AnalyzerParameter = p
+			}
+		} else if field.Analyzer != nil && *field.Analyzer == Analyzer_Split && value.AnalyzerParameter != nil {
+			param := new(otsprotocol.SplitAnalyzerParameter)
+			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
+				p := SplitAnalyzerParameter {}
+				if param.Delimiter != nil {
+					p.Delimiter = proto.String(*param.Delimiter)
+				}
+				field.AnalyzerParameter = p
+			}
+		} else if field.Analyzer != nil && *field.Analyzer == Analyzer_Fuzzy && value.AnalyzerParameter != nil {
+			param := new(otsprotocol.FuzzyAnalyzerParameter)
+			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
+				p := FuzzyAnalyzerParameter {}
+				if param.MinChars != nil {
+					p.MinChars = *param.MinChars
+				}
+				if param.MaxChars != nil {
+					p.MaxChars = *param.MaxChars
+				}
+				field.AnalyzerParameter = p
+			}
+		}
+		field.EnableSortAndAgg = value.SortAndAgg
 		field.Store = value.Store
 		field.IsArray = value.IsArray
 		if field.FieldType == FieldType_NESTED {
@@ -244,7 +313,24 @@ type Analyzer string
 const (
 	Analyzer_SingleWord Analyzer = "single_word"
 	Analyzer_MaxWord    Analyzer = "max_word"
+	Analyzer_MinWord	Analyzer = "min_word"
+	Analyzer_Split		Analyzer = "split"
+	Analyzer_Fuzzy		Analyzer = "fuzzy"
 )
+
+type SingleWordAnalyzerParameter struct {
+	CaseSensitive	*bool
+	DelimitWord		*bool
+}
+
+type SplitAnalyzerParameter struct {
+	Delimiter		*string
+}
+
+type  FuzzyAnalyzerParameter struct {
+	MinChars		int32
+	MaxChars		int32
+}
 
 type FieldSchema struct {
 	FieldName        *string
@@ -252,6 +338,7 @@ type FieldSchema struct {
 	Index            *bool
 	IndexOptions     *IndexOptions
 	Analyzer         *Analyzer
+	AnalyzerParameter	interface{}
 	EnableSortAndAgg *bool
 	Store            *bool
 	IsArray          *bool

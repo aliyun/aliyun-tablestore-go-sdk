@@ -248,16 +248,31 @@ enum FieldType {
     GEO_POINT = 7;
 }
 
+message SingleWordAnalyzerParameter {
+    optional bool case_sensitive = 1;
+    optional bool delimit_word = 2;
+}
+
+message SplitAnalyzerParameter {
+    optional string delimiter = 1;
+}
+
+message FuzzyAnalyzerParameter {
+    optional int32 min_chars = 1;
+    optional int32 max_chars = 2;
+}
+
 message FieldSchema {
     optional string field_name = 1;
     optional FieldType field_type = 2;
     optional IndexOptions index_options = 3;
     optional string analyzer = 4;
     optional bool index = 5;
-    optional bool doc_values = 6;
+    optional bool sort_and_agg = 6;
     optional bool store = 7;
     repeated FieldSchema field_schemas = 8; // only for nested type
     optional bool is_array = 9;
+    optional bytes analyzer_parameter = 10;
 }
 
 message IndexSchema {

@@ -18,7 +18,7 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 	if err != nil {
 		return nil, err
 	}
-	resp := new(otsprotocol.CreateSearchIndexRequest)
+	resp := new(otsprotocol.CreateSearchIndexResponse)
 	response := &CreateSearchIndexResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
