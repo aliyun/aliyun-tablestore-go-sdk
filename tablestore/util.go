@@ -496,6 +496,21 @@ func (columnType DefinedColumnType) ConvertToPbDefinedColumnType() otsprotocol.D
 	}
 }
 
+func ConvertPbDefinedColumnType(columnType otsprotocol.DefinedColumnType) DefinedColumnType {
+	switch columnType {
+	case otsprotocol.DefinedColumnType_DCT_INTEGER:
+		return DefinedColumn_INTEGER
+	case otsprotocol.DefinedColumnType_DCT_DOUBLE:
+		return DefinedColumn_DOUBLE
+	case otsprotocol.DefinedColumnType_DCT_BOOLEAN:
+		return DefinedColumn_BOOLEAN
+	case otsprotocol.DefinedColumnType_DCT_STRING:
+		return DefinedColumn_STRING
+	default:
+		return DefinedColumn_BINARY
+	}
+}
+
 func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 	switch *loType {
 	case LO_NOT:

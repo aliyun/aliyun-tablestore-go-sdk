@@ -469,6 +469,12 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 			responseTableMeta.SchemaEntry = append(responseTableMeta.SchemaEntry, &PrimaryKeySchema{Name: key.Name, Type: &keyType})
 		}
 	}
+
+	for _, value := range resp.TableMeta.DefinedColumn {
+		definedColumn := &DefinedColumnSchema{*value.Name, ConvertPbDefinedColumnType(*value.Type)}
+		responseTableMeta.DefinedColumns = append(responseTableMeta.DefinedColumns, definedColumn)
+	}
+
 	response.TableMeta = responseTableMeta
 	response.TableOption = &TableOption{TimeToAlive: int(*resp.TableOptions.TimeToLive), MaxVersion: int(*resp.TableOptions.MaxVersions), DeviationCellVersionInSec: *resp.TableOptions.DeviationCellVersionInSec}
 	if resp.StreamDetails != nil && *resp.StreamDetails.EnableStream {
