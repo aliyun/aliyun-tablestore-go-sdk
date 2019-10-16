@@ -81,20 +81,20 @@ func (l *TmLine) asyncScan(ctx context.Context, param *ScanParameter, retCh chan
 			return
 		default:
 		}
-		retMap, next, err := l.storeApi.Scan(l.id, param)
+		seqMessages, next, err := l.storeApi.SequentialScan(l.id, param)
 		if err != nil {
 			testClosedAndWriteError(ctx, errCh, err)
 			return
 		}
-		for seq, colMap := range retMap {
-			msg, err := l.adapter.Unmarshal(colMap)
+		for _, seqMessage := range seqMessages {
+			msg, err := l.adapter.Unmarshal(seqMessage.Column)
 			if err != nil {
 				if testClosedAndWriteError(ctx, errCh, err) {
 					return
 				}
 			} else {
 				count++
-				if testClosedAndWriteMsg(ctx, retCh, &Entry{seq, msg}) {
+				if testClosedAndWriteMsg(ctx, retCh, &Entry{seqMessage.Sequence, msg}) {
 					return
 				}
 			}

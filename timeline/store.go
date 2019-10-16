@@ -9,6 +9,11 @@ import (
 
 var pkColumns = 2
 
+type SequentialMessage struct {
+	Sequence int64
+	Column   ColumnMap
+}
+
 type MessageStore interface {
 	Sync() error
 	Store(id string, cols ColumnMap) (int64, error)
@@ -16,7 +21,12 @@ type MessageStore interface {
 	Update(id string, seq int64, cols ColumnMap) error
 	Load(id string, seq int64) (ColumnMap, error)
 	Delete(id string, seq int64) error
+	// Deprecated: Use SequentialScan instead, which keeps data
+	// sequential to support iterate from max to min and vice versa.
+	// Scan lost all sequential detail, as it puts all sequence
+	// number and data to map[int64]ColumnMap.
 	Scan(id string, param *ScanParameter) (map[int64]ColumnMap, int64, error)
+	SequentialScan(id string, param *ScanParameter) ([]*SequentialMessage, int64, error)
 	Close()
 }
 
@@ -141,6 +151,30 @@ func (s *DefaultStore) Scan(id string, param *ScanParameter) (map[int64]ColumnMa
 		next, _ = getSequence(resp.NextStartPrimaryKey.PrimaryKeys, s.opt.Schema)
 	}
 	return seqColMap, next, nil
+}
+
+func (s *DefaultStore) SequentialScan(id string, param *ScanParameter) ([]*SequentialMessage, int64, error) {
+	criteria := toRangeCriteria(id, param, &s.opt)
+	resp, err := s.api.GetRange(&tablestore.GetRangeRequest{RangeRowQueryCriteria: criteria})
+	if err != nil {
+		return nil, 0, err
+	}
+	seqMessages := make([]*SequentialMessage, len(resp.Rows))
+	for i, row := range resp.Rows {
+		seq, cols, err := parseRow(row, &s.opt)
+		if err != nil {
+			return nil, 0, err
+		}
+		seqMessages[i] = &SequentialMessage{
+			Sequence: seq,
+			Column:   cols,
+		}
+	}
+	var next int64
+	if resp.NextStartPrimaryKey != nil {
+		next, _ = getSequence(resp.NextStartPrimaryKey.PrimaryKeys, s.opt.Schema)
+	}
+	return seqMessages, next, nil
 }
 
 func (s *DefaultStore) Close() {
