@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
+	"net/http"
 	"time"
 )
 
@@ -12,6 +13,9 @@ var (
 	defaultConcurrent    = 300
 	defaultFlushInterval = 30 * time.Millisecond
 	defaultRetryTimeout  = 5 * time.Second
+
+	// BatchLimit is number of changes in a single batchWrite request, BatchLimit must be <= 200
+	BatchLimit = 200
 )
 
 type Config struct {
@@ -49,6 +53,7 @@ type BatchWriter struct {
 	tablestore.TableStoreApi
 
 	inputCh      chan *BatchAddContext
+	retryCh      chan *BatchAddContext
 	flushCh      chan struct{}
 	retryTimeout time.Duration
 
@@ -67,10 +72,12 @@ func NewBatchWriter(client tablestore.TableStoreApi, conf *Config) *BatchWriter 
 	asyncDIn := make(chan *BatchAddContext, 1000)
 	uploaderIn := make(chan map[string][]*BatchAddContext)
 	reducerIn := make(chan *BatchAddContext, 1000)
+	retryIn := make(chan *BatchAddContext, 1000)
 	ctx, cancel := context.WithCancel(context.Background())
 	w := &BatchWriter{
 		TableStoreApi: client,
 		inputCh:       asyncDIn,
+		retryCh:       retryIn,
 		flushCh:       make(chan struct{}),
 		retryTimeout:  conf.RetryTimeout,
 		cancel:        cancel,
@@ -78,7 +85,7 @@ func NewBatchWriter(client tablestore.TableStoreApi, conf *Config) *BatchWriter 
 	}
 	ticker := time.NewTicker(conf.FlushInterval)
 	go w.tickFlush(ticker)
-	go w.asyncDispatcher(asyncDIn, uploaderIn)
+	go w.asyncDispatcher(asyncDIn, retryIn, uploaderIn)
 	var concurrent = defaultConcurrent
 	if conf.Concurrent > 0 {
 		concurrent = conf.Concurrent
@@ -124,19 +131,20 @@ func (w *BatchWriter) tickFlush(ticker *time.Ticker) {
 	}
 }
 
-func (w *BatchWriter) asyncDispatcher(input <-chan *BatchAddContext, output chan<- map[string][]*BatchAddContext) {
-	limit := 200
+func (w *BatchWriter) asyncDispatcher(input <-chan *BatchAddContext,
+	retryInput <-chan *BatchAddContext, output chan<- map[string][]*BatchAddContext) {
+	limit := BatchLimit
+	if limit > 200 || limit <= 0 {
+		limit = 200
+	}
 	batch := make(map[string][]*BatchAddContext)
 	i := 0
 	for {
 		send := false
 		select {
-		case req := <-input:
+		case req := <-retryInput:
 			batch[req.change.GetTableName()] = append(batch[req.change.GetTableName()], req)
 			i++
-			if i == limit {
-				send = true
-			}
 		case <-w.ctx.Done():
 			return
 		default:
@@ -144,9 +152,9 @@ func (w *BatchWriter) asyncDispatcher(input <-chan *BatchAddContext, output chan
 			case req := <-input:
 				batch[req.change.GetTableName()] = append(batch[req.change.GetTableName()], req)
 				i++
-				if i == limit {
-					send = true
-				}
+			case req := <-retryInput:
+				batch[req.change.GetTableName()] = append(batch[req.change.GetTableName()], req)
+				i++
 			case <-w.flushCh:
 				if i != 0 {
 					send = true
@@ -154,6 +162,9 @@ func (w *BatchWriter) asyncDispatcher(input <-chan *BatchAddContext, output chan
 			case <-w.ctx.Done():
 				return
 			}
+		}
+		if i == limit {
+			send = true
 		}
 		if send {
 			select {
@@ -219,7 +230,7 @@ func (w *BatchWriter) reducer(input <-chan *BatchAddContext) {
 		var req *BatchAddContext
 		select {
 		case req = <-input:
-			if req.resp.Err == nil {
+			if req.resp.Err == nil || !shouldRetry(req.resp.Err) {
 				writeBack = true
 			} else {
 				dur := defaultBackoff.backoff(req.retries)
@@ -243,7 +254,17 @@ func (w *BatchWriter) reducer(input <-chan *BatchAddContext) {
 func (w *BatchWriter) backoffRetry(req *BatchAddContext, backoffDur time.Duration) {
 	time.Sleep(backoffDur)
 	select {
-	case w.inputCh <- req:
+	case w.retryCh <- req:
 	case <-w.ctx.Done():
 	}
+}
+
+func shouldRetry(err error) bool {
+	if otsErr, ok := err.(*tablestore.OtsError); ok {
+		if otsErr.HttpStatusCode >= 400 && otsErr.HttpStatusCode < 499 &&
+			otsErr.HttpStatusCode != http.StatusTooManyRequests && otsErr.HttpStatusCode != http.StatusTeapot {
+			return false
+		}
+	}
+	return true
 }

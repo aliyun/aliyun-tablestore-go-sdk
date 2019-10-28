@@ -72,7 +72,7 @@ func BenchmarkTmLine_BatchStore_WriteSpread(b *testing.B) {
 		}
 		for _, ret := range fails {
 			if ret.Err != nil {
-				b.Error(err)
+				b.Error(ret.Err)
 			}
 		}
 	}

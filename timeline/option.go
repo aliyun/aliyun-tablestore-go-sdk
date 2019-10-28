@@ -13,11 +13,12 @@ var (
 )
 
 type StoreOption struct {
-	Endpoint  string
-	Instance  string
-	TableName string
-	AkId      string
-	AkSecret  string
+	Endpoint      string
+	Instance      string
+	TableName     string
+	AkId          string
+	AkSecret      string
+	SecurityToken string
 
 	Schema     *Schema
 	TTL        int
@@ -32,11 +33,16 @@ type Schema struct {
 	SecondPk string
 }
 
-func (b *StoreOption) prepare() error {
-	if b.Endpoint == "" || b.Instance == "" || b.TableName == "" ||
-		b.AkId == "" || b.AkSecret == "" {
+func (b *StoreOption) prepare(withClient bool) error {
+	if !withClient {
+		if b.Endpoint == "" || b.Instance == "" || b.AkId == "" || b.AkSecret == "" {
+			return ErrMisuse
+		}
+	}
+	if b.TableName == "" {
 		return ErrMisuse
 	}
+
 	//fill in default value if empty
 	if b.Schema == nil {
 		b.Schema = &Schema{FirstPk: DefaultFirstPk, SecondPk: DefaultSecondPk}
