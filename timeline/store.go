@@ -35,12 +35,15 @@ type DefaultStore struct {
 	opt StoreOption
 }
 
-func NewDefaultStore(option StoreOption) (MessageStore, error) {
-	err := option.prepare()
+func NewMessageStore(client tablestore.TableStoreApi, option StoreOption) (MessageStore, error) {
+	err := option.prepare(client != nil)
 	if err != nil {
 		return nil, err
 	}
-	client := tablestore.NewClientWithConfig(option.Endpoint, option.Instance, option.AkId, option.AkSecret, "", option.TableStoreConfig)
+	if client == nil {
+		client = tablestore.NewClientWithConfig(option.Endpoint, option.Instance, option.AkId, option.AkSecret,
+			option.SecurityToken, option.TableStoreConfig)
+	}
 	bw := writer.NewBatchWriter(client, option.WriterConfig)
 	store := &DefaultStore{api: bw, opt: option}
 	err = store.Sync()
@@ -48,6 +51,10 @@ func NewDefaultStore(option StoreOption) (MessageStore, error) {
 		return nil, err
 	}
 	return store, nil
+}
+
+func NewDefaultStore(option StoreOption) (MessageStore, error) {
+	return NewMessageStore(nil, option)
 }
 
 func (s *DefaultStore) Sync() error {
