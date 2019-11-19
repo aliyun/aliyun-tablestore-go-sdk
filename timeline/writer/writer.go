@@ -193,16 +193,20 @@ func (w *BatchWriter) uploader(input <-chan map[string][]*BatchAddContext, outpu
 			if err != nil {
 				for _, reqSlice := range reqMap {
 					for _, req := range reqSlice {
-						req.resp = &BatchAddResult{Err: err}
+						req.resp = &BatchAddResult{Id: req.id, Err: err}
 					}
 				}
 			} else {
 				for _, results := range otsResp.TableToRowsResult {
 					for _, result := range results {
 						if result.IsSucceed {
-							reqMap[result.TableName][result.Index].resp = &BatchAddResult{Value: result}
+							reqMap[result.TableName][result.Index].resp = &BatchAddResult{
+								Id:    reqMap[result.TableName][result.Index].id,
+								Value: result,
+							}
 						} else {
 							reqMap[result.TableName][result.Index].resp = &BatchAddResult{
+								Id:  reqMap[result.TableName][result.Index].id,
 								Err: fmt.Errorf("%s: %s", result.Error.Code, result.Error.Message),
 							}
 						}
