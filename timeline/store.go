@@ -11,21 +11,21 @@ var pkColumns = 2
 
 type SequentialMessage struct {
 	Sequence int64
-	Column   ColumnMap
+	Column   *ColumnMap
 }
 
 type MessageStore interface {
 	Sync() error
-	Store(id string, cols ColumnMap) (int64, error)
-	BatchStore(id string, cols ColumnMap) *promise.Future
-	Update(id string, seq int64, cols ColumnMap) error
-	Load(id string, seq int64) (ColumnMap, error)
+	Store(id string, cols *ColumnMap) (int64, error)
+	BatchStore(id string, cols *ColumnMap) *promise.Future
+	Update(id string, seq int64, cols *ColumnMap) error
+	Load(id string, seq int64) (*ColumnMap, error)
 	Delete(id string, seq int64) error
 	// Deprecated: Use SequentialScan instead, which keeps data
 	// sequential to support iterate from max to min and vice versa.
 	// Scan lost all sequential detail, as it puts all sequence
 	// number and data to map[int64]ColumnMap.
-	Scan(id string, param *ScanParameter) (map[int64]ColumnMap, int64, error)
+	Scan(id string, param *ScanParameter) (map[int64]*ColumnMap, int64, error)
 	SequentialScan(id string, param *ScanParameter) ([]*SequentialMessage, int64, error)
 	Close()
 }
@@ -71,7 +71,7 @@ func (s *DefaultStore) Sync() error {
 	if err != nil {
 		return err
 	}
-	//not support throughput update now
+	// not support throughput update now
 	if s.opt.TTL != 0 && s.opt.TTL != resp.TableOption.TimeToAlive {
 		updateReq := &tablestore.UpdateTableRequest{
 			TableName:   s.opt.TableName,
@@ -83,7 +83,7 @@ func (s *DefaultStore) Sync() error {
 	return nil
 }
 
-func (s *DefaultStore) Store(id string, cols ColumnMap) (int64, error) {
+func (s *DefaultStore) Store(id string, cols *ColumnMap) (int64, error) {
 	change := toPutChange(id, cols, &s.opt)
 	resp, err := s.api.PutRow(&tablestore.PutRowRequest{PutRowChange: change})
 	if err != nil {
@@ -92,7 +92,7 @@ func (s *DefaultStore) Store(id string, cols ColumnMap) (int64, error) {
 	return getSequence(resp.PrimaryKey.PrimaryKeys, s.opt.Schema)
 }
 
-func (s *DefaultStore) BatchStore(id string, cols ColumnMap) *promise.Future {
+func (s *DefaultStore) BatchStore(id string, cols *ColumnMap) *promise.Future {
 	f := promise.NewFuture()
 	change := toPutChange(id, cols, &s.opt)
 	ctx := writer.NewBatchAdd(id, change, f)
@@ -103,30 +103,31 @@ func (s *DefaultStore) BatchStore(id string, cols ColumnMap) *promise.Future {
 	return f
 }
 
-func (s *DefaultStore) Update(id string, seq int64, cols ColumnMap) error {
+func (s *DefaultStore) Update(id string, seq int64, cols *ColumnMap) error {
 	change := &tablestore.UpdateRowChange{
 		TableName:  s.opt.TableName,
 		PrimaryKey: toPrimaryKey(id, seq, s.opt.Schema, false),
 		Condition:  &tablestore.RowCondition{RowExistenceExpectation: tablestore.RowExistenceExpectation_EXPECT_EXIST},
 	}
-	for key, value := range cols {
+	for key, value := range cols.ToMap() {
 		change.PutColumn(key, value)
 	}
 	_, err := s.api.UpdateRow(&tablestore.UpdateRowRequest{UpdateRowChange: change})
 	return err
 }
 
-func (s *DefaultStore) Load(id string, seq int64) (ColumnMap, error) {
+func (s *DefaultStore) Load(id string, seq int64) (*ColumnMap, error) {
+	pk := toPrimaryKey(id, seq, s.opt.Schema, false)
 	criteria := &tablestore.SingleRowQueryCriteria{
 		TableName:  s.opt.TableName,
-		PrimaryKey: toPrimaryKey(id, seq, s.opt.Schema, false),
+		PrimaryKey: pk,
 		MaxVersion: 1,
 	}
 	resp, err := s.api.GetRow(&tablestore.GetRowRequest{SingleRowQueryCriteria: criteria})
 	if err != nil {
 		return nil, err
 	}
-	return LoadColumnMap(resp.Columns), nil
+	return loadColumnMap(pk, resp.Columns), nil
 }
 
 func (s *DefaultStore) Delete(id string, seq int64) error {
@@ -139,13 +140,13 @@ func (s *DefaultStore) Delete(id string, seq int64) error {
 	return err
 }
 
-func (s *DefaultStore) Scan(id string, param *ScanParameter) (map[int64]ColumnMap, int64, error) {
+func (s *DefaultStore) Scan(id string, param *ScanParameter) (map[int64]*ColumnMap, int64, error) {
 	criteria := toRangeCriteria(id, param, &s.opt)
 	resp, err := s.api.GetRange(&tablestore.GetRangeRequest{RangeRowQueryCriteria: criteria})
 	if err != nil {
 		return nil, 0, err
 	}
-	seqColMap := make(map[int64]ColumnMap)
+	seqColMap := make(map[int64]*ColumnMap)
 	for _, row := range resp.Rows {
 		seq, cols, err := parseRow(row, &s.opt)
 		if err != nil {
@@ -188,7 +189,7 @@ func (s *DefaultStore) Close() {
 	s.api.Close()
 }
 
-func parseRow(row *tablestore.Row, opt *StoreOption) (int64, ColumnMap, error) {
+func parseRow(row *tablestore.Row, opt *StoreOption) (int64, *ColumnMap, error) {
 	seq, err := getSequence(row.PrimaryKey.PrimaryKeys, opt.Schema)
 	if err != nil {
 		return 0, nil, err
@@ -213,7 +214,7 @@ func toRangeCriteria(id string, param *ScanParameter, opt *StoreOption) *tablest
 	return criteria
 }
 
-func toPutChange(id string, cols ColumnMap, opt *StoreOption) *tablestore.PutRowChange {
+func toPutChange(id string, cols *ColumnMap, opt *StoreOption) *tablestore.PutRowChange {
 	pk := toPrimaryKey(id, 0, opt.Schema, true)
 	change := &tablestore.PutRowChange{
 		TableName:  opt.TableName,
@@ -221,7 +222,7 @@ func toPutChange(id string, cols ColumnMap, opt *StoreOption) *tablestore.PutRow
 		Condition:  &tablestore.RowCondition{RowExistenceExpectation: tablestore.RowExistenceExpectation_IGNORE},
 		ReturnType: tablestore.ReturnType_RT_PK,
 	}
-	for key, value := range cols {
+	for key, value := range cols.ToMap() {
 		change.AddColumn(key, value)
 	}
 	return change

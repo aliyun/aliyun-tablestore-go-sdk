@@ -43,7 +43,7 @@ func (b *StoreOption) prepare(withClient bool) error {
 		return ErrMisuse
 	}
 
-	//fill in default value if empty
+	// fill in default value if empty
 	if b.Schema == nil {
 		b.Schema = &Schema{FirstPk: DefaultFirstPk, SecondPk: DefaultSecondPk}
 	}
