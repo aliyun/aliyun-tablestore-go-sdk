@@ -2,13 +2,14 @@ package timeline
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
 	"math/rand"
 	"os"
 	"testing"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
 )
 
 func BenchmarkTmLine_BatchStore_Concurrent(b *testing.B) {

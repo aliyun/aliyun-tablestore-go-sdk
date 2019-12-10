@@ -1,10 +1,11 @@
 package timeline
 
 import (
+	"strings"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
-	"strings"
 )
 
 var pkColumns = 2

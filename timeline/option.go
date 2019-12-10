@@ -1,6 +1,8 @@
 package timeline
 
 import (
+	"fmt"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
 )
@@ -36,11 +38,13 @@ type Schema struct {
 func (b *StoreOption) prepare(withClient bool) error {
 	if !withClient {
 		if b.Endpoint == "" || b.Instance == "" || b.AkId == "" || b.AkSecret == "" {
-			return ErrMisuse
+			// require go 1.13
+			return fmt.Errorf("%w empty option", ErrMisuse)
 		}
 	}
 	if b.TableName == "" {
-		return ErrMisuse
+		// require go 1.13
+		return fmt.Errorf("%w invalid table name", ErrMisuse)
 	}
 
 	// fill in default value if empty
