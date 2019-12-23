@@ -156,6 +156,8 @@ func (cm *ColumnMap) AddAnyColumn(key string, val interface{}) {
 		cm.AddFloat64Column(key, float64(v))
 	case bool:
 		cm.AddBoolColumn(key, v)
+	case []byte:
+		cm.AddBytesColumn(key, v)
 	default:
 		panic("invalid value type")
 	}
