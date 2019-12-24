@@ -48,4 +48,10 @@ func main() {
 
 	// globalindex
 	sample.CreateTableWithGlobalIndexSample(client, "globalindex1")
+
+	//SearchIndex: agg & group by
+	sample.CreateSearchIndexForAggregationAndGroupBy(client, "agg_sample_table", "agg_sample_index")
+	sample.WriteDataForAggregationAndGroupBy(client, "agg_sample_table")
+	sample.AggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupBySample(client, "agg_sample_table", "agg_sample_index")
 }

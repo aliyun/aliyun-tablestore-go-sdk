@@ -1,6 +1,7 @@
 syntax = "proto2";
 package otsprotocol;
 
+/* query */
 enum QueryType {
     MATCH_QUERY = 1;
     MATCH_PHRASE_QUERY = 2;
@@ -197,6 +198,8 @@ message SearchQuery {
     optional Sort sort = 6;
     optional bool getTotalCount = 8;
     optional bytes token = 9;
+    optional Aggregations aggs = 10;
+    optional GroupBys group_bys = 11;
 }
 
 enum ColumnReturnType {
@@ -227,6 +230,8 @@ message SearchResponse {
     repeated bytes rows = 2;
     optional bool is_all_succeeded = 3;
     optional bytes next_token = 6;
+    optional bytes aggs = 7;
+    optional bytes group_bys = 8;
 }
 
 /* Create Search Index */
@@ -340,4 +345,221 @@ message DescribeSearchIndexRequest {
 message DescribeSearchIndexResponse {
     optional IndexSchema schema = 1;
     optional SyncStat sync_stat = 2;
+}
+
+
+/* aggregation & group by */
+enum AggregationType {
+    AGG_AVG = 1;
+    AGG_DISTINCT_COUNT = 6;
+    AGG_MAX = 2;
+    AGG_MIN = 3;
+    AGG_SUM = 4;
+    AGG_COUNT = 5;
+}
+
+enum GroupByType {
+    GROUP_BY_FIELD = 1;
+    GROUP_BY_RANGE = 2;
+    GROUP_BY_FILTER = 3;
+    GROUP_BY_GEO_DISTANCE = 4;
+}
+
+// agg & group by
+message Aggregation {
+    optional string name = 1;
+    optional AggregationType type = 2;
+    optional bytes body = 3;
+}
+message Aggregations {
+    repeated Aggregation aggs = 1;
+}
+
+message GroupBy {
+    optional string name = 1;
+    optional GroupByType type = 2;
+    optional bytes body = 3;
+}
+message GroupBys {
+    repeated GroupBy group_bys = 1;
+}
+
+// single agg
+message AvgAggregation {
+    optional string field_name = 1;
+    optional bytes missing = 2; //encoded as SQLVariant, check in SearchProxy
+}
+
+message MaxAggregation {
+    optional string field_name = 1;
+    optional bytes missing = 2;
+}
+
+message MinAggregation {
+    optional string field_name = 1;
+    optional bytes missing = 2;
+}
+
+message SumAggregation {
+    optional string field_name = 1;
+    optional bytes missing = 2;
+}
+
+message CountAggregation {
+    optional string field_name = 1;
+}
+
+message DistinctCountAggregation {
+    optional string field_name = 1;
+    optional bytes missing = 2;
+}
+
+// group agg
+message GroupKeySort {
+    optional SortOrder order = 1;
+}
+
+message RowCountSort {
+    optional SortOrder order = 1;
+}
+
+message SubAggSort {
+    optional string sub_agg_name = 1;
+    optional SortOrder order = 2;
+}
+
+message GroupBySorter {
+    optional GroupKeySort group_key_sort = 1;
+    optional RowCountSort row_count_sort = 2;
+    optional SubAggSort sub_agg_sort = 3;
+}
+
+message GroupBySort {
+    repeated GroupBySorter sorters = 1;
+}
+
+message GroupByField {
+    optional string field_name = 1;
+    optional int32 size = 2;
+    optional GroupBySort sort = 3;
+    optional Aggregations sub_aggs = 4;
+    optional GroupBys sub_group_bys = 5;
+}
+
+message Range {
+    optional double from = 1;
+    optional double to = 2;
+}
+
+message GroupByRange {
+    optional string field_name = 1;
+    repeated Range ranges = 2;
+    optional Aggregations sub_aggs = 3;
+    optional GroupBys sub_group_bys = 4;
+}
+
+message GroupByFilter {
+    repeated Query filters = 1;
+    optional Aggregations sub_aggs = 2;
+    optional GroupBys sub_group_bys = 3;
+}
+
+message GeoPoint {
+    optional double lat = 1;
+    optional double lon = 2;
+}
+
+message GroupByGeoDistance {
+    optional string field_name = 1;
+    optional GeoPoint origin = 2;
+    repeated Range ranges = 3;
+    optional Aggregations sub_aggs = 4;
+    optional GroupBys sub_group_bys = 5;
+}
+
+//single agg result
+message AvgAggregationResult {
+    optional double value = 1;
+}
+
+message DistinctCountAggregationResult {
+    optional int64 value = 1;
+}
+
+message MaxAggregationResult {
+    optional double value = 1;
+}
+
+message MinAggregationResult {
+    optional double value = 1;
+}
+
+message SumAggregationResult {
+    optional double value = 1;
+}
+
+message CountAggregationResult {
+    optional int64 value = 1;
+}
+
+message AggregationResult {
+    optional string name = 1;
+    optional AggregationType type = 2;
+    optional bytes agg_result = 3; // encoded by XxxAggregationResult
+}
+
+message AggregationsResult {
+    repeated AggregationResult agg_results = 1;
+}
+
+//group by result
+message GroupByFieldResultItem {
+    optional string key = 1;
+    optional int64 row_count = 2;
+    optional AggregationsResult sub_aggs_result = 3;
+    optional GroupBysResult sub_group_bys_result = 4;
+}
+message GroupByFieldResult {
+    repeated GroupByFieldResultItem group_by_field_result_items = 1;
+}
+
+message GroupByRangeResultItem {
+    optional double from = 1;
+    optional double to = 2;
+    optional int64 row_count = 3;
+    optional AggregationsResult sub_aggs_result = 4;
+    optional GroupBysResult sub_group_bys_result = 5;
+}
+message GroupByRangeResult {
+    repeated GroupByRangeResultItem group_by_range_result_items = 1;
+}
+
+message GroupByGeoDistanceResultItem {
+    optional double from = 1;
+    optional double to = 2;
+    optional int64 row_count = 3;
+    optional AggregationsResult sub_aggs_result = 4;
+    optional GroupBysResult sub_group_bys_result = 5;
+}
+message GroupByGeoDistanceResult {
+    repeated GroupByGeoDistanceResultItem group_by_geo_distance_result_items = 1;
+}
+
+message GroupByFilterResultItem {
+    optional int64 row_count = 1;
+    optional AggregationsResult sub_aggs_result = 2;
+    optional GroupBysResult sub_group_bys_result = 3;
+}
+message GroupByFilterResult {
+    repeated GroupByFilterResultItem group_by_filter_result_items = 1;
+}
+
+message GroupByResult {
+    optional string name = 1;
+    optional GroupByType type = 2;
+    optional bytes group_by_result = 3; //encoded by XxxGroupByResult
+}
+
+message GroupBysResult {
+    repeated GroupByResult group_by_results = 1;
 }
