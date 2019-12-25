@@ -85,6 +85,10 @@ type SearchResponse struct {
 	Rows         []*Row
 	IsAllSuccess bool
 	NextToken    []byte
+
+	AggregationResults 	search.AggregationResults
+	GroupByResults		search.GroupByResults
+
 	ResponseInfo
 }
 

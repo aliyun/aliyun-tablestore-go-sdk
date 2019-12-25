@@ -19,6 +19,9 @@ const (
 )
 
 func ToVariantValue(value interface{}) (VariantValue, error) {
+	if value == nil {
+		return nil, errors.New("interface{} should not be nil")
+	}
 	t := reflect.TypeOf(value)
 	switch t.Kind() {
 	case reflect.String:

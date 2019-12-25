@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -132,5 +133,24 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 	if resp.NextToken != nil && len(resp.NextToken) > 0 {
 		response.NextToken = resp.NextToken
 	}
+
+	pbAggResults := new(otsprotocol.AggregationsResult)
+	if err := proto.Unmarshal(resp.Aggs, pbAggResults); err == nil && pbAggResults != nil && len(pbAggResults.AggResults) > 0 {
+		aggResults, err := search.ParseAggregationResultsFromPB(pbAggResults.AggResults)
+		if err != nil {
+			return nil, err
+		}
+		response.AggregationResults = *aggResults
+	}
+
+	pbGroupByResults := new(otsprotocol.GroupBysResult)
+	if err = proto.Unmarshal(resp.GroupBys, pbGroupByResults); err == nil && pbGroupByResults != nil && len(pbGroupByResults.GroupByResults) > 0 {
+		groupByResults, err := search.ParseGroupByResultsFromPB(pbGroupByResults.GroupByResults)
+		if err != nil {
+			return nil, err
+		}
+		response.GroupByResults = *groupByResults
+	}
+
 	return response, nil
 }
