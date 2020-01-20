@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/search"
 	"github.com/golang/protobuf/proto"
 )
 

@@ -152,7 +152,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore",
+    "github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore",
     "github.com/cenkalti/backoff",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",

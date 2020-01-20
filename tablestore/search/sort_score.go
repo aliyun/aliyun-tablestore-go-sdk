@@ -1,6 +1,6 @@
 package search
 
-import "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+import "github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/otsprotocol"
 
 type ScoreSort struct {
 	Order *SortOrder

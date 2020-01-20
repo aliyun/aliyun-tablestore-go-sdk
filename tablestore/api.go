@@ -5,7 +5,7 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"math/rand"

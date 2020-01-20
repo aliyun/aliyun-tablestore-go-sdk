@@ -2,14 +2,14 @@ package tablestore
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	//"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	//"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore"
 )
 
 // @class TableStoreClient

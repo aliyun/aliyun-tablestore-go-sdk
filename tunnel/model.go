@@ -2,7 +2,7 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tunnel/protocol"
 	"strconv"
 	"strings"
 	"time"

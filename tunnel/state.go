@@ -4,7 +4,7 @@ import (
 	"errors"
 	"go.uber.org/zap"
 	"sync"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tunnel/protocol"
 )
 
 type BatchGetStatusReq struct {

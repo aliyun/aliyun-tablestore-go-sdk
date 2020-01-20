@@ -2,10 +2,10 @@ package sample
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore"
+	"github.com/golang/protobuf/proto"
 	"strconv"
 	"time"
-	"github.com/golang/protobuf/proto"
 )
 
 func GetStreamRecordWithTimestampSample(client *tablestore.TableStoreClient, tableName string) {

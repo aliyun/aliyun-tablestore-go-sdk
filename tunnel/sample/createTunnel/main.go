@@ -6,7 +6,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tunnel"
 )
 
 type Config struct {

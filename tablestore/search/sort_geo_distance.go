@@ -3,7 +3,7 @@ package search
 import (
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/v5/tablestore/otsprotocol"
 )
 
 type GeoDistanceType int8
