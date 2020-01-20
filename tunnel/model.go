@@ -191,9 +191,9 @@ type Record struct {
 
 func (r *Record) String() string {
 	return fmt.Sprintf(
-		"{\"Type\":%s, \"PrimaryKey\":%s, \"Columns\":%s}",
+		"{\"Type\":%s, \"PrimaryKey\":%v, \"Columns\":%s}",
 		r.Type,
-		*r.PrimaryKey,
+		r.PrimaryKey,
 		r.Columns)
 }
 
