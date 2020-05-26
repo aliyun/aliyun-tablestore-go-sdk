@@ -135,7 +135,10 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	} else {
 		body = nil
 	}
-
+	maxInterval := int64(MaxRetryInterval)
+	if tableStoreClient.config.MaxRetryNapMil > 0 {
+		maxInterval = tableStoreClient.config.MaxRetryNapMil
+	}
 	var value int64
 	var i uint
 	var respBody []byte
@@ -147,7 +150,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 		if err == nil {
 			break
 		} else {
-			value = getNextPause(tableStoreClient, err, i, end, value, uri)
+			value = getNextPause(tableStoreClient, err, i, end, value, maxInterval, uri)
 
 			// fmt.Println("hit retry", uri, err, *e.Code, value)
 			if value <= 0 {
@@ -170,7 +173,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	return nil
 }
 
-func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end time.Time, lastInterval int64, action string) int64 {
+func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end time.Time, lastInterval, maxInterval int64, action string) int64 {
 	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
 		return 0
 	}
@@ -190,8 +193,8 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 
 	if retry {
 		value := lastInterval*2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
-		if value > MaxRetryInterval {
-			value = MaxRetryInterval
+		if value > maxInterval {
+			value = maxInterval
 		}
 
 		return value

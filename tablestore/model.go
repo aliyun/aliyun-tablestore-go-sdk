@@ -61,6 +61,7 @@ type HTTPTimeout struct {
 type TableStoreConfig struct {
 	RetryTimes         uint
 	MaxRetryTime       time.Duration
+	MaxRetryNapMil	   int64
 	HTTPTimeout        HTTPTimeout
 	MaxIdleConnections int
 	Transport          http.RoundTripper
