@@ -1,19 +1,24 @@
 package tablestore
 
 import (
+	"encoding/base64"
 	"fmt"
 	. "gopkg.in/check.v1"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
-	"io"
-	"syscall"
 )
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
+}
 
 // Hook up gocheck into the "go test" runner.
 func Test(t *testing.T) {
@@ -26,8 +31,16 @@ var tableNamePrefix string
 
 var _ = Suite(&TableStoreSuite{})
 
-var defaultTableName = "defaulttable"
-var rangeQueryTableName = "rangetable"
+var (
+	defaultTableName = "defaulttable"
+	rangeQueryTableName = "rangetable"
+	fuzzyTableName = "fuzzytable"
+
+	fuzzyMetaPk1 = "pkStr"
+	fuzzyMetaPk2 = "pkBlob"
+	fuzzyMetaPk3 = "pkInt"
+	fuzzyMetaAttr = []string{"string", "integer", "boolean", "double", "blob"}
+)
 
 // Todo: use config
 var client TableStoreApi
@@ -46,7 +59,31 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	rangeQueryTableName = tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
 	PrepareTable2(rangeQueryTableName)
+	err := PrepareFuzzyTable(fuzzyTableName)
+	c.Assert(err, IsNil)
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
+}
+
+func PrepareFuzzyTable(tableName string) error {
+	client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	time.Sleep(time.Second)
+	meta := &TableMeta{
+		TableName: tableName,
+	}
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk1, PrimaryKeyType_STRING)
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk2, PrimaryKeyType_BINARY)
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk3, PrimaryKeyType_INTEGER)
+	req := &CreateTableRequest{
+		TableMeta: meta,
+		TableOption: &TableOption{
+			TimeToAlive: -1,
+			MaxVersion: 1,
+		},
+		ReservedThroughput: &ReservedThroughput{0,0},
+	}
+	_, err := client.CreateTable(req)
+	time.Sleep(time.Second)
+	return err
 }
 
 func PrepareTable(tableName string) error {
@@ -935,6 +972,116 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	c.Check(error, NotNil)
 
 	fmt.Println("TestBatchWriteRow finished")
+}
+
+func (s *TableStoreSuite) TestFuzzyGetRangeMatrix(c *C) {
+	fmt.Println("FuzzyGetRangeMatrix")
+	expect, err := PrepareFuzzyTableData(fuzzyTableName, 1024, 10240, 10000)
+	c.Assert(err, IsNil)
+	startPk := new(PrimaryKey)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk1)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk2)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk3)
+	endPk := new(PrimaryKey)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk1)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk2)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk3)
+	criteria := &RangeRowQueryCriteria{
+		TableName: fuzzyTableName,
+		StartPrimaryKey: startPk,
+		EndPrimaryKey: endPk,
+		ColumnsToGet: fuzzyMetaAttr,
+		MaxVersion: 1,
+		Limit: 2000,
+		DataBlockType: SimpleRowMatrix,
+	}
+	for {
+		resp, err := client.GetRange(&GetRangeRequest{criteria})
+		c.Assert(err, IsNil)
+		c.Assert(resp.DataBlockType, Equals, SimpleRowMatrix)
+		for _, row := range resp.Rows {
+			pks := row.PrimaryKey.PrimaryKeys
+			cpKey := pks[0].Value.(string)+ "-" + base64.StdEncoding.EncodeToString(pks[1].Value.([]byte)) +
+				"-" +fmt.Sprintf("%d", pks[2].Value.(int64))
+			attrs, ok := expect[cpKey]
+			if !ok {
+				c.Errorf("got %s", cpKey)
+			}
+			for _, column := range row.Columns {
+				//fmt.Printf("%s %v\n", column.ColumnName, column.Value)
+				switch column.ColumnName {
+				case "string":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "blob":
+					c.Assert(column.Value.([]byte), DeepEquals, attrs[column.ColumnName].([]byte))
+				case "boolean":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "integer":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "double":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				}
+			}
+			c.Assert(len(row.Columns), Equals, len(attrs))
+			delete(expect, cpKey)
+		}
+		if resp.NextStartPrimaryKey != nil {
+			criteria.StartPrimaryKey = resp.NextStartPrimaryKey
+		} else {
+			break
+		}
+	}
+	c.Assert(len(expect), Equals, 0)
+}
+
+func PrepareFuzzyTableData(tableName string, maxStringLen, maxBlobLen int, rowCount int) (map[string]map[string]interface{}, error) {
+	retMap := make(map[string]map[string]interface{})
+	for i:=0;i<rowCount;i++ {
+		pk := new(PrimaryKey)
+		pkStr := randStringRunes(128)
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk1, pkStr)
+		buf := make([]byte, rand.Intn(512))
+		rand.Read(buf)
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk2, buf)
+		pkInt := rand.Int63()
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk3, pkInt)
+		encodeKey := pkStr + "-" + base64.StdEncoding.EncodeToString(buf)+ "-" + fmt.Sprintf("%d", pkInt)
+		change := &PutRowChange{
+			TableName: tableName,
+			PrimaryKey: pk,
+			Condition: &RowCondition{RowExistenceExpectation: RowExistenceExpectation_IGNORE},
+		}
+		attrs := make(map[string]interface{}, len(fuzzyMetaAttr))
+		for _, nameType := range fuzzyMetaAttr {
+			var v interface{}
+			switch nameType {
+			case "string":
+				v = randStringRunes(maxStringLen)
+			case "integer":
+				v = rand.Int63n(101)
+				if v.(int64)%10 == 0 {
+					v = nil
+				}
+			case "boolean":
+				v = rand.Int()%2 == 0
+			case "double":
+				v = rand.Float64()
+			case "blob":
+				v = make([]byte, rand.Intn(maxBlobLen) + 1)
+				rand.Read(v.([]byte))
+			}
+			if v != nil {
+				change.AddColumn(nameType, v)
+				attrs[nameType] = v
+			}
+		}
+		_, err := client.PutRow(&PutRowRequest{change})
+		if err != nil {
+			return nil, err
+		}
+		retMap[encodeKey] = attrs
+	}
+	return retMap, nil
 }
 
 func (s *TableStoreSuite) TestGetRange(c *C) {

@@ -1001,6 +1001,12 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		req.EndColumn = request.RangeRowQueryCriteria.EndColumn
 	}
 
+	req.DataBlockTypeHint = toPBDataBlockType(request.RangeRowQueryCriteria.DataBlockType)
+	req.CompressTypeHint = toPBCompressType(request.RangeRowQueryCriteria.CompressType)
+	if request.RangeRowQueryCriteria.ReturnSpecifiedPkOnly {
+		req.ReturnEntirePrimaryKeys = proto.Bool(false)
+	}
+
 	req.InclusiveStartPrimaryKey = request.RangeRowQueryCriteria.StartPrimaryKey.Build(false)
 	req.ExclusiveEndPrimaryKey = request.RangeRowQueryCriteria.EndPrimaryKey.Build(false)
 
@@ -1012,6 +1018,11 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+	compressType, err := parseProtocolCompressType(resp.GetCompressType())
+	if err != nil {
+		return nil, err
+	}
+	response.CompressType = compressType
 	if len(resp.NextStartPrimaryKey) != 0 {
 		currentRows, err := readRowsWithHeader(bytes.NewReader(resp.NextStartPrimaryKey))
 		if err != nil {
@@ -1029,13 +1040,58 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		return response, nil
 	}
 
-	rows, err := readRowsWithHeader(bytes.NewReader(resp.Rows))
+	switch resp.GetDataBlockType() {
+	case otsprotocol.DataBlockType_DBT_PLAIN_BUFFER:
+		rows, err := parsePlainBufferRows(resp.Rows)
+		if err != nil {
+			return nil, err
+		}
+		response.Rows = rows
+		response.DataBlockType = PlainBuffer
+	case otsprotocol.DataBlockType_DBT_SIMPLE_ROW_MATRIX:
+		rows, err := parseMatrixRows(resp.Rows)
+		if err != nil {
+			return nil, err
+		}
+		response.Rows = rows
+		response.DataBlockType = SimpleRowMatrix
+	default:
+		return nil, fmt.Errorf("unknow data block type %d", resp.GetDataBlockType())
+	}
+	return response, nil
+}
+
+func toPBCompressType(compressType CompressType) *otsprotocol.CompressType {
+	switch compressType {
+	case None:
+		return otsprotocol.CompressType_CPT_NONE.Enum()
+	default:
+		// return CompressType_CPT_NONE
+		return otsprotocol.CompressType_CPT_NONE.Enum()
+	}
+}
+
+func toPBDataBlockType(blockType DataBlockType) *otsprotocol.DataBlockType {
+	switch blockType {
+	case PlainBuffer:
+		return otsprotocol.DataBlockType_DBT_PLAIN_BUFFER.Enum()
+	case SimpleRowMatrix:
+		return otsprotocol.DataBlockType_DBT_SIMPLE_ROW_MATRIX.Enum()
+	default:
+		// return DataBlockType_DBT_PLAIN_BUFFER
+		return otsprotocol.DataBlockType_DBT_PLAIN_BUFFER.Enum()
+	}
+}
+
+func parsePlainBufferRows(rowBytes []byte) ([]*Row, error) {
+	pbRows, err := readRowsWithHeader(bytes.NewReader(rowBytes))
 	if err != nil {
-		return response, err
+		return nil, err
 	}
 
-	for _, row := range rows {
-		currentRow := &Row{}
+	rows := make([]*Row, len(pbRows))
+	for i, row := range pbRows {
+		currentRow := new(Row)
 		currentpk := new(PrimaryKey)
 		for _, pk := range row.primaryKey {
 			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
@@ -1049,11 +1105,9 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 
-		response.Rows = append(response.Rows, currentRow)
+		rows[i] = currentRow
 	}
-
-	return response, nil
-
+	return rows, nil
 }
 
 func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamResponse, error) {

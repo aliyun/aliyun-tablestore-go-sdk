@@ -17,6 +17,15 @@ enum PrimaryKeyOption {
     AUTO_INCREMENT = 1;
 }
 
+enum DataBlockType {
+    DBT_PLAIN_BUFFER = 0;
+    DBT_SIMPLE_ROW_MATRIX = 1;
+}
+
+enum CompressType {
+    CPT_NONE = 0;
+}
+
 message PrimaryKeySchema {
     required string name = 1;
     required PrimaryKeyType type = 2;
@@ -418,6 +427,9 @@ message GetRangeRequest {
     optional string end_column = 12;
     optional bytes token = 13;
     optional string transaction_id = 14;
+    optional DataBlockType data_block_type_hint = 15 [default = DBT_PLAIN_BUFFER];
+    optional bool return_entire_primary_keys = 16 [default = true];
+    optional CompressType compress_type_hint = 17 [default = CPT_NONE];
 }
 
 message GetRangeResponse {
@@ -425,6 +437,8 @@ message GetRangeResponse {
     required bytes rows = 2; // encoded as InplaceRowChangeSet
     optional bytes next_start_primary_key = 3; // 若为空，则代表数据全部读取完毕. encoded as InplaceRowChangeSet, but only has primary key
     optional bytes next_token = 4;
+    optional DataBlockType data_block_type = 5;
+    optional CompressType compress_type = 6;
 }
 /* ###################################################################################################### */
 /* #############################################  Stream  ############################################# */

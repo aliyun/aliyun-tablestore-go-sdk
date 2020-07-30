@@ -40,6 +40,7 @@ const (
 	VT_STRING  = 0x3
 
 	//public final static byte VT_NULL = 0x6;
+	VT_NULL           = 0x6
 	VT_BLOB           = 0x7
 	VT_INF_MIN        = 0x9
 	VT_INF_MAX        = 0xa
