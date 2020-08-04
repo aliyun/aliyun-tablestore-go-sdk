@@ -7,10 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
-	"github.com/golang/protobuf/proto"
-	"github.com/satori/go.uuid"
 	"io"
 	"io/ioutil"
 	"net"
@@ -18,6 +14,11 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/cenkalti/backoff"
+	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
+	uuid "github.com/satori/go.uuid"
 )
 
 const (

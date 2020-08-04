@@ -2,7 +2,8 @@ package sample
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 )
 
 func CreateTableSample(client *tablestore.TableStoreClient, tableName string) {

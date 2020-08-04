@@ -1,7 +1,7 @@
 package timeline
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 )
 
 type ColumnMap struct {
@@ -9,7 +9,7 @@ type ColumnMap struct {
 	bytesFields   map[string][]byte
 	stringFields  map[string]string
 	float64Fields map[string]float64
-	boolFields map[string]bool
+	boolFields    map[string]bool
 
 	fields map[string]struct{}
 }
@@ -20,8 +20,8 @@ func NewColumnMap() *ColumnMap {
 		bytesFields:   make(map[string][]byte),
 		stringFields:  make(map[string]string),
 		float64Fields: make(map[string]float64),
-		boolFields: make(map[string]bool),
-		fields: make(map[string]struct{}),
+		boolFields:    make(map[string]bool),
+		fields:        make(map[string]struct{}),
 	}
 }
 
@@ -170,4 +170,3 @@ func FromMap(mm map[string]interface{}) *ColumnMap {
 	}
 	return cm
 }
-

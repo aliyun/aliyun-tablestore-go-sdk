@@ -2,9 +2,10 @@ package search
 
 import (
 	"errors"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/stretchr/testify/assert"
 )
 
 //mockGroupBy
@@ -65,7 +66,7 @@ func TestBuildPBForGroupByInvalidBody(t *testing.T) {
 
 func TestBuildPBForGroupBys(t *testing.T) {
 	mockGroupBy := &mockGroupBy{}
-	groupBys := []GroupBy {
+	groupBys := []GroupBy{
 		mockGroupBy,
 	}
 	pbGroupBys, err := BuildPBForGroupBys(groupBys)
@@ -80,7 +81,7 @@ func TestBuildPBForGroupBys(t *testing.T) {
 func TestBuildPBForGroupBysInvalid(t *testing.T) {
 	mockGroupBy := &mockGroupBy{}
 	invalidBodyGroupBy := &invalidBodyGroupBy{}
-	groupBys := []GroupBy {
+	groupBys := []GroupBy{
 		mockGroupBy,
 		invalidBodyGroupBy,
 	}

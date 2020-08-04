@@ -1,13 +1,13 @@
 package search
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type CountAggregation struct {
-	AggName		string
-	Field		string
+	AggName string
+	Field   string
 }
 
 func (a *CountAggregation) GetName() string {

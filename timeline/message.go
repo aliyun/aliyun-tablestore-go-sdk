@@ -1,8 +1,9 @@
 package timeline
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"strings"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 )
 
 var DefaultStreamAdapter = &StreamMessageAdapter{

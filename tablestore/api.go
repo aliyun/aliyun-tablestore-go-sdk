@@ -5,14 +5,15 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/golang/protobuf/proto"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 const (
@@ -48,8 +49,8 @@ const (
 	committransactionuri      = "/CommitTransaction"
 	aborttransactionuri       = "/AbortTransaction"
 
-	adddefinedcolumnuri = "/AddDefinedColumn";
-	deletedefinedcolumnuri = "/DeleteDefinedColumn";
+	adddefinedcolumnuri    = "/AddDefinedColumn"
+	deletedefinedcolumnuri = "/DeleteDefinedColumn"
 )
 
 // Constructor: to create the client of TableStore service.
@@ -204,7 +205,7 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 
 func shouldRetry(tableStoreClient *TableStoreClient, errorCode string, errorMsg string, action string, statusCode int) bool {
 	if tableStoreClient.CustomizedRetryFunc != nil {
-		if  tableStoreClient.CustomizedRetryFunc(errorCode, errorMsg, action, statusCode) == true {
+		if tableStoreClient.CustomizedRetryFunc(errorCode, errorMsg, action, statusCode) == true {
 			return true
 		}
 	}
@@ -528,7 +529,7 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 				EnableStream:   &request.StreamSpec.EnableStream,
 				ExpirationTime: &request.StreamSpec.ExpirationTime}
 		} else {
-			req.StreamSpec = &otsprotocol.StreamSpecification{EnableStream:   &request.StreamSpec.EnableStream}
+			req.StreamSpec = &otsprotocol.StreamSpecification{EnableStream: &request.StreamSpec.EnableStream}
 		}
 	}
 
@@ -543,8 +544,8 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		Readcap:  int(*(resp.ReservedThroughputDetails.CapacityUnit.Read)),
 		Writecap: int(*(resp.ReservedThroughputDetails.CapacityUnit.Write))}
 	response.TableOption = &TableOption{
-		TimeToAlive: int(*resp.TableOptions.TimeToLive),
-		MaxVersion:  int(*resp.TableOptions.MaxVersions),
+		TimeToAlive:               int(*resp.TableOptions.TimeToLive),
+		MaxVersion:                int(*resp.TableOptions.MaxVersions),
 		DeviationCellVersionInSec: *resp.TableOptions.DeviationCellVersionInSec}
 
 	if *resp.StreamDetails.EnableStream {

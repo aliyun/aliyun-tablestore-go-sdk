@@ -8,7 +8,7 @@ timeline is based on [TableStore](https://cn.aliyun.com/product/ots
 ## Installation
 
 ```
-$ go get github.com/aliyun/aliyun-tablestore-go-sdk
+$ go get github.com/lanjingren/aliyun-tablestore-go-sdk
 ```
 
 ## Sample
@@ -41,7 +41,7 @@ $ cd timeline
 $ go test -bench=. -benchtime=10s -test.cpu=12
 goos: linux
 goarch: amd64
-pkg: github.com/aliyun/aliyun-tablestore-go-sdk/timeline
+pkg: github.com/lanjingren/aliyun-tablestore-go-sdk/timeline
 BenchmarkTmLine_BatchStore_Concurrent-12                       	   10000	   1737993 ns/op
 BenchmarkTmLine_BatchStore_WriteSpread-12                      	     100	 127729883 ns/op
 BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost-12    	     200	  80166859 ns/op
@@ -55,7 +55,7 @@ $ cd timeline
 $ go test -bench=. -benchtime=10s -test.cpu=12
 goos: linux
 goarch: amd64
-pkg: github.com/aliyun/aliyun-tablestore-go-sdk/timeline
+pkg: github.com/lanjingren/aliyun-tablestore-go-sdk/timeline
 BenchmarkTmLine_BatchStore_Concurrent-12                       	   10000	   1791522 ns/op
 BenchmarkTmLine_BatchStore_WriteSpread-12                      	     100	 124597783 ns/op
 BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost-12    	     200	  83780501 ns/op

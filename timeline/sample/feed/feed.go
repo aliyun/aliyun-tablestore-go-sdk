@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/writer"
 	"math"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/timeline"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/timeline/promise"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/timeline/writer"
 )
 
 type Feed struct {

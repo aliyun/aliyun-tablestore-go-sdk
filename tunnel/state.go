@@ -2,9 +2,10 @@ package tunnel
 
 import (
 	"errors"
-	"go.uber.org/zap"
 	"sync"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"go.uber.org/zap"
 )
 
 type BatchGetStatusReq struct {

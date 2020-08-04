@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/search"
 )
 
 type ColumnsToGet struct {
@@ -86,8 +86,8 @@ type SearchResponse struct {
 	IsAllSuccess bool
 	NextToken    []byte
 
-	AggregationResults 	search.AggregationResults
-	GroupByResults		search.GroupByResults
+	AggregationResults search.AggregationResults
+	GroupByResults     search.GroupByResults
 
 	ResponseInfo
 }
@@ -124,7 +124,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 						field.AnalyzerParameter = paramBytes
 					}
 				} else if *value.Analyzer == Analyzer_Split {
-					param := &otsprotocol.SplitAnalyzerParameter {}
+					param := &otsprotocol.SplitAnalyzerParameter{}
 					if value.AnalyzerParameter.(SplitAnalyzerParameter).Delimiter != nil {
 						param.Delimiter = proto.String(*value.AnalyzerParameter.(SplitAnalyzerParameter).Delimiter)
 					}
@@ -133,7 +133,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 					}
 				} else if *value.Analyzer == Analyzer_Fuzzy {
 					fuzzyParam := value.AnalyzerParameter.(FuzzyAnalyzerParameter)
-					param := &otsprotocol.FuzzyAnalyzerParameter {}
+					param := &otsprotocol.FuzzyAnalyzerParameter{}
 					if fuzzyParam.MaxChars != 0 {
 						param.MaxChars = proto.Int32(fuzzyParam.MaxChars)
 					}
@@ -205,7 +205,7 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		if field.Analyzer != nil && *field.Analyzer == Analyzer_SingleWord && value.AnalyzerParameter != nil {
 			param := new(otsprotocol.SingleWordAnalyzerParameter)
 			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
-				p := SingleWordAnalyzerParameter {}
+				p := SingleWordAnalyzerParameter{}
 				if param.CaseSensitive != nil {
 					p.CaseSensitive = proto.Bool(*param.CaseSensitive)
 				}
@@ -217,7 +217,7 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		} else if field.Analyzer != nil && *field.Analyzer == Analyzer_Split && value.AnalyzerParameter != nil {
 			param := new(otsprotocol.SplitAnalyzerParameter)
 			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
-				p := SplitAnalyzerParameter {}
+				p := SplitAnalyzerParameter{}
 				if param.Delimiter != nil {
 					p.Delimiter = proto.String(*param.Delimiter)
 				}
@@ -226,7 +226,7 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		} else if field.Analyzer != nil && *field.Analyzer == Analyzer_Fuzzy && value.AnalyzerParameter != nil {
 			param := new(otsprotocol.FuzzyAnalyzerParameter)
 			if err := proto.Unmarshal(value.AnalyzerParameter, param); err == nil && param != nil {
-				p := FuzzyAnalyzerParameter {}
+				p := FuzzyAnalyzerParameter{}
 				if param.MinChars != nil {
 					p.MinChars = *param.MinChars
 				}
@@ -317,36 +317,36 @@ type Analyzer string
 const (
 	Analyzer_SingleWord Analyzer = "single_word"
 	Analyzer_MaxWord    Analyzer = "max_word"
-	Analyzer_MinWord	Analyzer = "min_word"
-	Analyzer_Split		Analyzer = "split"
-	Analyzer_Fuzzy		Analyzer = "fuzzy"
+	Analyzer_MinWord    Analyzer = "min_word"
+	Analyzer_Split      Analyzer = "split"
+	Analyzer_Fuzzy      Analyzer = "fuzzy"
 )
 
 type SingleWordAnalyzerParameter struct {
-	CaseSensitive	*bool
-	DelimitWord		*bool
+	CaseSensitive *bool
+	DelimitWord   *bool
 }
 
 type SplitAnalyzerParameter struct {
-	Delimiter		*string
+	Delimiter *string
 }
 
-type  FuzzyAnalyzerParameter struct {
-	MinChars		int32
-	MaxChars		int32
+type FuzzyAnalyzerParameter struct {
+	MinChars int32
+	MaxChars int32
 }
 
 type FieldSchema struct {
-	FieldName        *string
-	FieldType        FieldType
-	Index            *bool
-	IndexOptions     *IndexOptions
-	Analyzer         *Analyzer
-	AnalyzerParameter	interface{}
-	EnableSortAndAgg *bool
-	Store            *bool
-	IsArray          *bool
-	FieldSchemas     []*FieldSchema
+	FieldName         *string
+	FieldType         FieldType
+	Index             *bool
+	IndexOptions      *IndexOptions
+	Analyzer          *Analyzer
+	AnalyzerParameter interface{}
+	EnableSortAndAgg  *bool
+	Store             *bool
+	IsArray           *bool
+	FieldSchemas      []*FieldSchema
 }
 
 func (fs *FieldSchema) String() string {

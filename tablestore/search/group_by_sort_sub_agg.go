@@ -1,12 +1,12 @@
 package search
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type SubAggGroupBySort struct {
-	Order		*SortOrder
-	SubAggName	string
+	Order      *SortOrder
+	SubAggName string
 }
 
 func (s *SubAggGroupBySort) ProtoBuffer() (*otsprotocol.GroupBySorter, error) {

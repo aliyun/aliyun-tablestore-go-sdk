@@ -1,14 +1,14 @@
 package search
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type MinAggregation struct {
-	AggName		string
-	Field	string
-	MissingValue 	interface{}
+	AggName      string
+	Field        string
+	MissingValue interface{}
 }
 
 func (a *MinAggregation) GetName() string {

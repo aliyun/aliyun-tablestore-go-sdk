@@ -2,9 +2,10 @@ package sample
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"math/rand"
 	"time"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 )
 
 func BatchWriteRowSample(client *tablestore.TableStoreClient, tableName string) {
@@ -176,8 +177,8 @@ func GetRangeWithRegxFilterSample(client *tablestore.TableStoreClient, tableName
 		putRowChange.PrimaryKey = putPk
 		colKey1 := randStringRunes(random, 5)
 		colKey2 := randStringRunes(random, 5)
-		val1 := "t1:" + colKey1 + "," + "t2:" + randStringRunes(random, 1) + "," + "t3:-" + randStringRunes(random, 1) + "," + "t4:" + randStringRunes(random, 1) + "." + randStringRunes(random, 1) + "," + "t5:dummy";
-		val2 := "c1:" + colKey2 + "," + "c2:" + randStringRunes(random, 1) + "," + "c3:-" + randStringRunes(random, 1) + "," + "c4:" + randStringRunes(random, 1) + "." + randStringRunes(random, 1) + "," + "c5:dummy";
+		val1 := "t1:" + colKey1 + "," + "t2:" + randStringRunes(random, 1) + "," + "t3:-" + randStringRunes(random, 1) + "," + "t4:" + randStringRunes(random, 1) + "." + randStringRunes(random, 1) + "," + "t5:dummy"
+		val2 := "c1:" + colKey2 + "," + "c2:" + randStringRunes(random, 1) + "," + "c3:-" + randStringRunes(random, 1) + "," + "c4:" + randStringRunes(random, 1) + "." + randStringRunes(random, 1) + "," + "c5:dummy"
 		putRowChange.AddColumn("col1", val1)
 		putRowChange.AddColumn("col2", val2)
 		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
@@ -229,7 +230,7 @@ func GetRangeWithRegxFilterSample(client *tablestore.TableStoreClient, tableName
 		}
 		if len(getRangeResp.Rows) > 0 {
 			for _, row := range getRangeResp.Rows {
-				fmt.Println("range get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.Columns[0].ColumnName,row.Columns[0].Value)
+				fmt.Println("range get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.Columns[0].ColumnName, row.Columns[0].Value)
 			}
 			if getRangeResp.NextStartPrimaryKey == nil {
 				break
@@ -246,4 +247,3 @@ func GetRangeWithRegxFilterSample(client *tablestore.TableStoreClient, tableName
 	}
 	fmt.Println("putrow finished")
 }
-

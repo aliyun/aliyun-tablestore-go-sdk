@@ -3,12 +3,13 @@ package exactlyOnce
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
+
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel"
 )
 
 type userCheckpointer interface {

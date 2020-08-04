@@ -2,12 +2,13 @@ package tablestore
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
-	"github.com/golang/protobuf/proto"
-	. "gopkg.in/check.v1"
 	"math"
 	"os"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/search"
+	. "gopkg.in/check.v1"
 )
 
 //run with "gocheck"
@@ -118,14 +119,14 @@ func createSearchIndex1(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field6 := &FieldSchema{
-		FieldName:        proto.String("Col_Text"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field7 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Nested"),
 				FieldType:        FieldType_LONG,
@@ -157,9 +158,9 @@ func createSearchIndex1(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
@@ -197,14 +198,14 @@ func createSearchIndex1(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field16 := &FieldSchema{
-		FieldName:        proto.String("Col_Text_Missing"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text_Missing"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field17 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested_Missing"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested_Missing"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Missing_Nested"),
 				FieldType:        FieldType_LONG,
@@ -236,14 +237,13 @@ func createSearchIndex1(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Missing_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Missing_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
 	schemas = append(schemas, field11, field12, field13, field14, field15, field16, field17)
-
 
 	request.IndexSchema = &IndexSchema{
 		FieldSchemas: schemas,
@@ -294,14 +294,14 @@ func createSearchIndex2(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field6 := &FieldSchema{
-		FieldName:        proto.String("Col_Text"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field7 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Nested"),
 				FieldType:        FieldType_LONG,
@@ -333,9 +333,9 @@ func createSearchIndex2(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
@@ -360,32 +360,31 @@ func deleteSearchIndex(tableName string, indexName string) {
 }
 
 func writeData1(c *C) {
-	strs := []string {"hangzhou", "tablestore", "ots"}
-	geopoints := []string {
-		"30.137817,120.08681",	//飞天园区
-		"30.135131,120.088355",	//中大银座
-		"30.181877,120.152818",	//中医药地铁站
-		"30.20223,120.13787",	//六和塔
-		"30.216961,120.157633",	//八卦田
-		"30.231566,120.148578",	//太子湾
-		"30.26058,120.170712",	//龙翔桥
-		"30.269501,120.169347",	//凤起路
-		"30.28073,120.168843",	//运河
-		"30.296946,120.21958",	//杭州东站
+	strs := []string{"hangzhou", "tablestore", "ots"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
 	}
 
-	for i := 0; i < 10; i++ {	//0, 1, ..., 9
+	for i := 0; i < 10; i++ { //0, 1, ..., 9
 		putRowRequest := new(PutRowRequest)
 		putRowChange := new(PutRowChange)
 		putRowChange.TableName = searchAPITestTableName1
 		putPk := new(PrimaryKey)
 		putPk.AddPrimaryKeyColumn("pk1", fmt.Sprintf("pk_%d", i))
 
-
 		longValue := int64(i)
 		doubleValue := float64(i) + 0.1
 		boolValue := false
-		if i % 2 == 0 {
+		if i%2 == 0 {
 			boolValue = true
 		}
 		keywordValue := strs[i%len(strs)]
@@ -405,7 +404,7 @@ func writeData1(c *C) {
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
 
-		if i >= 5 {	//leave out the first 5 rows
+		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
 			putRowChange.AddColumn("Col_Double_Missing", doubleValue)
 			putRowChange.AddColumn("Col_Boolean_Missing", boolValue)
@@ -424,24 +423,24 @@ func writeData1(c *C) {
 }
 
 func writeData2(c *C) {
-	longs := []int64 {1, 2, 2, 3, 3, 3, 4, 4, 4, 4}
-	doubles := []float64 {1.1, 2.1, 2.1, 3.1, 3.1, 3.1, 4.1, 4.1, 4.1, 4.1}
-	bools := []bool {false, false, false, false, true, true, true, true, true, true}
-	strs := []string {"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
-	geopoints := []string {
-		"30.137817,120.08681",	//飞天园区
-		"30.135131,120.088355",	//中大银座
-		"30.181877,120.152818",	//中医药地铁站
-		"30.20223,120.13787",	//六和塔
-		"30.216961,120.157633",	//八卦田
-		"30.231566,120.148578",	//太子湾
-		"30.26058,120.170712",	//龙翔桥
-		"30.269501,120.169347",	//凤起路
-		"30.28073,120.168843",	//运河
-		"30.296946,120.21958",	//杭州东站
+	longs := []int64{1, 2, 2, 3, 3, 3, 4, 4, 4, 4}
+	doubles := []float64{1.1, 2.1, 2.1, 3.1, 3.1, 3.1, 4.1, 4.1, 4.1, 4.1}
+	bools := []bool{false, false, false, false, true, true, true, true, true, true}
+	strs := []string{"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
 	}
 
-	for i := 0; i < 10; i++ {	//0, 1, ..., 9
+	for i := 0; i < 10; i++ { //0, 1, ..., 9
 		putRowRequest := new(PutRowRequest)
 		putRowChange := new(PutRowChange)
 		putRowChange.TableName = searchAPITestTableName2
@@ -468,7 +467,7 @@ func writeData2(c *C) {
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
 
-		if i >= 5 {	//leave out the first 5 rows
+		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
 			putRowChange.AddColumn("Col_Double_Missing", doubleValue)
 			putRowChange.AddColumn("Col_Boolean_Missing", boolValue)
@@ -511,7 +510,6 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 	writeData2(c)
 	time.Sleep(time.Duration(30) * time.Second)
 }
-
 
 /* avg agg */
 
@@ -1332,7 +1330,7 @@ func (s *SearchSuite) TestGroupByGroupByGetResultWrongType(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,
@@ -1355,7 +1353,7 @@ func (s *SearchSuite) TestGroupByGroupByGetResultNotExist(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,
@@ -1433,7 +1431,7 @@ func (s *SearchSuite) TestGroupByGroupByFieldSorters(c *C) {
 			GroupBy(search.NewGroupByField("group_by1", "Col_Keyword").
 				GroupBySorters([]search.GroupBySorter{
 					&search.SubAggGroupBySort{
-						Order: search.SortOrder_ASC.Enum(),
+						Order:      search.SortOrder_ASC.Enum(),
 						SubAggName: "sub_agg1",
 					},
 					&search.GroupKeyGroupBySort{
@@ -1470,7 +1468,7 @@ func (s *SearchSuite) TestGroupByGroupByFilter(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,

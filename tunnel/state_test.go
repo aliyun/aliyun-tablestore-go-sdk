@@ -3,13 +3,14 @@ package tunnel
 import (
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/golang/mock/gomock"
-	. "github.com/smartystreets/goconvey/convey"
-	"go.uber.org/zap"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
+	. "github.com/smartystreets/goconvey/convey"
+	"go.uber.org/zap"
 )
 
 func TestTunnelStateMachine_BatchUpdateStatus(t *testing.T) {

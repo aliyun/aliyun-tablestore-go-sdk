@@ -1,8 +1,8 @@
 package search
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type SearchQuery interface {
@@ -45,73 +45,73 @@ func (s *searchQuery) SetQuery(query Query) *searchQuery {
 }
 
 func NewAvgAggregation(name string, fieldName string) *AvgAggregation {
-	return &AvgAggregation {
+	return &AvgAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 func NewDistinctCountAggregation(name string, fieldName string) *DistinctCountAggregation {
-	return &DistinctCountAggregation {
+	return &DistinctCountAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 func NewMaxAggregation(name string, fieldName string) *MaxAggregation {
-	return &MaxAggregation {
+	return &MaxAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 func NewMinAggregation(name string, fieldName string) *MinAggregation {
-	return &MinAggregation {
+	return &MinAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 func NewSumAggregation(name string, fieldName string) *SumAggregation {
-	return &SumAggregation {
+	return &SumAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 func NewCountAggregation(name string, fieldName string) *CountAggregation {
-	return &CountAggregation {
+	return &CountAggregation{
 		AggName: name,
-		Field: fieldName,
+		Field:   fieldName,
 	}
 }
 
 //
 func NewGroupByField(name string, fieldName string) *GroupByField {
-	return &GroupByField {
+	return &GroupByField{
 		AggName: name,
 		Field:   fieldName,
 	}
 }
 
 func NewGroupByRange(name string, fieldName string) *GroupByRange {
-	return &GroupByRange {
+	return &GroupByRange{
 		AggName: name,
 		Field:   fieldName,
 	}
 }
 
 func NewGroupByFilter(name string) *GroupByFilter {
-	return &GroupByFilter {
+	return &GroupByFilter{
 		AggName: name,
 	}
 }
 
 func NewGroupByGeoDistance(name string, fieldName string, origin GeoPoint) *GroupByGeoDistance {
-	return &GroupByGeoDistance {
+	return &GroupByGeoDistance{
 		AggName: name,
 		Field:   fieldName,
-		Origin: origin,
+		Origin:  origin,
 	}
 }
 

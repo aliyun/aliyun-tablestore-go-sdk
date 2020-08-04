@@ -1,6 +1,6 @@
 package search
 
-import "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+import "github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 
 type PrimaryKeySort struct {
 	Order *SortOrder

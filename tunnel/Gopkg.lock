@@ -3,7 +3,7 @@
 
 [[projects]]
   digest = "1:030a6f7fd300954a7c6b0e6c7e06fac75766433a46dbdce1c5b6dc61c1fd6e95"
-  name = "github.com/aliyun/aliyun-tablestore-go-sdk"
+  name = "github.com/lanjingren/aliyun-tablestore-go-sdk"
   packages = [
     "tablestore",
     "tablestore/otsprotocol",
@@ -152,7 +152,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
-    "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore",
+    "github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore",
     "github.com/cenkalti/backoff",
     "github.com/golang/mock/gomock",
     "github.com/golang/protobuf/proto",
