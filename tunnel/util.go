@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
 	"time"

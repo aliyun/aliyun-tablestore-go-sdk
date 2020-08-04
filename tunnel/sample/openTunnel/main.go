@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel"
 	"log"
 	"os"
 	"os/signal"

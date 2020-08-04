@@ -1,8 +1,8 @@
 package writer
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/timeline/promise"
 	"math/rand"
 	"os"
 	"strings"

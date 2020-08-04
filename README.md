@@ -13,8 +13,8 @@
 
 ## 安装方法
 ### GitHub安装
-> - 执行命令`go get github.com/aliyun/aliyun-tablestore-go-sdk`获取远程代码包。
-> - 在您的代码中使用`import "github.com/aliyun/aliyun-tablestore-go-sdk"`引入TableStore Go SDK的包。
+> - 执行命令`go get github.com/lanjingren/aliyun-tablestore-go-sdk`获取远程代码包。
+> - 在您的代码中使用`import "github.com/lanjingren/aliyun-tablestore-go-sdk"`引入TableStore Go SDK的包。
 
 ## 贡献代码
  - 我们非常欢迎大家为TableStore Go# SDK以及其他阿里云SDK贡献代码

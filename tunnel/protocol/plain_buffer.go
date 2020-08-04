@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 	"io"
 	"math"
 )
