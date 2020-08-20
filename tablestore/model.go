@@ -876,3 +876,29 @@ type AbortTransactionRequest struct {
 type AbortTransactionResponse struct {
 	ResponseInfo
 }
+
+// compute splits
+type SearchIndexSplitsOptions struct {
+	IndexName	string
+}
+
+type ComputeSplitsRequest struct {
+	TableName					string
+	searchIndexSplitsOptions	*SearchIndexSplitsOptions
+}
+
+type ComputeSplitsResponse struct {
+	SessionId					[]byte
+	SplitsSize					int32
+	ResponseInfo
+}
+
+func (r *ComputeSplitsRequest) SetTableName(tableName string) *ComputeSplitsRequest {
+	r.TableName = tableName
+	return r
+}
+
+func (r *ComputeSplitsRequest) SetSearchIndexSplitsOptions(options SearchIndexSplitsOptions) *ComputeSplitsRequest {
+	r.searchIndexSplitsOptions = &options
+	return r
+}
