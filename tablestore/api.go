@@ -40,6 +40,8 @@ const (
 	listSearchIndexUri                 = "/ListSearchIndex"
 	deleteSearchIndexUri               = "/DeleteSearchIndex"
 	describeSearchIndexUri             = "/DescribeSearchIndex"
+	computeSplitsUri				   = "/ComputeSplits"
+	parallelScanUri					   = "/ParallelScan"
 
 	createIndexUri = "/CreateIndex"
 	dropIndexUri   = "/DropIndex"
@@ -233,7 +235,8 @@ func isIdempotent(action string) bool {
 	if action == batchGetRowUri || action == describeTableUri ||
 		action == getRangeUri || action == getRowUri ||
 		action == listTableUri || action == listStreamUri ||
-		action == getStreamRecordUri || action == describeStreamUri {
+		action == getStreamRecordUri || action == describeStreamUri ||
+		action == computeSplitsUri || action == parallelScanUri {
 		return true
 	} else {
 		return false
@@ -1316,6 +1319,31 @@ func (client *TableStoreClient) AbortTransaction(request *AbortTransactionReques
 	response := &AbortTransactionResponse{}
 	if err := client.doRequestWithRetry(aborttransactionuri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
+	}
+
+	return response, nil
+}
+
+func (client *TableStoreClient) ComputeSplits(request *ComputeSplitsRequest) (*ComputeSplitsResponse, error) {
+	req := new(otsprotocol.ComputeSplitsRequest)
+	resp := new(otsprotocol.ComputeSplitsResponse)
+
+	req.TableName = proto.String(request.TableName)
+	req.SearchIndexSplitsOptions = new(otsprotocol.SearchIndexSplitsOptions)
+	if request.searchIndexSplitsOptions != nil {
+		req.SearchIndexSplitsOptions.IndexName = proto.String(request.searchIndexSplitsOptions.IndexName)
+	}
+
+	response := &ComputeSplitsResponse{}
+	if err := client.doRequestWithRetry(computeSplitsUri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	if resp.SessionId != nil && len(resp.SessionId) > 0 {
+		response.SessionId = resp.SessionId
+	}
+	if resp.SplitsSize != nil {
+		response.SplitsSize = *resp.SplitsSize
 	}
 
 	return response, nil
