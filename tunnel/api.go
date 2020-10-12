@@ -405,7 +405,7 @@ func (api *TunnelApi) shutdown(tunnelId, clientId string) error {
 	return nil
 }
 
-func (api *TunnelApi) getCheckpoint(tunnelId, clientId string, channelId string) (string, int64, error) {
+func (api *TunnelApi) GetCheckpoint(tunnelId, clientId string, channelId string) (string, int64, error) {
 	getCheckpointRequest := &protocol.GetCheckpointRequest{
 		TunnelId:  &tunnelId,
 		ChannelId: &channelId,
@@ -420,7 +420,25 @@ func (api *TunnelApi) getCheckpoint(tunnelId, clientId string, channelId string)
 	return *getCheckpointResponse.Checkpoint, *getCheckpointResponse.SequenceNumber, nil
 }
 
-func (api *TunnelApi) readRecords(tunnelId, clientId string, channelId string, token string) ([]*Record, string, string, int, error) {
+//add for oss data lake sync part
+func (api *TunnelApi) ReadRows(tunnelId, clientId string, channelId string, token string) ([]*protocol.Record, string, string, int, error) {
+	readRecordsRequest := &protocol.ReadRecordsRequest{
+		TunnelId:  &tunnelId,
+		ClientId:  &clientId,
+		ChannelId: &channelId,
+		Token:     &token,
+	}
+
+	readRecordsResponse := new(protocol.ReadRecordsResponse)
+	traceId, size, err := api.doRequest(readRecordsUri, readRecordsRequest, readRecordsResponse)
+	if err != nil {
+		return nil, "", traceId, 0, err
+	}
+	nextToken := *readRecordsResponse.NextToken
+	return readRecordsResponse.Records, nextToken, traceId, size, nil
+}
+
+func (api *TunnelApi) ReadRecords(tunnelId, clientId string, channelId string, token string) ([]*Record, string, string, int, error) {
 	readRecordsRequest := &protocol.ReadRecordsRequest{
 		TunnelId:  &tunnelId,
 		ClientId:  &clientId,
@@ -450,7 +468,7 @@ func (api *TunnelApi) readRecords(tunnelId, clientId string, channelId string, t
 	return records, nextToken, traceId, size, nil
 }
 
-func (api *TunnelApi) checkpoint(tunnelId, clientId string, channelId string, token string, sequenceNumber int64) error {
+func (api *TunnelApi) Checkpoint(tunnelId, clientId string, channelId string, token string, sequenceNumber int64) error {
 	checkpointRequest := &protocol.CheckpointRequest{
 		TunnelId:       &tunnelId,
 		ClientId:       &clientId,
