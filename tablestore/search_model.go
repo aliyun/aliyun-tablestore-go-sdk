@@ -12,6 +12,7 @@ import (
 type ColumnsToGet struct {
 	Columns   []string
 	ReturnAll bool
+	ReturnAllFromIndex bool
 }
 
 type SearchRequest struct {
@@ -66,6 +67,8 @@ func (r *SearchRequest) ProtoBuffer() (*otsprotocol.SearchRequest, error) {
 	if r.ColumnsToGet != nil {
 		if r.ColumnsToGet.ReturnAll {
 			pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_ALL.Enum()
+		} else if r.ColumnsToGet.ReturnAllFromIndex {
+			pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_ALL_FROM_INDEX.Enum()
 		} else if len(r.ColumnsToGet.Columns) > 0 {
 			pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_SPECIFIED.Enum()
 			pbColumns.ColumnNames = r.ColumnsToGet.Columns
@@ -415,4 +418,75 @@ type DeleteSearchIndexRequest struct {
 
 type DeleteSearchIndexResponse struct {
 	ResponseInfo ResponseInfo
+}
+
+//ParallelScan
+
+type ParallelScanRequest struct {
+	TableName string
+	IndexName string
+	ScanQuery search.ScanQuery
+	ColumnsToGet  *ColumnsToGet
+	SessionId    []byte
+}
+
+type ParallelScanResponse struct {
+	Rows         []*Row
+	NextToken    []byte
+
+	ResponseInfo
+}
+
+func (r *ParallelScanRequest) SetTableName(tableName string) *ParallelScanRequest {
+	r.TableName = tableName
+	return r
+}
+
+func (r *ParallelScanRequest) SetIndexName(indexName string) *ParallelScanRequest {
+	r.IndexName = indexName
+	return r
+}
+
+func (r *ParallelScanRequest) SetScanQuery(scanQuery search.ScanQuery) *ParallelScanRequest {
+	r.ScanQuery = scanQuery
+	return r
+}
+
+func (r *ParallelScanRequest) SetColumnsToGet(columnsToGet *ColumnsToGet) *ParallelScanRequest {
+	r.ColumnsToGet = columnsToGet
+	return r
+}
+
+func (r *ParallelScanRequest) SetSessionId(sessionId []byte) *ParallelScanRequest {
+	r.SessionId = sessionId
+	return r
+}
+
+func (r *ParallelScanRequest) ProtoBuffer() (*otsprotocol.ParallelScanRequest, error) {
+	req := &otsprotocol.ParallelScanRequest{}
+	req.TableName = proto.String(r.TableName)
+	req.IndexName = proto.String(r.IndexName)
+	req.SessionId = r.SessionId
+
+	query, err := r.ScanQuery.Serialize()
+	if err != nil {
+		return nil, err
+	}
+	req.ScanQuery = query
+
+	pbColumns := &otsprotocol.ColumnsToGet{}
+	pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_NONE.Enum()
+	if r.ColumnsToGet != nil {
+		if r.ColumnsToGet.ReturnAllFromIndex {
+			pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_ALL_FROM_INDEX.Enum()
+		} else if r.ColumnsToGet.ReturnAll {
+			return nil, errors.New("RETURN_ALL is not allowed for parallel scan")
+		} else if len(r.ColumnsToGet.Columns) > 0 {
+			pbColumns.ReturnType = otsprotocol.ColumnReturnType_RETURN_SPECIFIED.Enum()
+			pbColumns.ColumnNames = r.ColumnsToGet.Columns
+		}
+	}
+	req.ColumnsToGet = pbColumns
+
+	return req, err
 }

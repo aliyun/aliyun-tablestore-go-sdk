@@ -26,4 +26,7 @@ type TableStoreApi interface {
 	ListSearchIndex(request *ListSearchIndexRequest) (*ListSearchIndexResponse, error)
 	DescribeSearchIndex(request *DescribeSearchIndexRequest) (*DescribeSearchIndexResponse, error)
 	Search(request *SearchRequest) (*SearchResponse, error)
+
+	ComputeSplits(request *ComputeSplitsRequest) (*ComputeSplitsResponse, error)
+	ParallelScan(request *ParallelScanRequest) (*ParallelScanResponse, error)
 }
