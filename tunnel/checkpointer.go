@@ -25,7 +25,7 @@ func newCheckpointer(api *TunnelApi, tunnelId, clientId, channelId string, seque
 }
 
 func (cp *defaultCheckpointer) Checkpoint(token string) error {
-	err := cp.api.checkpoint(cp.tunnelId, cp.clientId, cp.channelId, token, cp.sequenceNumber)
+	err := cp.api.Checkpoint(cp.tunnelId, cp.clientId, cp.channelId, token, cp.sequenceNumber)
 	if err != nil {
 		if needCheck(err) {
 			cerr := cp.checkSequence()
@@ -48,7 +48,7 @@ func needCheck(err error) bool {
 }
 
 func (cp *defaultCheckpointer) checkSequence() error {
-	_, seqNum, err := cp.api.getCheckpoint(cp.tunnelId, cp.clientId, cp.channelId)
+	_, seqNum, err := cp.api.GetCheckpoint(cp.tunnelId, cp.clientId, cp.channelId)
 	if err != nil {
 		return err
 	}

@@ -44,6 +44,12 @@ const (
 	createIndexUri = "/CreateIndex"
 	dropIndexUri   = "/DropIndex"
 
+	createDeliveryTaskUri   = "/CreateDeliveryTask"
+	deleteDeliveryTaskUri   = "/DeleteDeliveryTask"
+	updateDeliveryTaskUri   = "/UpdateDeliveryTask"
+	describeDeliveryTaskUri = "/DescribeDeliveryTask"
+	listDeliveryTaskUri     = "/ListDeliveryTask"
+
 	createlocaltransactionuri = "/StartLocalTransaction"
 	committransactionuri      = "/CommitTransaction"
 	aborttransactionuri       = "/AbortTransaction"
@@ -1318,5 +1324,69 @@ func (client *TableStoreClient) AbortTransaction(request *AbortTransactionReques
 		return nil, err
 	}
 
+	return response, nil
+}
+
+func (client *TableStoreClient) CreateDeliveryTask(request *CreateDeliveryTaskRequest) (*CreateDeliveryTaskResponse, error) {
+	pbReq := &otsprotocol.CreateDeliveryTaskRequest{
+		TableName:  &request.TableName,
+		TaskName:   &request.TaskName,
+		TaskType:   otsprotocol.DeliveryTaskType(request.TaskType).Enum(),
+		TaskConfig: toTaskPbConfig(request.TaskConfig),
+	}
+	pbResp := new(otsprotocol.CreateDeliveryTaskResponse)
+	response := new(CreateDeliveryTaskResponse)
+	if err := client.doRequestWithRetry(createDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (client *TableStoreClient) DeleteDeliveryTask(request *DeleteDeliveryTaskRequest) (*DeleteDeliveryTaskResponse, error) {
+	pbReq := &otsprotocol.DeleteDeliveryTaskRequest{
+		TableName: &request.TableName,
+		TaskName:  &request.TaskName,
+	}
+	pbResp := new(otsprotocol.DeleteDeliveryTaskResponse)
+	response := new(DeleteDeliveryTaskResponse)
+	if err := client.doRequestWithRetry(deleteDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (client *TableStoreClient) ListDeliveryTask(request *ListDeliveryTaskRequest) (*ListDeliveryTaskResponse, error) {
+	pbReq := &otsprotocol.ListDeliveryTaskRequest{
+		TableName: &request.TableName,
+	}
+	pbResp := new(otsprotocol.ListDeliveryTaskResponse)
+	response := new(ListDeliveryTaskResponse)
+	if err := client.doRequestWithRetry(listDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	response.Tasks = make([]*DeliveryTaskInfo, len(pbResp.Tasks))
+	for i, task := range pbResp.Tasks {
+		response.Tasks[i] = &DeliveryTaskInfo{
+			TableName: task.GetTableName(),
+			TaskName:  task.GetTaskName(),
+			TaskType:  TaskType(task.GetTaskType()),
+		}
+	}
+	return response, nil
+}
+
+func (client *TableStoreClient) DescribeDeliveryTask(request *DescribeDeliveryTaskRequest) (*DescribeDeliveryTaskResponse, error) {
+	pbReq := &otsprotocol.DescribeDeliveryTaskRequest{
+		TableName: &request.TableName,
+		TaskName:  &request.TaskName,
+	}
+	pbResp := new(otsprotocol.DescribeDeliveryTaskResponse)
+	response := new(DescribeDeliveryTaskResponse)
+	if err := client.doRequestWithRetry(describeDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	response.TaskType = TaskType(pbResp.GetTaskType())
+	response.TaskConfig = toOSSTaskConfig(pbResp.TaskConfig)
+	response.TaskSyncStat = toTaskSyncStat(pbResp.TaskSyncStat)
 	return response, nil
 }
