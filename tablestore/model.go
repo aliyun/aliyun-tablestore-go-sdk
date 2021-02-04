@@ -567,8 +567,11 @@ type BatchGetRowResponse struct {
 	ResponseInfo
 }
 
+//IsAtomic设置是否为批量原子写
+//如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
 type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
+	IsAtomic bool
 }
 
 type BatchWriteRowResponse struct {

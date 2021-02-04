@@ -921,6 +921,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	}
 
 	req.Tables = tablesInBatch
+	req.IsAtomic = proto.Bool(request.IsAtomic)
 
 	resp := new(otsprotocol.BatchWriteRowResponse)
 	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
