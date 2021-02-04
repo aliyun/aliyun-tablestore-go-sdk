@@ -372,6 +372,7 @@ message TableInBatchWriteRowRequest {
 message BatchWriteRowRequest {
     repeated TableInBatchWriteRowRequest tables = 1;
     optional string transaction_id = 2;
+    optional bool is_atomic = 3;
 }
 
 message RowInBatchWriteRowResponse {
