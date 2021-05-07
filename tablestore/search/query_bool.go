@@ -1,8 +1,8 @@
 package search
 
 import (
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type BoolQuery struct {
@@ -63,7 +63,7 @@ func (q *BoolQuery) Serialize() ([]byte, error) {
 		}
 		query.ShouldQueries = pbShouldQs
 	}
-	if (q.MinimumShouldMatch != nil) {
+	if q.MinimumShouldMatch != nil {
 		query.MinimumShouldMatch = q.MinimumShouldMatch
 	}
 	data, err := proto.Marshal(query)

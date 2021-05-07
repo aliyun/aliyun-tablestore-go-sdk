@@ -1,8 +1,8 @@
 package search
 
 import (
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -32,8 +32,8 @@ func TestMinAggregation_GetType(t *testing.T) {
 
 func TestMinAggregation_ProtoBuffer(t *testing.T) {
 	agg := MinAggregation{
-		AggName: "agg1",
-		Field:   "col1",
+		AggName:      "agg1",
+		Field:        "col1",
 		MissingValue: 66.66,
 	}
 
@@ -41,7 +41,7 @@ func TestMinAggregation_ProtoBuffer(t *testing.T) {
 	assert.Nil(t, err)
 
 	//type
-	assert.Equal(t, pbAgg.GetType(),otsprotocol.AggregationType_AGG_MIN)
+	assert.Equal(t, pbAgg.GetType(), otsprotocol.AggregationType_AGG_MIN)
 
 	//name
 	assert.Equal(t, pbAgg.GetName(), "agg1")

@@ -2,8 +2,8 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/stretchr/testify/assert"
 	"io/ioutil"
 	"net/http"

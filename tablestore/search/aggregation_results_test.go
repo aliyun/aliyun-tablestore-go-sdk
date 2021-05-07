@@ -1,8 +1,8 @@
 package search
 
 import (
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/stretchr/testify/assert"
 	"testing"
 )
@@ -10,73 +10,73 @@ import (
 func genPBAggregationsResult() *otsprotocol.AggregationsResult {
 	pbAggsResult := otsprotocol.AggregationsResult{}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.AvgAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.AvgAggregationResult{
 			Value: proto.Float64(6.6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg1"),
-			Type: otsprotocol.AggregationType_AGG_AVG.Enum(),
+			Name:      proto.String("agg1"),
+			Type:      otsprotocol.AggregationType_AGG_AVG.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.DistinctCountAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.DistinctCountAggregationResult{
 			Value: proto.Int64(6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg2"),
-			Type: otsprotocol.AggregationType_AGG_DISTINCT_COUNT.Enum(),
+			Name:      proto.String("agg2"),
+			Type:      otsprotocol.AggregationType_AGG_DISTINCT_COUNT.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.MaxAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.MaxAggregationResult{
 			Value: proto.Float64(6.6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg3"),
-			Type: otsprotocol.AggregationType_AGG_MAX.Enum(),
+			Name:      proto.String("agg3"),
+			Type:      otsprotocol.AggregationType_AGG_MAX.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.MinAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.MinAggregationResult{
 			Value: proto.Float64(6.6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg4"),
-			Type: otsprotocol.AggregationType_AGG_MIN.Enum(),
+			Name:      proto.String("agg4"),
+			Type:      otsprotocol.AggregationType_AGG_MIN.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.SumAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.SumAggregationResult{
 			Value: proto.Float64(6.6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg5"),
-			Type: otsprotocol.AggregationType_AGG_SUM.Enum(),
+			Name:      proto.String("agg5"),
+			Type:      otsprotocol.AggregationType_AGG_SUM.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
 	{
-		aggBodyBytes, _ := proto.Marshal(&otsprotocol.CountAggregationResult {
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.CountAggregationResult{
 			Value: proto.Int64(6),
 		})
 
 		aggResult := otsprotocol.AggregationResult{
-			Name: proto.String("agg6"),
-			Type: otsprotocol.AggregationType_AGG_COUNT.Enum(),
+			Name:      proto.String("agg6"),
+			Type:      otsprotocol.AggregationType_AGG_COUNT.Enum(),
 			AggResult: aggBodyBytes,
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)

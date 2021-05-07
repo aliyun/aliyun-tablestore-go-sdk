@@ -2,8 +2,8 @@ package search
 
 import (
 	"errors"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type AggregationType int
@@ -69,7 +69,7 @@ message Aggregation {
     optional AggregationType type = 2;
     optional bytes body = 3;
 }
- */
+*/
 type Aggregation interface {
 	//get agg name
 	GetName() string

@@ -190,28 +190,28 @@ func ParseSerializedSeqInfo(hexedSeqStr string) (*SequenceInfo, error) {
 	seqTags := strings.Split(hexedSeqStr, sequenceSep)
 	if len(seqTags) != 3 {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: "invalid hexed sequence info",
 		}
 	}
 	epoch, err := strconv.ParseInt(seqTags[0], 16, 32)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}
 	timestamp, err := strconv.ParseInt(seqTags[1], 16, 64)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}
 	index, err := strconv.ParseInt(seqTags[2], 16, 32)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}

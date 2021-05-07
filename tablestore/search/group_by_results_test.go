@@ -1,8 +1,8 @@
 package search
 
 import (
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/stretchr/testify/assert"
 	"math"
 	"testing"
@@ -11,29 +11,29 @@ import (
 func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 	pbGroupBysResults := otsprotocol.GroupBysResult{}
 	{
-		items := []*otsprotocol.GroupByFieldResultItem {
+		items := []*otsprotocol.GroupByFieldResultItem{
 			{
-				Key: proto.String("k1"),
+				Key:      proto.String("k1"),
 				RowCount: proto.Int64(6),
 			},
 			{
-				Key: proto.String("k2"),
+				Key:      proto.String("k2"),
 				RowCount: proto.Int64(9),
 			},
 		}
 
-		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByFieldResult {
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByFieldResult{
 			GroupByFieldResultItems: items,
 		})
 		groupByResult := otsprotocol.GroupByResult{
-			Name: proto.String("group_by1"),
-			Type: otsprotocol.GroupByType_GROUP_BY_FIELD.Enum(),
+			Name:          proto.String("group_by1"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_FIELD.Enum(),
 			GroupByResult: groupByBodyBytes,
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
 	{
-		items := []*otsprotocol.GroupByFilterResultItem {
+		items := []*otsprotocol.GroupByFilterResultItem{
 			{
 				RowCount: proto.Int64(3),
 			},
@@ -42,70 +42,70 @@ func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 			},
 		}
 
-		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByFilterResult {
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByFilterResult{
 			GroupByFilterResultItems: items,
 		})
 		groupByResult := otsprotocol.GroupByResult{
-			Name: proto.String("group_by2"),
-			Type: otsprotocol.GroupByType_GROUP_BY_FILTER.Enum(),
+			Name:          proto.String("group_by2"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_FILTER.Enum(),
 			GroupByResult: groupByBodyBytes,
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
 	{
-		items := []*otsprotocol.GroupByRangeResultItem {
+		items := []*otsprotocol.GroupByRangeResultItem{
 			{
-				From: proto.Float64(math.Inf(-1)),
-				To: proto.Float64(3),
+				From:     proto.Float64(math.Inf(-1)),
+				To:       proto.Float64(3),
 				RowCount: proto.Int64(333),
 			},
 			{
-				From: proto.Float64(3),
-				To: proto.Float64(5),
+				From:     proto.Float64(3),
+				To:       proto.Float64(5),
 				RowCount: proto.Int64(666),
 			},
 			{
-				From: proto.Float64(5),
-				To: proto.Float64(math.Inf(1)),
+				From:     proto.Float64(5),
+				To:       proto.Float64(math.Inf(1)),
 				RowCount: proto.Int64(999),
 			},
 		}
 
-		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByRangeResult {
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByRangeResult{
 			GroupByRangeResultItems: items,
 		})
 		groupByResult := otsprotocol.GroupByResult{
-			Name: proto.String("group_by3"),
-			Type: otsprotocol.GroupByType_GROUP_BY_RANGE.Enum(),
+			Name:          proto.String("group_by3"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_RANGE.Enum(),
 			GroupByResult: groupByBodyBytes,
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
 	{
-		items := []*otsprotocol.GroupByGeoDistanceResultItem {
+		items := []*otsprotocol.GroupByGeoDistanceResultItem{
 			{
-				From: proto.Float64(math.Inf(-1)),
-				To: proto.Float64(3),
+				From:     proto.Float64(math.Inf(-1)),
+				To:       proto.Float64(3),
 				RowCount: proto.Int64(333),
 			},
 			{
-				From: proto.Float64(3),
-				To: proto.Float64(5),
+				From:     proto.Float64(3),
+				To:       proto.Float64(5),
 				RowCount: proto.Int64(666),
 			},
 			{
-				From: proto.Float64(5),
-				To: proto.Float64(math.Inf(1)),
+				From:     proto.Float64(5),
+				To:       proto.Float64(math.Inf(1)),
 				RowCount: proto.Int64(999),
 			},
 		}
 
-		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByGeoDistanceResult {
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByGeoDistanceResult{
 			GroupByGeoDistanceResultItems: items,
 		})
 		groupByResult := otsprotocol.GroupByResult{
-			Name: proto.String("group_by4"),
-			Type: otsprotocol.GroupByType_GROUP_BY_GEO_DISTANCE.Enum(),
+			Name:          proto.String("group_by4"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_GEO_DISTANCE.Enum(),
 			GroupByResult: groupByBodyBytes,
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)

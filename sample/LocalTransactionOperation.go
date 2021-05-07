@@ -1,8 +1,8 @@
 package sample
 
 import (
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 	"fmt"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
 	"time"
 )
 

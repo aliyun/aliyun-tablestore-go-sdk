@@ -3,8 +3,8 @@ package search
 import (
 	"errors"
 	"fmt"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type AggregationResult interface {
@@ -31,7 +31,7 @@ func (a *AggregationResults) Put(name string, result AggregationResult) {
 	a.resultMap[name] = result
 }
 
-func (a AggregationResults) Avg(name string) (*AvgAggregationResult, error){
+func (a AggregationResults) Avg(name string) (*AvgAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationAvgType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationAvgType.String()))
@@ -41,7 +41,7 @@ func (a AggregationResults) Avg(name string) (*AvgAggregationResult, error){
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
-func (a AggregationResults) DistinctCount(name string) (*DistinctCountAggregationResult, error){
+func (a AggregationResults) DistinctCount(name string) (*DistinctCountAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationDistinctCountType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationDistinctCountType.String()))
@@ -51,7 +51,7 @@ func (a AggregationResults) DistinctCount(name string) (*DistinctCountAggregatio
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
-func (a AggregationResults) Max(name string) (*MaxAggregationResult, error){
+func (a AggregationResults) Max(name string) (*MaxAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationMaxType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationMaxType.String()))
@@ -61,7 +61,7 @@ func (a AggregationResults) Max(name string) (*MaxAggregationResult, error){
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
-func (a AggregationResults) Min(name string) (*MinAggregationResult, error){
+func (a AggregationResults) Min(name string) (*MinAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationMinType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationMinType.String()))
@@ -71,7 +71,7 @@ func (a AggregationResults) Min(name string) (*MinAggregationResult, error){
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
-func (a AggregationResults) Sum(name string) (*SumAggregationResult, error){
+func (a AggregationResults) Sum(name string) (*SumAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationSumType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationSumType.String()))
@@ -81,7 +81,7 @@ func (a AggregationResults) Sum(name string) (*SumAggregationResult, error){
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
-func (a AggregationResults) Count(name string) (*CountAggregationResult, error){
+func (a AggregationResults) Count(name string) (*CountAggregationResult, error) {
 	if result, ok := a.resultMap[name]; ok {
 		if result.GetType() != AggregationCountType {
 			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationCountType.String()))
@@ -94,7 +94,6 @@ func (a AggregationResults) Count(name string) (*CountAggregationResult, error){
 func (a AggregationResults) Empty() bool {
 	return len(a.resultMap) == 0
 }
-
 
 func ParseAvgAggregationResultFromPB(pbAggResult *otsprotocol.AggregationResult) (*AvgAggregationResult, error) {
 	aggResult := new(AvgAggregationResult)

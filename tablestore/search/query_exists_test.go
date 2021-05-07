@@ -2,15 +2,14 @@ package search
 
 import (
 	"bytes"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"testing"
 )
 
-
 func TestExistsQuery_Type(t *testing.T) {
 	query := &ExistsQuery{
-		FieldName:  "FieldBlabla",
+		FieldName: "FieldBlabla",
 	}
 	if query.Type() != QueryType_ExistsQuery {
 		t.Error("query type error: ", query.Type().ToPB())
@@ -19,7 +18,7 @@ func TestExistsQuery_Type(t *testing.T) {
 
 func TestExistsQuery_Serialize(t *testing.T) {
 	query := &ExistsQuery{
-		FieldName:  "FieldBlabla",
+		FieldName: "FieldBlabla",
 	}
 	data, err := query.Serialize()
 	if err != nil {
@@ -41,7 +40,7 @@ func TestExistsQuery_Serialize(t *testing.T) {
 
 func TestExistsQuery_ProtoBuffer(t *testing.T) {
 	query := &ExistsQuery{
-		FieldName:  "FieldBlabla",
+		FieldName: "FieldBlabla",
 	}
 	queryPb, err := query.ProtoBuffer()
 	if err != nil {

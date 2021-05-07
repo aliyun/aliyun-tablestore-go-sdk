@@ -30,15 +30,15 @@ func TestGroupByField_Size(t *testing.T) {
 }
 
 func TestGroupByField_GroupBySorters(t *testing.T) {
-	sorters := [] GroupBySorter {
-		&GroupKeyGroupBySort {
+	sorters := []GroupBySorter{
+		&GroupKeyGroupBySort{
 			Order: SortOrder_DESC.Enum(),
 		},
-		&RowCountGroupBySort {
+		&RowCountGroupBySort{
 			Order: SortOrder_ASC.Enum(),
 		},
-		&SubAggGroupBySort {
-			Order: SortOrder_DESC.Enum(),
+		&SubAggGroupBySort{
+			Order:      SortOrder_DESC.Enum(),
 			SubAggName: "sub_agg1",
 		},
 	}
@@ -50,7 +50,7 @@ func TestGroupByField_GroupBySorters(t *testing.T) {
 }
 
 func TestGroupByField_SubAggregation(t *testing.T) {
-	subAggList := []Aggregation {
+	subAggList := []Aggregation{
 		&MaxAggregation{AggName: "sub_agg1", Field: "field1"},
 		&SumAggregation{AggName: "sub_agg2", Field: "field2"},
 	}
@@ -68,9 +68,9 @@ func TestGroupByField_SubAggregation(t *testing.T) {
 }
 
 func TestGroupByField_SubGroupBy(t *testing.T) {
-	subGroupByList := []GroupBy {
-		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query {&MatchAllQuery{}}},
-		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from:2, to: math.Inf(1)}}},
+	subGroupByList := []GroupBy{
+		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query{&MatchAllQuery{}}},
+		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from: 2, to: math.Inf(1)}}},
 	}
 
 	{

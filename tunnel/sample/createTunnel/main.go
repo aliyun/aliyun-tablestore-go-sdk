@@ -2,11 +2,11 @@ package main
 
 import (
 	"fmt"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel"
 )
 
 type Config struct {

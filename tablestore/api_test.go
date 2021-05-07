@@ -3,16 +3,16 @@ package tablestore
 import (
 	"fmt"
 	. "gopkg.in/check.v1"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
-	"io"
-	"syscall"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -943,8 +943,8 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
 
-	for i:=0; i<10; i++ {
-		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+	for i := 0; i < 10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_"+strconv.Itoa(i), "colVal1_"+strconv.Itoa(i), rangeQueryTableName)
 		batchWriteReq.AddRowChange(rowChange)
 	}
 
@@ -992,11 +992,11 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithDiffPartitionKey(c *C) {
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
 
-	for i:=0; i<10; i++ {
-		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+	for i := 0; i < 10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_"+strconv.Itoa(i), "colVal1_"+strconv.Itoa(i), rangeQueryTableName)
 		batchWriteReq.AddRowChange(rowChange)
 	}
-	rowChange := CreatePutRowChangeV2("atomicPk1_1", "atomicPk2_" + strconv.Itoa(10), "colVal1_" + strconv.Itoa(10), rangeQueryTableName)
+	rowChange := CreatePutRowChangeV2("atomicPk1_1", "atomicPk2_"+strconv.Itoa(10), "colVal1_"+strconv.Itoa(10), rangeQueryTableName)
 	batchWriteReq.AddRowChange(rowChange)
 
 	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)

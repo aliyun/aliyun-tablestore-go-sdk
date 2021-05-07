@@ -2,8 +2,8 @@ package search
 
 import (
 	"errors"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 type GroupByFilter struct {
@@ -11,8 +11,8 @@ type GroupByFilter struct {
 
 	Queries []Query
 
-	SubAggList			[]Aggregation
-	SubGroupByList		[]GroupBy
+	SubAggList     []Aggregation
+	SubGroupByList []GroupBy
 }
 
 func (g *GroupByFilter) GetName() string {
@@ -72,7 +72,6 @@ func (g *GroupByFilter) SubAggregation(subAggregation Aggregation) *GroupByFilte
 	g.SubAggList = append(g.SubAggList, subAggregation)
 	return g
 }
-
 
 func (g *GroupByFilter) SubGroupBys(subGroupBys ...GroupBy) *GroupByFilter {
 	g.SubGroupByList = subGroupBys
