@@ -2,6 +2,7 @@ package tablestore
 
 import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"testing"
@@ -901,4 +902,43 @@ func TestParseFieldSchemaFromPb_NoAnalyzerNoParam(t *testing.T) {
 
 	assert.Nil(t, fieldSchemas[0].Analyzer)
 	assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+}
+
+func TestParallelScanRequest_ProtoBuffer(t *testing.T) {
+	query := search.NewScanQuery().SetQuery(&search.MatchAllQuery{})
+	request := ParallelScanRequest{
+		TableName:    "table1",
+		IndexName:    "index1",
+		ScanQuery:    query,
+		ColumnsToGet: &ColumnsToGet{
+			Columns:            []string{"col1", "col2"},
+			ReturnAll:          false,
+			ReturnAllFromIndex: false,
+		},
+		SessionId:    []byte("bcd"),
+	}
+
+	pbParallelScanRequest, err := request.ProtoBuffer()
+	assert.Nil(t, err)
+
+	assert.Equal(t, "table1", *pbParallelScanRequest.TableName)
+	assert.Equal(t, "index1", *pbParallelScanRequest.IndexName)
+
+	//assert ScanQuery
+	scanQueryExpected := &otsprotocol.ScanQuery{}
+	scanQueryExpected.Query = &otsprotocol.Query{}
+	scanQueryExpected.Query.Type = otsprotocol.QueryType_MATCH_ALL_QUERY.Enum()
+	scanQueryExpected.Query.Query, _ = proto.Marshal(&otsprotocol.MatchAllQuery{})
+	scanQueryBytesExpected, _ := proto.Marshal(scanQueryExpected)
+
+	assert.Equal(t, scanQueryBytesExpected, pbParallelScanRequest.ScanQuery)
+
+	//assert columnsToGet
+	columnsToGetExpected := otsprotocol.ColumnsToGet{
+		ReturnType:           otsprotocol.ColumnReturnType_RETURN_SPECIFIED.Enum(),
+		ColumnNames:          []string{"col1", "col2"},
+	}
+	assert.Equal(t, columnsToGetExpected, *pbParallelScanRequest.ColumnsToGet)
+
+	assert.Equal(t, []byte("bcd"), pbParallelScanRequest.SessionId)
 }

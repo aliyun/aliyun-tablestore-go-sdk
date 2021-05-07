@@ -3,7 +3,7 @@ package sample
 import (
 	"encoding/json"
 	"fmt"
-
+	"sync"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
@@ -1260,4 +1260,108 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 	for _, item := range group4.Items {	//遍历返回的所有分桶
 		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount)	//打印本次分桶的行数
 	}
+}
+
+func computeSplits(client *tablestore.TableStoreClient, tableName string, indexName string) (*tablestore.ComputeSplitsResponse, error) {
+	req := &tablestore.ComputeSplitsRequest{}
+	req.
+		SetTableName(tableName).
+		SetSearchIndexSplitsOptions(tablestore.SearchIndexSplitsOptions{IndexName:indexName})
+	res, err := client.ComputeSplits(req)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+/**
+ * ParallelScan单并发
+ */
+func ParallelScanSingleConcurrency(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	computeSplitsResp, err := computeSplits(client, tableName, indexName)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	query := search.NewScanQuery().SetQuery(&search.MatchAllQuery{}).SetLimit(2)
+
+	req := &tablestore.ParallelScanRequest{}
+	req.SetTableName(tableName).
+		SetIndexName(indexName).
+		SetColumnsToGet(&tablestore.ColumnsToGet{ReturnAllFromIndex: false}).
+		SetScanQuery(query).
+		SetSessionId(computeSplitsResp.SessionId)
+
+	res, err := client.ParallelScan(req)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	total := len(res.Rows)
+	for res.NextToken != nil {
+		req.SetScanQuery(query.SetToken(res.NextToken))
+		res, err = client.ParallelScan(req)
+		if err != nil {
+			fmt.Printf("%#v", err)
+			return
+		}
+
+		total += len(res.Rows) //process rows each loop
+	}
+	fmt.Println("total: ", total)
+}
+
+/**
+ * ParallelScan多并发
+ */
+func ParallelScanMultiConcurrency(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	computeSplitsResp, err := computeSplits(client, tableName, indexName)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	var wg sync.WaitGroup
+	wg.Add(int(computeSplitsResp.SplitsSize))
+
+	for i := int32(0); i < computeSplitsResp.SplitsSize; i++ {
+		current := i
+		go func() {
+			defer wg.Done()
+			query := search.NewScanQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetCurrentParallelID(current).
+				SetMaxParallel(computeSplitsResp.SplitsSize).
+				SetLimit(2)
+
+			req := &tablestore.ParallelScanRequest{}
+			req.SetTableName(tableName).
+				SetIndexName(indexName).
+				SetColumnsToGet(&tablestore.ColumnsToGet{ReturnAllFromIndex: false}).
+				SetScanQuery(query).
+				SetSessionId(computeSplitsResp.SessionId)
+
+			res, err := client.ParallelScan(req)
+			if err != nil {
+				fmt.Printf("%#v", err)
+				return
+			}
+
+			total := len(res.Rows)
+			for res.NextToken != nil {
+				req.SetScanQuery(query.SetToken(res.NextToken))
+				res, err = client.ParallelScan(req)
+				if err != nil {
+					fmt.Printf("%#v", err)
+					return
+				}
+
+				total += len(res.Rows) //process rows each loop
+			}
+			fmt.Println("total: ", total)
+		}()
+	}
+	wg.Wait()
 }

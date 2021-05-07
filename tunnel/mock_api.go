@@ -33,8 +33,8 @@ func (m *MocktunnelDataApi) EXPECT() *MocktunnelDataApiMockRecorder {
 }
 
 // readRecords mocks base method
-func (m *MocktunnelDataApi) readRecords(tunnelId, clientId, channelId, token string) ([]*Record, string, string, int, error) {
-	ret := m.ctrl.Call(m, "readRecords", tunnelId, clientId, channelId, token)
+func (m *MocktunnelDataApi) ReadRecords(tunnelId, clientId, channelId, token string) ([]*Record, string, string, int, error) {
+	ret := m.ctrl.Call(m, "ReadRecords", tunnelId, clientId, channelId, token)
 	ret0, _ := ret[0].([]*Record)
 	ret1, _ := ret[1].(string)
 	ret2, _ := ret[2].(string)
@@ -44,8 +44,8 @@ func (m *MocktunnelDataApi) readRecords(tunnelId, clientId, channelId, token str
 }
 
 // readRecords indicates an expected call of readRecords
-func (mr *MocktunnelDataApiMockRecorder) readRecords(tunnelId, clientId, channelId, token interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "readRecords", reflect.TypeOf((*MocktunnelDataApi)(nil).readRecords), tunnelId, clientId, channelId, token)
+func (mr *MocktunnelDataApiMockRecorder) ReadRecords(tunnelId, clientId, channelId, token interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRecords", reflect.TypeOf((*MocktunnelDataApi)(nil).ReadRecords), tunnelId, clientId, channelId, token)
 }
 
 // MockTunnelMetaApi is a mock of TunnelMetaApi interface

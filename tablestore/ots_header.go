@@ -16,6 +16,7 @@ const (
 	xOtsContentmd5          = "x-ots-contentmd5"
 	xOtsHeaderStsToken      = "x-ots-ststoken"
 	xOtsHeaderChargeAdmin   = "x-ots-charge-for-admin"
+	xOtsHeaderChargeTunnel  = "x-ots-tunnel-name"
 	xOtsSignature           = "x-ots-signature"
 	xOtsRequestCompressType = "x-ots-request-compress-type"
 	xOtsRequestCompressSize = "x-ots-request-compress-size"
@@ -49,6 +50,7 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsRequestCompressType, must: false},
 		&otsHeader{name: xOtsHeaderStsToken, must: false},
 		&otsHeader{name: xOtsHeaderChargeAdmin, must: false},
+		&otsHeader{name: xOtsHeaderChargeTunnel, must: false},
 	}
 
 	sort.Sort(h)

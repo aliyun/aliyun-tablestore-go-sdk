@@ -97,7 +97,7 @@ func (c *ChannelContext) String() string {
 	return fmt.Sprintf("TunnelId %s, ClientId %s, ChannelId %s", c.TunnelId, c.ClientId, c.ChannelId)
 }
 
-func newChannelContext(tunnelId, clientId, channelId string, customValue interface{}) *ChannelContext {
+func NewChannelContext(tunnelId, clientId, channelId string, customValue interface{}) *ChannelContext {
 	return &ChannelContext{TunnelId: tunnelId, ChannelId: channelId, ClientId: clientId, CustomValue: customValue}
 }
 

@@ -10,7 +10,8 @@ import (
 )
 
 var (
-	pipeChannelSize = 5
+	// PipeChannelSize is channelDialer's data pipeline channel size
+	PipeChannelSize = 1
 
 	rpoBar     = 500
 	rpoSizeBar = 900 * 1024 //900K bytes
@@ -97,9 +98,6 @@ type channelDialer struct {
 }
 
 func (d *channelDialer) ChannelDial(tunnelId, clientId, channelId, token string, p ChannelProcessor, state *TunnelStateMachine) ChannelConn {
-	finish := atomic.Value{}
-	finish.Store(false)
-
 	isStream, err := streamToken(token)
 	if err != nil {
 		isStream = true //treat as stream token with flow control
@@ -114,7 +112,6 @@ func (d *channelDialer) ChannelDial(tunnelId, clientId, channelId, token string,
 		state:         state,
 		lg:            d.lg,
 		bc:            d.bc,
-		finished:      finish,
 		streamChannel: isStream,
 	}
 	return conn
@@ -128,7 +125,7 @@ var (
 )
 
 type tunnelDataApi interface {
-	readRecords(tunnelId, clientId string, channelId string, token string) ([]*Record, string, string, int, error)
+	ReadRecords(tunnelId, clientId string, channelId string, token string) ([]*Record, string, string, int, error)
 }
 
 type channelConn struct {
@@ -148,8 +145,7 @@ type channelConn struct {
 	lg *zap.Logger
 	bc *ChannelBackoffConfig
 
-	status   int32
-	finished atomic.Value
+	status int32
 
 	ticker *backoff.Ticker
 
@@ -167,7 +163,7 @@ func (c *channelConn) NotifyStatus(channel *ChannelStatus) {
 	case protocol.ChannelStatus_CLOSE:
 		c.lg.Info("closed channel status", zap.String("tunnelId", c.tunnelId),
 			zap.String("clientId", c.clientId), zap.String("channelId", c.channelId), zap.Int64("version", channel.Version))
-		c.close(false)
+		c.close()
 	case protocol.ChannelStatus_CLOSING: //draw closing action and check closed/finish status
 		if atomic.LoadInt32(&c.status) == waitStatus {
 			atomic.StoreInt32(&c.status, closedStatus)
@@ -184,7 +180,7 @@ func (c *channelConn) NotifyStatus(channel *ChannelStatus) {
 	case protocol.ChannelStatus_TERMINATED:
 		c.lg.Info("terminated channel status", zap.String("tunnelId", c.tunnelId),
 			zap.String("clientId", c.clientId), zap.String("channelId", c.channelId), zap.Int64("version", channel.Version))
-		c.close(true)
+		c.close()
 	default:
 		c.lg.Error("Unexpected channel status", zap.String("tunnelId", c.tunnelId),
 			zap.String("clientId", c.clientId), zap.String("channelId", c.channelId),
@@ -197,27 +193,39 @@ func (c *channelConn) Closed() bool {
 }
 
 func (c *channelConn) Close() {
-	c.close(false)
+	c.close()
 }
 
-func (c *channelConn) close(finish bool) {
+func (c *channelConn) close() {
 	c.p.Shutdown()
-	if finish {
-		c.finished.Store(true)
-	}
 	atomic.StoreInt32(&c.status, closedStatus)
 }
 
 func (c *channelConn) checkUpdateStatus() {
-	if atomic.LoadInt32(&c.status) == closedStatus {
-		c.currentState.Version += 1
-		if c.finished.Load().(bool) {
-			c.currentState.Status = protocol.ChannelStatus_TERMINATED
-		} else {
-			c.currentState.Status = protocol.ChannelStatus_CLOSE
-		}
-		c.state.UpdateStatus(c.currentState)
+	if c.p.Finished() {
+		c.closeAndUpdate(protocol.ChannelStatus_TERMINATED)
+		return
 	}
+	if c.p.Error() {
+		c.closeAndUpdate(protocol.ChannelStatus_CLOSE)
+		return
+	}
+	if atomic.LoadInt32(&c.status) == closedStatus {
+		if c.currentState.Status != protocol.ChannelStatus_TERMINATED {
+			if c.p.Finished() {
+				c.closeAndUpdate(protocol.ChannelStatus_TERMINATED)
+			} else {
+				c.closeAndUpdate(protocol.ChannelStatus_CLOSE)
+			}
+		}
+	}
+}
+
+func (c *channelConn) closeAndUpdate(status protocol.ChannelStatus) {
+	c.close()
+	c.currentState.Version += 1
+	c.currentState.Status = status
+	c.state.UpdateStatus(c.currentState)
 }
 
 type pipeResult struct {
@@ -229,29 +237,26 @@ type pipeResult struct {
 }
 
 func (c *channelConn) workLoop() {
-	pipeCh := make(chan *pipeResult, pipeChannelSize)
+	pipeCh := make(chan *pipeResult, PipeChannelSize)
+	c.lg.Info("run channel workLoop", zap.Int("PipeChannelSize", PipeChannelSize),
+		zap.String("cid", c.channelId))
 	closeCh := make(chan struct{})
 	defer close(closeCh)
 	go c.readRecordsPipe(pipeCh, closeCh)
 
 	for atomic.LoadInt32(&c.status) == runningStatus {
-		finish, err := c.processRecords(pipeCh)
+		drained, err := c.processRecords(pipeCh)
 		if err != nil {
-			c.close(false)
 			c.lg.Info("channel shutdown with error", zap.String("cid", c.channelId), zap.Error(err))
 			break
-		} else {
-			if finish {
-				c.close(true)
-				c.lg.Info("channel finished", zap.String("cid", c.channelId))
-				break
-			}
+		}
+		if drained {
+			c.lg.Info("channel read finished", zap.String("cid", c.channelId))
+			return
 		}
 	}
-	if atomic.LoadInt32(&c.status) == closingStatus {
-		c.close(false)
-		c.lg.Info("channel shutdown", zap.String("cid", c.channelId))
-	}
+	c.lg.Info("channel shutdown", zap.String("cid", c.channelId))
+	c.close()
 }
 
 func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struct{}) {
@@ -272,7 +277,7 @@ func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struc
 			ret.finished = true
 		} else {
 			s := time.Now()
-			records, nextToken, traceId, size, err := c.api.readRecords(c.tunnelId, c.clientId, c.channelId, c.token)
+			records, nextToken, traceId, size, err := c.api.ReadRecords(c.tunnelId, c.clientId, c.channelId, c.token)
 			if err != nil {
 				ret.error = err
 			} else {
