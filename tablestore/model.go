@@ -2,14 +2,14 @@ package tablestore
 
 import (
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"math/rand"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	//"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 // @class TableStoreClient
@@ -61,6 +61,7 @@ type HTTPTimeout struct {
 type TableStoreConfig struct {
 	RetryTimes         uint
 	MaxRetryTime       time.Duration
+	MaxRetryNapMil     int64
 	HTTPTimeout        HTTPTimeout
 	MaxIdleConnections int
 	Transport          http.RoundTripper

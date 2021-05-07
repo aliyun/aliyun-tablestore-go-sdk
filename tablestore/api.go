@@ -5,14 +5,15 @@ import (
 	"crypto/md5"
 	"encoding/base64"
 	"fmt"
-	"github.com/golang/protobuf/proto"
-	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"io"
 	"math/rand"
 	"net"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/golang/protobuf/proto"
+	"github.com/lanjingren/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
 const (
@@ -144,6 +145,11 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 		body = nil
 	}
 
+	maxInterval := int64(MaxRetryInterval)
+	if tableStoreClient.config.MaxRetryNapMil > 0 {
+		maxInterval = tableStoreClient.config.MaxRetryNapMil
+	}
+
 	var value int64
 	var i uint
 	var respBody []byte
@@ -155,9 +161,10 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 		if err == nil {
 			break
 		} else {
-			value = getNextPause(tableStoreClient, err, i, end, value, uri)
+			value = getNextPause(tableStoreClient, err, i, end, value, maxInterval, uri)
 
 			// fmt.Println("hit retry", uri, err, *e.Code, value)
+			fmt.Println("==> [tablestore] hit retry", uri, err, value, ", max:", maxInterval)
 			if value <= 0 {
 				return err
 			}
@@ -178,7 +185,7 @@ func (tableStoreClient *TableStoreClient) doRequestWithRetry(uri string, req, re
 	return nil
 }
 
-func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end time.Time, lastInterval int64, action string) int64 {
+func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end time.Time, lastInterval, maxInterval int64, action string) int64 {
 	if tableStoreClient.config.RetryTimes <= count || time.Now().After(end) {
 		return 0
 	}
@@ -198,8 +205,8 @@ func getNextPause(tableStoreClient *TableStoreClient, err error, count uint, end
 
 	if retry {
 		value := lastInterval*2 + tableStoreClient.random.Int63n(DefaultRetryInterval-1) + 1
-		if value > MaxRetryInterval {
-			value = MaxRetryInterval
+		if value > maxInterval {
+			value = maxInterval
 		}
 
 		return value
