@@ -206,6 +206,7 @@ enum ColumnReturnType {
     RETURN_ALL = 1;
     RETURN_SPECIFIED = 2;
     RETURN_NONE = 3;
+    RETURN_ALL_FROM_INDEX = 4;
 }
 
 message ColumnsToGet {
@@ -562,4 +563,27 @@ message GroupByResult {
 
 message GroupBysResult {
     repeated GroupByResult group_by_results = 1;
+}
+
+/* ParallelScan API, same to Search API */
+message ScanQuery {
+    optional Query query = 1;
+    optional int32 limit = 2;
+    optional int32 alive_time = 3;  //unit is second
+    optional bytes token = 4;
+    optional int32 current_parallel_id = 5;
+    optional int32 max_parallel = 6;
+}
+
+message ParallelScanRequest {
+    optional string table_name = 1;
+    optional string index_name = 2;
+    optional ColumnsToGet columns_to_get = 3;
+    optional bytes session_id = 4;
+    optional bytes scan_query = 5;
+}
+
+message ParallelScanResponse {
+    repeated bytes rows = 1;
+    optional bytes next_token = 2;
 }

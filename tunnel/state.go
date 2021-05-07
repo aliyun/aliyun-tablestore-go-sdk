@@ -2,9 +2,10 @@ package tunnel
 
 import (
 	"errors"
-	"go.uber.org/zap"
 	"sync"
+
 	"github.com/lanjingren/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"go.uber.org/zap"
 )
 
 type BatchGetStatusReq struct {
@@ -92,6 +93,7 @@ func (s *TunnelStateMachine) Close() {
 		close(s.closeCh)
 		s.wg.Wait()
 		for _, conn := range s.channelConn {
+			conn := conn
 			go conn.Close()
 		}
 		s.lg.Info("state machine is closed")
@@ -129,7 +131,10 @@ func (s *TunnelStateMachine) doUpdateStatus(channel *protocol.Channel) {
 		return
 	}
 	s.currentChannels[cid] = channel
+	s.lg.Info("update channel", zap.String("channelId", cid),
+		zap.String("status", protocol.ChannelStatus_name[int32(channel.GetStatus())]))
 	if conn, ok := s.channelConn[cid]; ok {
+		s.lg.Info("check channel", zap.String("channelId", cid), zap.Bool("closed", conn.Closed()))
 		if conn.Closed() {
 			delete(s.channelConn, cid)
 		}
@@ -142,16 +147,23 @@ func (s *TunnelStateMachine) doBatchUpdateStatus(batchChannels []*protocol.Chann
 	for cid, channel := range s.currentChannels {
 		conn, ok := s.channelConn[cid]
 		if !ok {
-			token, sequenceNumber, err := s.api.getCheckpoint(s.tunnelId, s.clientId, cid)
+			token, sequenceNumber, err := s.api.GetCheckpoint(s.tunnelId, s.clientId, cid)
 			if err != nil {
 				s.lg.Error("get channel checkpoint failed", zap.String("tunnelId", s.tunnelId), zap.String("clientId", s.clientId),
 					zap.String("channelId", cid), zap.Error(err))
 				//failConn will turn channel to closed if necessary
 				conn = &failConn{state: s}
 			} else {
-				processor := s.pFactory.NewProcessor(s.tunnelId, s.clientId, cid,
+				processor, err := s.pFactory.NewProcessor(s.tunnelId, s.clientId, cid,
 					newCheckpointer(s.api, s.tunnelId, s.clientId, cid, sequenceNumber+1))
-				conn = s.dialer.ChannelDial(s.tunnelId, s.clientId, cid, token, processor, s)
+				if err != nil {
+					s.lg.Error("new processor failed", zap.String("tunnelId", s.tunnelId), zap.String("clientId", s.clientId),
+						zap.String("channelId", cid), zap.Error(err))
+					//failConn will turn channel to closed if necessary
+					conn = &failConn{state: s}
+				} else {
+					conn = s.dialer.ChannelDial(s.tunnelId, s.clientId, cid, token, processor, s)
+				}
 			}
 			s.channelConn[cid] = conn
 		}
@@ -159,6 +171,7 @@ func (s *TunnelStateMachine) doBatchUpdateStatus(batchChannels []*protocol.Chann
 	}
 	// clean
 	for cid, conn := range s.channelConn {
+		cid, conn := cid, conn
 		if _, ok := s.currentChannels[cid]; !ok {
 			s.lg.Info("redundant channel conn", zap.String("channelId", cid))
 			if !conn.Closed() {

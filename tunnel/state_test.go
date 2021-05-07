@@ -19,7 +19,7 @@ func TestTunnelStateMachine_BatchUpdateStatus(t *testing.T) {
 	cidMu := new(sync.Mutex)
 	cidTokenMap := map[string]string{}
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().readRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).DoAndReturn(func(tid, cid, ccid, token string) ([]*Record, string, string, int, error) {
+	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).DoAndReturn(func(tid, cid, ccid, token string) ([]*Record, string, string, int, error) {
 		cidMu.Lock()
 		defer cidMu.Unlock()
 		if tk, ok := cidTokenMap[ccid]; ok {
@@ -216,7 +216,7 @@ func TestTunnelStateMachine_UpdateStatus(t *testing.T) {
 	defer mockCtrl.Finish()
 	lg, _ := testLogConfig.Build()
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().readRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).Return(nil, "token", "trace", 0, nil).AnyTimes()
+	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).Return(nil, "token", "trace", 0, nil).AnyTimes()
 	dialer := &channelDialer{
 		api: bypassApi,
 		lg:  lg,

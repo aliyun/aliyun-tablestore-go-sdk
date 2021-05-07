@@ -154,3 +154,44 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 
 	return response, nil
 }
+
+func (TableStoreClient *TableStoreClient) ParallelScan(request *ParallelScanRequest) (*ParallelScanResponse, error) {
+	req, err := request.ProtoBuffer()
+	if err != nil {
+		return nil, err
+	}
+	resp := new(otsprotocol.ParallelScanResponse)
+	response := &ParallelScanResponse{}
+	if err := TableStoreClient.doRequestWithRetry(parallelScanUri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	rows := make([]*PlainBufferRow, 0)
+	for _, buf := range resp.Rows {
+		row, err := readRowsWithHeader(bytes.NewReader(buf))
+		if err != nil {
+			return nil, err
+		}
+		rows = append(rows, row[0])
+	}
+	for _, row := range rows {
+		currentRow := &Row{}
+		currentPk := new(PrimaryKey)
+		for _, pk := range row.primaryKey {
+			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+			currentPk.PrimaryKeys = append(currentPk.PrimaryKeys, pkColumn)
+		}
+		currentRow.PrimaryKey = currentPk
+		for _, cell := range row.cells {
+			dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
+			currentRow.Columns = append(currentRow.Columns, dataColumn)
+		}
+		response.Rows = append(response.Rows, currentRow)
+	}
+
+	if resp.NextToken != nil && len(resp.NextToken) > 0 {
+		response.NextToken = resp.NextToken
+	}
+
+	return response, nil
+}

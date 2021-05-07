@@ -26,7 +26,7 @@ var (
 )
 
 const (
-	OTS_CLIENT_UNKNOWN       = "OTSClientUnknownError"
+	OTS_CLIENT_UNKNOWN = "OTSClientUnknownError"
 
 	ROW_OPERATION_CONFLICT   = "OTSRowOperationConflict"
 	NOT_ENOUGH_CAPACITY_UNIT = "OTSNotEnoughCapacityUnit"
@@ -42,8 +42,8 @@ const (
 )
 
 type OtsError struct {
-	Code string
-	Message string
+	Code      string
+	Message   string
 	RequestId string
 
 	HttpStatusCode int

@@ -179,6 +179,45 @@ type SequenceInfo struct {
 	RowIndex int32
 }
 
+var sequenceSep = ":"
+
+func (si *SequenceInfo) Serialization() string {
+	return fmt.Sprintf(strings.Join([]string{"%08x", "%016x", "%08x"}, sequenceSep),
+		si.Epoch, si.Timestamp, si.RowIndex)
+}
+
+func ParseSerializedSeqInfo(hexedSeqStr string) (*SequenceInfo, error) {
+	seqTags := strings.Split(hexedSeqStr, sequenceSep)
+	if len(seqTags) != 3 {
+		return nil, &TunnelError{
+			Code: ErrCodeClientError,
+			Message: "invalid hexed sequence info",
+		}
+	}
+	epoch, err := strconv.ParseInt(seqTags[0], 16, 32)
+	if err != nil {
+		return nil, &TunnelError{
+			Code: ErrCodeClientError,
+			Message: err.Error(),
+		}
+	}
+	timestamp, err := strconv.ParseInt(seqTags[1], 16, 64)
+	if err != nil {
+		return nil, &TunnelError{
+			Code: ErrCodeClientError,
+			Message: err.Error(),
+		}
+	}
+	index, err := strconv.ParseInt(seqTags[2], 16, 32)
+	if err != nil {
+		return nil, &TunnelError{
+			Code: ErrCodeClientError,
+			Message: err.Error(),
+		}
+	}
+	return &SequenceInfo{int32(epoch), timestamp, int32(index)}, nil
+}
+
 type Record struct {
 	Type      ActionType
 	Timestamp int64
@@ -191,7 +230,7 @@ type Record struct {
 
 func (r *Record) String() string {
 	return fmt.Sprintf(
-		"{\"Type\":%s, \"PrimaryKey\":%s, \"Columns\":%s}",
+		"{\"Type\":%s, \"PrimaryKey\":%v, \"Columns\":%s}",
 		r.Type,
 		*r.PrimaryKey,
 		r.Columns)

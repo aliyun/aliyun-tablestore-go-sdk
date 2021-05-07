@@ -937,6 +937,84 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	fmt.Println("TestBatchWriteRow finished")
 }
 
+func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
+	fmt.Println("TestAtomicBatchWriteRowWithSamePartitionKey started")
+
+	batchWriteReq := &BatchWriteRowRequest{}
+	batchWriteReq.IsAtomic = true
+
+	for i:=0; i<10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+		batchWriteReq.AddRowChange(rowChange)
+	}
+
+	updateRowChange := new(UpdateRowChange)
+	updateRowChange.TableName = rangeQueryTableName
+	updatePk := new(PrimaryKey)
+	updatePk.AddPrimaryKeyColumn("pk1", "atomicPk1")
+	updatePk.AddPrimaryKeyColumn("pk2", "atomicPk2_0")
+	updateRowChange.PrimaryKey = updatePk
+	updateRowChange.DeleteColumn("col1")
+	updateRowChange.PutColumn("col2", int64(77))
+	updateRowChange.PutColumn("col3", "newcol3")
+	updateRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+
+	deleteRowChange := new(DeleteRowChange)
+	deleteRowChange.TableName = rangeQueryTableName
+	deletePk := new(PrimaryKey)
+	deletePk.AddPrimaryKeyColumn("pk1", "atomicPk1")
+	deletePk.AddPrimaryKeyColumn("pk2", "atomicPk2_1")
+	deleteRowChange.PrimaryKey = deletePk
+	deleteRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+
+	batchWriteReq.AddRowChange(updateRowChange)
+	batchWriteReq.AddRowChange(deleteRowChange)
+
+	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
+	c.Check(error, Equals, nil)
+	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
+
+	for index, rowToCheck := range batchWriteResponse.TableToRowsResult[rangeQueryTableName] {
+		c.Check(rowToCheck.Index, Equals, int32(index))
+		c.Check(rowToCheck.TableName, Equals, rangeQueryTableName)
+		c.Check(rowToCheck.IsSucceed, Equals, true)
+	}
+
+	_, error = invalidClient.BatchWriteRow(batchWriteReq)
+	c.Check(error, NotNil)
+
+	fmt.Println("TestAtomicBatchWriteRowWithSamePartitionKey finished")
+}
+
+func (s *TableStoreSuite) TestAtomicBatchWriteRowWithDiffPartitionKey(c *C) {
+	fmt.Println("TestAtomicBatchWriteRowWithDiffPartitionKey started")
+
+	batchWriteReq := &BatchWriteRowRequest{}
+	batchWriteReq.IsAtomic = true
+
+	for i:=0; i<10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+		batchWriteReq.AddRowChange(rowChange)
+	}
+	rowChange := CreatePutRowChangeV2("atomicPk1_1", "atomicPk2_" + strconv.Itoa(10), "colVal1_" + strconv.Itoa(10), rangeQueryTableName)
+	batchWriteReq.AddRowChange(rowChange)
+
+	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
+	c.Check(error, Equals, nil)
+	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
+
+	for index, rowToCheck := range batchWriteResponse.TableToRowsResult[rangeQueryTableName] {
+		c.Check(rowToCheck.Index, Equals, int32(index))
+		c.Check(rowToCheck.TableName, Equals, rangeQueryTableName)
+		c.Check(rowToCheck.IsSucceed, Equals, false)
+	}
+
+	_, error = invalidClient.BatchWriteRow(batchWriteReq)
+	c.Check(error, NotNil)
+
+	fmt.Println("TestAtomicBatchWriteRowWithDiffPartitionKey finished")
+}
+
 func (s *TableStoreSuite) TestGetRange(c *C) {
 	fmt.Println("TestGetRange started")
 	rowCount := 9
@@ -1436,6 +1514,18 @@ func CreatePutRowChange(pkValue, colValue string) *PutRowChange {
 	putRowChange.TableName = defaultTableName
 	putPk := new(PrimaryKey)
 	putPk.AddPrimaryKeyColumn("pk1", pkValue)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.AddColumn("col1", colValue)
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	return putRowChange
+}
+
+func CreatePutRowChangeV2(pk1Value, pk2Value, colValue, tableName string) *PutRowChange {
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = tableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", pk1Value)
+	putPk.AddPrimaryKeyColumn("pk2", pk2Value)
 	putRowChange.PrimaryKey = putPk
 	putRowChange.AddColumn("col1", colValue)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)

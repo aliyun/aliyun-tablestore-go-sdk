@@ -7,6 +7,8 @@ import (
 	. "gopkg.in/check.v1"
 	"math"
 	"os"
+	"strings"
+	"sync"
 	"time"
 )
 
@@ -629,7 +631,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeKeyword(c *C) {
@@ -645,7 +647,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeGeoPoint(c *C) {
@@ -661,7 +663,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeNested(c *C) {
@@ -677,7 +679,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeText(c *C) {
@@ -693,7 +695,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeText(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Text type:text is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationUnknownField(c *C) {
@@ -709,7 +711,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationUnknownField(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field: Col_Unknown does not exist.*")
 }
 
 /* max agg */
@@ -770,7 +772,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeKeyword(c *C) {
@@ -786,7 +788,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeGeoPoint(c *C) {
@@ -802,7 +804,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeNested(c *C) {
@@ -818,7 +820,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationUnknownField(c *C) {
@@ -834,7 +836,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationUnknownField(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field: Col_Unknown does not exist.*")
 }
 
 /* min agg */
@@ -895,7 +897,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeKeyword(c *C) {
@@ -911,7 +913,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeGeoPoint(c *C) {
@@ -927,7 +929,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeNested(c *C) {
@@ -943,7 +945,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationUnknownField(c *C) {
@@ -959,7 +961,7 @@ func (s *SearchSuite) TestAggregationMinAggregationUnknownField(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field: Col_Unknown does not exist.*")
 }
 
 /* sum agg */
@@ -1020,7 +1022,7 @@ func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[sum agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeKeyword(c *C) {
@@ -1036,7 +1038,7 @@ func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[sum agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeGeoPoint(c *C) {
@@ -1052,7 +1054,7 @@ func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[sum agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeNested(c *C) {
@@ -1068,7 +1070,7 @@ func (s *SearchSuite) TestAggregationSumAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid invalid.*type.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[sum agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
 }
 
 func (s *SearchSuite) TestAggregationSumAggregationUnknownField(c *C) {
@@ -1084,7 +1086,7 @@ func (s *SearchSuite) TestAggregationSumAggregationUnknownField(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[sum agg\\] field: Col_Unknown does not exist.*")
 }
 
 /* count */
@@ -1180,7 +1182,7 @@ func (s *SearchSuite) TestAggregationCountAggregationUnknownField(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[count agg\\] field: Col_Unknown does not exist.*")
 }
 
 /* distinct count */
@@ -1276,7 +1278,7 @@ func (s *SearchSuite) TestAggregationDistinctCountAggregationUnknownField(c *C) 
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid field \\[Col_Unknown\\] not found.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[distinct count agg\\] field: Col_Unknown does not exist.*")
 }
 
 func (s *SearchSuite) TestAggregationSameLevelAggsBeyondLimit(c *C) {
@@ -1747,4 +1749,134 @@ func (s *SearchSuite) TestGroupByNestedFieldUnderGroupBy(c *C) {
 		c.Check(true, Equals, subGroupBy1.Items[2].SubAggregations.Empty())
 		c.Check(true, Equals, subGroupBy1.Items[2].SubGroupBys.Empty())
 	}
+}
+
+/* compute splits */
+func (s *SearchSuite) TestComputeSplits(c *C) {
+	req := &ComputeSplitsRequest{}
+	req.
+		SetTableName(searchAPITestTableName1).
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:searchAPITestIndexName1})
+	res, err := client.ComputeSplits(req)
+	c.Check(err, Equals, nil)
+	c.Check(int32(1), Equals, res.SplitsSize)
+	//session id: ${uuid}_0
+	//e.g. 7c407215-97d4-40c5-8663-f1d9229e9955_0
+	c.Check(true, Equals, len(res.SessionId) == 38 && strings.HasSuffix(string(res.SessionId), "_0"))
+}
+
+func (s *SearchSuite) TestComputeSplitsInvalidTableName(c *C) {
+	req := &ComputeSplitsRequest{}
+	req.SetTableName("invalid_table_name").
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:searchAPITestIndexName1})
+	_, err := client.ComputeSplits(req)
+	c.Check(err.Error(), Matches, "OTSParameterInvalid table \\[invalid_table_name\\] does not exist.*")
+}
+
+func (s *SearchSuite) TestComputeSplitsInvalidIndexName(c *C) {
+	req := &ComputeSplitsRequest{}
+	req.
+		SetTableName(searchAPITestTableName1).
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:"invalid_index_name"})
+	_, err := client.ComputeSplits(req)
+	c.Check(err.Error(), Matches, "OTSMetaNotMatch index \\[invalid_index_name\\] does not exist.*")
+}
+
+func computeSplits(tableName string, indexName string) (*ComputeSplitsResponse, error) {
+	req := &ComputeSplitsRequest{}
+	req.
+		SetTableName(tableName).
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:indexName})
+	res, err := client.ComputeSplits(req)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
+}
+
+func (s *SearchSuite) TestParallelScanSingleThread(c *C) {
+	computeSplitsResp, err := computeSplits(searchAPITestTableName1, searchAPITestIndexName1)
+	c.Check(err, Equals, nil)
+
+	query := search.NewScanQuery().SetQuery(&search.MatchAllQuery{}).SetLimit(2)
+
+	req := &ParallelScanRequest{}
+	req.SetTableName(searchAPITestTableName1).
+		SetIndexName(searchAPITestIndexName1).
+		SetColumnsToGet(&ColumnsToGet{ReturnAllFromIndex: false}).
+		SetScanQuery(query).
+		SetSessionId(computeSplitsResp.SessionId)
+
+	res, err := client.ParallelScan(req)
+	c.Check(err, Equals, nil)
+
+	total := len(res.Rows)
+	for res.NextToken != nil {
+		req.SetScanQuery(query.SetToken(res.NextToken))
+		res, err = client.ParallelScan(req)
+		c.Check(err, Equals, nil)
+
+		total += len(res.Rows) //process rows each loop
+	}
+	c.Check(total, Equals, 10)
+}
+
+func (s *SearchSuite) TestParallelScanMultiThread(c *C) {
+	//reindex to more than 1 shard
+	computeSplitsResp, err := computeSplits(searchAPITestTableName1, searchAPITestIndexName1)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	var lock sync.Mutex
+	total := 0
+
+	var wg sync.WaitGroup
+	wg.Add(int(computeSplitsResp.SplitsSize))
+
+	for i := int32(0); i < computeSplitsResp.SplitsSize; i++ {
+		current := i
+		go func() {
+			defer wg.Done()
+			query := search.NewScanQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetCurrentParallelID(current).
+				SetMaxParallel(computeSplitsResp.SplitsSize).
+				SetLimit(2)
+
+			req := &ParallelScanRequest{}
+			req.SetTableName(searchAPITestTableName1).
+				SetIndexName(searchAPITestIndexName1).
+				SetColumnsToGet(&ColumnsToGet{ReturnAllFromIndex: false}).
+				SetScanQuery(query).
+				SetSessionId(computeSplitsResp.SessionId)
+
+			res, err := client.ParallelScan(req)
+			if err != nil {
+				fmt.Printf("%#v", err)
+				return
+			}
+
+			lock.Lock()
+			total += len(res.Rows)
+			lock.Unlock()
+
+			for res.NextToken != nil {
+				req.SetScanQuery(query.SetToken(res.NextToken))
+				res, err = client.ParallelScan(req)
+				if err != nil {
+					fmt.Printf("%#v", err)
+					return
+				}
+
+				lock.Lock()
+				total += len(res.Rows)
+				lock.Unlock()
+			}
+		}()
+	}
+	wg.Wait()
+
+	c.Check(total, Equals, 10)
 }

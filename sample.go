@@ -54,4 +54,7 @@ func main() {
 	sample.WriteDataForAggregationAndGroupBy(client, "agg_sample_table")
 	sample.AggregationSample(client, "agg_sample_table", "agg_sample_index")
 	sample.GroupBySample(client, "agg_sample_table", "agg_sample_index")
+
+	sample.ParallelScanSingleConcurrency(client, "scan_sample_table", "scan_sample_index")
+	sample.ParallelScanMultiConcurrency(client, "scan_sample_table", "scan_sample_index")
 }

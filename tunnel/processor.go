@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"go.uber.org/atomic"
 	"go.uber.org/zap"
 	"sync"
 	"time"
@@ -12,12 +13,14 @@ var (
 )
 
 type ChannelProcessorFactory interface {
-	NewProcessor(tunnelId, clientId, channelId string, checkpointer Checkpointer) ChannelProcessor
+	NewProcessor(tunnelId, clientId, channelId string, checkpointer Checkpointer) (ChannelProcessor, error)
 }
 
 type ChannelProcessor interface {
 	Process(records []*Record, nextToken, traceId string) error
 	Shutdown()
+	Error() bool
+	Finished() bool
 }
 
 type SimpleProcessFactory struct {
@@ -31,7 +34,7 @@ type SimpleProcessFactory struct {
 	Logger *zap.Logger
 }
 
-func (s *SimpleProcessFactory) NewProcessor(tunnelId, clientId, channelId string, checkpointer Checkpointer) ChannelProcessor {
+func (s *SimpleProcessFactory) NewProcessor(tunnelId, clientId, channelId string, checkpointer Checkpointer) (ChannelProcessor, error) {
 	var lg *zap.Logger
 	if s.Logger == nil {
 		lg, _ = DefaultLogConfig.Build(ReplaceLogCore(DefaultSyncer, DefaultLogConfig))
@@ -43,7 +46,7 @@ func (s *SimpleProcessFactory) NewProcessor(tunnelId, clientId, channelId string
 		interval = s.CpInterval
 	}
 	p := &defaultProcessor{
-		ctx:          newChannelContext(tunnelId, clientId, channelId, s.CustomValue),
+		ctx:          NewChannelContext(tunnelId, clientId, channelId, s.CustomValue),
 		checkpointer: checkpointer,
 		processFunc:  s.ProcessFunc,
 		shutdownFunc: s.ShutdownFunc,
@@ -52,10 +55,11 @@ func (s *SimpleProcessFactory) NewProcessor(tunnelId, clientId, channelId string
 		ticker:       time.NewTicker(interval),
 		wg:           new(sync.WaitGroup),
 		lg:           lg,
+		finished:     atomic.NewBool(false),
 	}
 	p.wg.Add(1)
 	go p.cpLoop()
-	return p
+	return p, nil
 }
 
 type defaultProcessor struct {
@@ -70,6 +74,8 @@ type defaultProcessor struct {
 	closeOnce    sync.Once
 	ticker       *time.Ticker
 	wg           *sync.WaitGroup
+
+	finished *atomic.Bool
 
 	lg *zap.Logger
 }
@@ -93,7 +99,15 @@ func (p *defaultProcessor) Process(records []*Record, nextToken, traceId string)
 	case p.checkpointCh <- nextToken:
 	case <-p.closeCh:
 	}
+	if nextToken == FinishTag {
+		p.finished.Store(true)
+		p.Shutdown()
+	}
 	return nil
+}
+
+func (p *defaultProcessor) Error() bool {
+	return false
 }
 
 func (p *defaultProcessor) Shutdown() {
@@ -111,6 +125,10 @@ func (p *defaultProcessor) Shutdown() {
 			p.shutdownFunc(ctx)
 		}
 	})
+}
+
+func (p *defaultProcessor) Finished() bool {
+	return p.finished.Load()
 }
 
 func (p *defaultProcessor) cpLoop() {

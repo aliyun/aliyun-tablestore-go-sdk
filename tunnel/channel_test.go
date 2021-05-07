@@ -108,7 +108,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().readRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
 
 	Convey("nil state channel notify status", t, func() {
 		cases := []struct {
@@ -133,11 +133,16 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 
 		for _, test := range cases {
 			Convey("from nil to status:"+test.updateState.String(), func() {
-				conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", newTestProcessor(time.Duration(0)), state)
+				p := newTestProcessor(time.Duration(0))
+				conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", p, state)
 				conn.NotifyStatus(ToChannelStatus(test.updateState))
 				cconn := conn.(*channelConn)
 				So(cconn.getState(), ShouldResemble, test.expectState)
 				So(atomic.LoadInt32(&cconn.status), ShouldEqual, test.expectChStatus)
+				if test.expectState.GetStatus() == protocol.ChannelStatus_TERMINATED ||
+					test.expectState.GetStatus() == protocol.ChannelStatus_CLOSE {
+					So(p.shutdownDone, ShouldBeTrue)
+				}
 				cconn.Close()
 			})
 		}
@@ -176,6 +181,10 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 				cconn := conn.(*channelConn)
 				So(cconn.getState(), ShouldResemble, test.expectState)
 				So(atomic.LoadInt32(&cconn.status), ShouldEqual, test.expectChStatus)
+				if test.expectState.GetStatus() == protocol.ChannelStatus_TERMINATED ||
+					test.expectState.GetStatus() == protocol.ChannelStatus_CLOSE {
+					So(cconn.p.(*testProcessor).shutdownDone, ShouldBeTrue)
+				}
 				conn.Close()
 			})
 		}
@@ -196,7 +205,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 			{newChannel(1, protocol.ChannelStatus_OPEN),
 				newChannel(2, protocol.ChannelStatus_CLOSE), closedStatus},
 			{newChannel(1, protocol.ChannelStatus_TERMINATED),
-				newChannel(2, protocol.ChannelStatus_TERMINATED), closedStatus},
+				newChannel(1, protocol.ChannelStatus_TERMINATED), closedStatus},
 			{newChannel(0, protocol.ChannelStatus_CLOSING),
 				newChannel(2, protocol.ChannelStatus_CLOSE), closedStatus},
 		}
@@ -219,6 +228,10 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 				cconn.checkUpdateStatus()
 				So(cconn.getState(), ShouldResemble, test.stateAfterCheck)
 				So(atomic.LoadInt32(&cconn.status), ShouldEqual, test.statusAfterCheck)
+				if test.stateAfterCheck.GetStatus() == protocol.ChannelStatus_TERMINATED ||
+					test.stateAfterCheck.GetStatus() == protocol.ChannelStatus_CLOSE {
+					So(cconn.p.(*testProcessor).shutdownDone, ShouldBeTrue)
+				}
 				conn.Close()
 			})
 		}
@@ -244,7 +257,7 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 				newChannel(1, protocol.ChannelStatus_OPEN), runningStatus},
 			{newChannel(1, protocol.ChannelStatus_TERMINATED),
 				newChannel(1, protocol.ChannelStatus_TERMINATED), closedStatus,
-				newChannel(2, protocol.ChannelStatus_TERMINATED), closedStatus},
+				newChannel(1, protocol.ChannelStatus_TERMINATED), closedStatus},
 			{newChannel(0, protocol.ChannelStatus_CLOSING),
 				newChannel(1, protocol.ChannelStatus_OPEN), runningStatus,
 				newChannel(1, protocol.ChannelStatus_OPEN), runningStatus},
@@ -268,6 +281,10 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 				cconn.checkUpdateStatus()
 				So(cconn.getState(), ShouldResemble, test.finalState)
 				So(atomic.LoadInt32(&cconn.status), ShouldEqual, test.finalChStatus)
+				if test.expectState.GetStatus() == protocol.ChannelStatus_TERMINATED ||
+					test.expectState.GetStatus() == protocol.ChannelStatus_CLOSE {
+					So(cconn.p.(*testProcessor).shutdownDone, ShouldBeTrue)
+				}
 				conn.Close()
 			})
 		}
@@ -299,12 +316,18 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 
 		for _, test := range cases {
 			Convey("from closed to status:"+test.updateState.String(), func() {
-				conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", newTestProcessor(time.Duration(0)), state)
+				conn := dialer.ChannelDial("tunnelId", "clientId", "channelId", "token", &testProcessor{
+					finished: true,
+				}, state)
 				conn.NotifyStatus(ToChannelStatus(termState))
 				conn.NotifyStatus(ToChannelStatus(test.updateState))
 				cconn := conn.(*channelConn)
 				So(cconn.getState(), ShouldResemble, test.expectState)
 				So(atomic.LoadInt32(&cconn.status), ShouldEqual, test.expectChStatus)
+				if test.expectState.GetStatus() == protocol.ChannelStatus_TERMINATED ||
+					test.expectState.GetStatus() == protocol.ChannelStatus_CLOSE {
+					So(cconn.p.(*testProcessor).shutdownDone, ShouldBeTrue)
+				}
 				conn.Close()
 			})
 		}
@@ -317,13 +340,13 @@ func TestChannelConn_NotifyStatus_ProcessRecords(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().readRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
 
 	failApi := NewMocktunnelDataApi(mockCtrl)
-	failApi.EXPECT().readRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, errors.New("abc")).Times(1)
+	failApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, errors.New("abc")).Times(1)
 
 	finishApi := NewMocktunnelDataApi(mockCtrl)
-	finishApi.EXPECT().readRecords("tunnelId", "clientId", "channelId", "token").Return(nil, FinishTag, "traceId", 0, nil).Times(1)
+	finishApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, FinishTag, "traceId", 0, nil).Times(1)
 
 	cases := []struct {
 		desc        string
@@ -367,7 +390,7 @@ func TestChannelConn_Close(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().readRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
 
 	Convey("open tunnel is closed", t, func() {
 		openState := newChannel(0, protocol.ChannelStatus_OPEN)
@@ -394,19 +417,33 @@ func newChannel(v int64, status protocol.ChannelStatus) *protocol.Channel {
 }
 
 type testProcessor struct {
-	sleepDur time.Duration
+	sleepDur     time.Duration
+	shutdownDone bool
+	finished     bool
 }
 
 func newTestProcessor(dur time.Duration) *testProcessor {
-	return &testProcessor{dur}
+	return &testProcessor{dur, false, false}
 }
 
 func (p *testProcessor) Process(records []*Record, nextToken, traceId string) error {
+	if nextToken == FinishTag {
+		p.finished = true
+	}
 	return nil
 }
 
 func (p *testProcessor) Shutdown() {
 	time.Sleep(p.sleepDur)
+	p.shutdownDone = true
+}
+
+func (p *testProcessor) Finished() bool {
+	return p.finished
+}
+
+func (p *testProcessor) Error() bool {
+	return false
 }
 
 type failProcessor struct{}
@@ -416,6 +453,16 @@ func (p *failProcessor) Process(records []*Record, nextToken, traceId string) er
 }
 
 func (p *failProcessor) Shutdown() {}
+
+func (p *failProcessor) Finished() bool {
+	return false
+}
+
+func (p *failProcessor) Error() bool {
+	return false
+}
+
+//todo test async failProcessor
 
 func (c *channelConn) getState() *protocol.Channel {
 	c.mu.Lock()
