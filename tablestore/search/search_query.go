@@ -9,7 +9,7 @@ type SearchQuery interface {
 	Serialize() ([]byte, error)
 }
 
-type searchQuery struct {
+type SearchQueryObject struct {
 	Offset        int32
 	Limit         int32
 	Query         Query
@@ -21,25 +21,25 @@ type searchQuery struct {
 	GroupBys      []GroupBy
 }
 
-func NewSearchQuery() *searchQuery {
-	return &searchQuery{
+func NewSearchQuery() *SearchQueryObject {
+	return &SearchQueryObject{
 		Offset:        -1,
 		Limit:         -1,
 		GetTotalCount: false,
 	}
 }
 
-func (s *searchQuery) SetOffset(offset int32) *searchQuery {
+func (s *SearchQueryObject) SetOffset(offset int32) *SearchQueryObject {
 	s.Offset = offset
 	return s
 }
 
-func (s *searchQuery) SetLimit(limit int32) *searchQuery {
+func (s *SearchQueryObject) SetLimit(limit int32) *SearchQueryObject {
 	s.Limit = limit
 	return s
 }
 
-func (s *searchQuery) SetQuery(query Query) *searchQuery {
+func (s *SearchQueryObject) SetQuery(query Query) *SearchQueryObject {
 	s.Query = query
 	return s
 }
@@ -115,42 +115,42 @@ func NewGroupByGeoDistance(name string, fieldName string, origin GeoPoint) *Grou
 	}
 }
 
-func (s *searchQuery) Aggregation(agg ...Aggregation) *searchQuery {
+func (s *SearchQueryObject) Aggregation(agg ...Aggregation) *SearchQueryObject {
 	for i := 0; i < len(agg); i++ {
 		s.Aggregations = append(s.Aggregations, agg[i])
 	}
 	return s
 }
 
-func (s *searchQuery) GroupBy(groupBy ...GroupBy) *searchQuery {
+func (s *SearchQueryObject) GroupBy(groupBy ...GroupBy) *SearchQueryObject {
 	for i := 0; i < len(groupBy); i++ {
 		s.GroupBys = append(s.GroupBys, groupBy[i])
 	}
 	return s
 }
 
-func (s *searchQuery) SetCollapse(collapse *Collapse) *searchQuery {
+func (s *SearchQueryObject) SetCollapse(collapse *Collapse) *SearchQueryObject {
 	s.Collapse = collapse
 	return s
 }
 
-func (s *searchQuery) SetSort(sort *Sort) *searchQuery {
+func (s *SearchQueryObject) SetSort(sort *Sort) *SearchQueryObject {
 	s.Sort = sort
 	return s
 }
 
-func (s *searchQuery) SetGetTotalCount(getTotalCount bool) *searchQuery {
+func (s *SearchQueryObject) SetGetTotalCount(getTotalCount bool) *SearchQueryObject {
 	s.GetTotalCount = getTotalCount
 	return s
 }
 
-func (s *searchQuery) SetToken(token []byte) *searchQuery {
+func (s *SearchQueryObject) SetToken(token []byte) *SearchQueryObject {
 	s.Token = token
 	s.Sort = nil
 	return s
 }
 
-func (s *searchQuery) Serialize() ([]byte, error) {
+func (s *SearchQueryObject) Serialize() ([]byte, error) {
 	searchQuery := &otsprotocol.SearchQuery{}
 	if s.Offset >= 0 {
 		searchQuery.Offset = &s.Offset
