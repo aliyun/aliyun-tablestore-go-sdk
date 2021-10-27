@@ -89,6 +89,7 @@ type GetRpoRequest struct {
 type GetRpoResponse struct {
 	RpoInfos       map[string]map[string]*RpoLatency
 	TunnelRpoInfos map[string]*TunnelRpoLatency
+	TunnelId       string
 }
 
 type RpoLatency struct {

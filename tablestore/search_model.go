@@ -167,6 +167,16 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		if value.FieldType == FieldType_NESTED {
 			field.FieldSchemas = convertFieldSchemaToPBFieldSchema(value.FieldSchemas)
 		}
+		if value.IsVirtualField != nil {
+			field.IsVirtualField = proto.Bool(*value.IsVirtualField)
+		}
+		if len(value.SourceFieldNames) != 0 {
+			sourceFieldNameArray := make([]string, 0)
+			for _, element := range value.SourceFieldNames {
+				sourceFieldNameArray = append(sourceFieldNameArray, element)
+			}
+			field.SourceFieldNames = sourceFieldNameArray
+		}
 
 		schemas = append(schemas, field)
 	}
@@ -242,6 +252,10 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		field.EnableSortAndAgg = value.SortAndAgg
 		field.Store = value.Store
 		field.IsArray = value.IsArray
+		field.IsVirtualField = value.IsVirtualField
+		if value.SourceFieldNames != nil  {
+			field.SourceFieldNames = value.SourceFieldNames
+		}
 		if field.FieldType == FieldType_NESTED {
 			field.FieldSchemas = parseFieldSchemaFromPb(value.FieldSchemas)
 		}
@@ -340,16 +354,18 @@ type  FuzzyAnalyzerParameter struct {
 }
 
 type FieldSchema struct {
-	FieldName        *string
-	FieldType        FieldType
-	Index            *bool
-	IndexOptions     *IndexOptions
-	Analyzer         *Analyzer
-	AnalyzerParameter	interface{}
-	EnableSortAndAgg *bool
-	Store            *bool
-	IsArray          *bool
-	FieldSchemas     []*FieldSchema
+	FieldName         *string
+	FieldType         FieldType
+	Index             *bool
+	IndexOptions      *IndexOptions
+	Analyzer          *Analyzer
+	AnalyzerParameter interface{}
+	EnableSortAndAgg  *bool
+	Store             *bool
+	IsArray           *bool
+	FieldSchemas      []*FieldSchema
+	IsVirtualField    *bool
+	SourceFieldNames  []string
 }
 
 func (fs *FieldSchema) String() string {

@@ -1,0 +1,36 @@
+namespace flatbuffer;
+
+enum DataType:byte {NONE = 0, LONG = 1, BOOLEAN = 2, DOUBLE = 3, STRING = 4, BINARY = 5}
+
+table BytesValue {
+    value: [byte];
+}
+
+table FieldValues {
+    long_values: [long];
+    bool_values: [bool];
+    double_values: [double];
+    string_values: [string];
+    binary_values: [BytesValue];
+}
+
+table FlatBufferRowInGroup {
+    data_source: string;
+    tags: string;
+    time: int64;
+    field_values: FieldValues;
+    meta_cache_update_time: uint32;
+}
+
+table FlatBufferRowGroup {
+    measurement_name: string;
+    field_names: [string];
+    field_types: [DataType];
+    rows: [FlatBufferRowInGroup];
+}
+
+table FlatBufferRows {
+    row_groups: [FlatBufferRowGroup];
+}
+
+root_type FlatBufferRows;
