@@ -49,6 +49,9 @@ func main() {
 	// globalindex
 	sample.CreateTableWithGlobalIndexSample(client, "globalindex1")
 
+	//SearchIndex
+	sample.CreateSearchIndexWithVirtualField(client, "virtual_sample_table", "virtual_sample_index")
+
 	//SearchIndex: agg & group by
 	sample.CreateSearchIndexForAggregationAndGroupBy(client, "agg_sample_table", "agg_sample_index")
 	sample.WriteDataForAggregationAndGroupBy(client, "agg_sample_table")

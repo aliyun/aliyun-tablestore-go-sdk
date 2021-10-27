@@ -147,6 +147,22 @@ func TestDoRequest_SetToken(t *testing.T) {
 	c.EqualValues(cp.GetCheckpoint(), "testToken")
 }
 
+func TestDoRequest_AddExternalHeader(t *testing.T) {
+	c := assert.New(t)
+	ts := mockServer()
+	defer ts.Close()
+
+	ep := ts.URL
+	header :=  make(map[string]string)
+	header["x-ots-tunnel-type"] = "type/datadelivery"
+	api := NewTunnelApiWithExternalHeader(ep, "testInstance", "testAkId", "testAkSec",
+		"", nil, header)
+
+	traceId, _, err := api.doRequest(successUri, nil, nil)
+	c.Nil(err)
+	c.True(traceId != requestId)
+}
+
 func mockServer() *httptest.Server {
 	handler := http.NewServeMux()
 	handler.HandleFunc(alwaysFailUri, func(w http.ResponseWriter, r *http.Request) {

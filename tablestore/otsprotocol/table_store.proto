@@ -507,6 +507,8 @@ message GetStreamRecordResponse {
 message ComputeSplitPointsBySizeRequest {
     required string table_name = 1;
     required int64 split_size = 2; // in 100MB
+    optional int64 split_size_unit_in_byte = 3;
+    optional int32 split_point_limit = 4;
 }
 
 message ComputeSplitPointsBySizeResponse {
@@ -645,4 +647,20 @@ message SearchIndexSplitsOptions{
 message ComputeSplitsResponse {
     optional bytes session_id = 1;
     optional int32 splits_size = 2;
+}
+
+/* SQLQuery */
+message SQLQueryRequest {
+    required string query = 1;
+}
+
+message TableConsumedCapacity {
+    optional string table_name = 1;
+    optional ConsumedCapacity consumed = 2;
+    optional ReservedThroughput reserved_throughput = 3;
+}
+
+message SQLQueryResponse {
+    repeated TableConsumedCapacity consumes = 1;
+    optional bytes rows = 2;
 }

@@ -81,13 +81,35 @@ func genPBAggregationsResult() *otsprotocol.AggregationsResult {
 		}
 		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
 	}
+	{
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.TopRowsAggregationResult{
+		})
+
+		aggResult := otsprotocol.AggregationResult{
+			Name: proto.String("agg7"),
+			Type: otsprotocol.AggregationType_AGG_TOP_ROWS.Enum(),
+			AggResult: aggBodyBytes,
+		}
+		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
+	}
+	{
+		aggBodyBytes, _ := proto.Marshal(&otsprotocol.PercentilesAggregationResult{
+		})
+
+		aggResult := otsprotocol.AggregationResult{
+			Name: proto.String("agg8"),
+			Type: otsprotocol.AggregationType_AGG_PERCENTILES.Enum(),
+			AggResult: aggBodyBytes,
+		}
+		pbAggsResult.AggResults = append(pbAggsResult.AggResults, &aggResult)
+	}
 	return &pbAggsResult
 }
 
 func TestParseAggregationResultsFromPB(t *testing.T) {
 	pbAggsResult := genPBAggregationsResult()
 	aggResults, _ := ParseAggregationResultsFromPB(pbAggsResult.AggResults)
-	assert.Equal(t, 6, len(aggResults.resultMap))
+	assert.Equal(t, 8, len(aggResults.resultMap))
 	assert.Equal(t, false, aggResults.Empty())
 
 	{
@@ -119,5 +141,15 @@ func TestParseAggregationResultsFromPB(t *testing.T) {
 		aggResult, err := aggResults.Count("agg6")
 		assert.Nil(t, err)
 		assert.Equal(t, int64(6), aggResult.Value)
+	}
+	{
+		aggResult, err := aggResults.TopRows("agg7")
+		assert.Nil(t, err)
+		assert.Equal(t, "agg7", aggResult.Name)
+	}
+	{
+		aggResult, err := aggResults.Percentiles("agg8")
+		assert.Nil(t, err)
+		assert.Equal(t, "agg8", aggResult.Name)
 	}
 }

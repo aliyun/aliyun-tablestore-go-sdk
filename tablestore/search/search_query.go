@@ -9,7 +9,7 @@ type SearchQuery interface {
 	Serialize() ([]byte, error)
 }
 
-type SearchQueryBase struct {
+type searchQuery struct {
 	Offset        int32
 	Limit         int32
 	Query         Query
@@ -21,25 +21,25 @@ type SearchQueryBase struct {
 	GroupBys      []GroupBy
 }
 
-func NewSearchQuery() *SearchQueryBase {
-	return &SearchQueryBase{
+func NewSearchQuery() *searchQuery {
+	return &searchQuery {
 		Offset:        -1,
 		Limit:         -1,
 		GetTotalCount: false,
 	}
 }
 
-func (s *SearchQueryBase) SetOffset(offset int32) *SearchQueryBase {
+func (s *searchQuery) SetOffset(offset int32) *searchQuery {
 	s.Offset = offset
 	return s
 }
 
-func (s *SearchQueryBase) SetLimit(limit int32) *SearchQueryBase {
+func (s *searchQuery) SetLimit(limit int32) *searchQuery {
 	s.Limit = limit
 	return s
 }
 
-func (s *SearchQueryBase) SetQuery(query Query) *SearchQueryBase {
+func (s *searchQuery) SetQuery(query Query) *searchQuery {
 	s.Query = query
 	return s
 }
@@ -86,6 +86,19 @@ func NewCountAggregation(name string, fieldName string) *CountAggregation {
 	}
 }
 
+func NewTopRowsAggregation(name string) *TopRowsAggregation {
+	return &TopRowsAggregation {
+		AggName: name,
+	}
+}
+
+func NewPercentilesAggregation(name string, filedName string) *PercentilesAggregation {
+	return &PercentilesAggregation {
+		AggName: name,
+		Field: 	 filedName,
+	}
+}
+
 //
 func NewGroupByField(name string, fieldName string) *GroupByField {
 	return &GroupByField {
@@ -111,46 +124,53 @@ func NewGroupByGeoDistance(name string, fieldName string, origin GeoPoint) *Grou
 	return &GroupByGeoDistance {
 		AggName: name,
 		Field:   fieldName,
-		Origin: origin,
+		Origin:  origin,
 	}
 }
 
-func (s *SearchQueryBase) Aggregation(agg ...Aggregation) *SearchQueryBase {
+func NewGroupByHistogram(name string, filedName string) *GroupByHistogram {
+	return &GroupByHistogram{
+		GroupByName: name,
+		Field:       filedName,
+	}
+}
+
+func (s *searchQuery) Aggregation(agg ...Aggregation) *searchQuery {
 	for i := 0; i < len(agg); i++ {
 		s.Aggregations = append(s.Aggregations, agg[i])
 	}
 	return s
 }
 
-func (s *SearchQueryBase) GroupBy(groupBy ...GroupBy) *SearchQueryBase {
+func (s *searchQuery) GroupBy(groupBy ...GroupBy) *searchQuery {
 	for i := 0; i < len(groupBy); i++ {
 		s.GroupBys = append(s.GroupBys, groupBy[i])
 	}
 	return s
 }
 
-func (s *SearchQueryBase) SetCollapse(collapse *Collapse) *SearchQueryBase {
+func (s *searchQuery) SetCollapse(collapse *Collapse) *searchQuery {
 	s.Collapse = collapse
 	return s
 }
 
-func (s *SearchQueryBase) SetSort(sort *Sort) *SearchQueryBase {
+func (s *searchQuery) SetSort(sort *Sort) *searchQuery {
 	s.Sort = sort
 	return s
 }
 
-func (s *SearchQueryBase) SetGetTotalCount(getTotalCount bool) *SearchQueryBase {
+func (s *searchQuery) SetGetTotalCount(getTotalCount bool) *searchQuery {
 	s.GetTotalCount = getTotalCount
 	return s
 }
 
-func (s *SearchQueryBase) SetToken(token []byte) *SearchQueryBase {
+func (s *searchQuery) SetToken(token []byte) *searchQuery {
 	s.Token = token
 	s.Sort = nil
 	return s
 }
 
-func (s *SearchQueryBase) Serialize() ([]byte, error) {
+func (s *searchQuery) Serialize() ([]byte, error) {
 	searchQuery := &otsprotocol.SearchQuery{}
 	if s.Offset >= 0 {
 		searchQuery.Offset = &s.Offset

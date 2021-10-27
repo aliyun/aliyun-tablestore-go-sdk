@@ -25,6 +25,16 @@ func NewTunnelClientWithToken(endpoint, instanceName, accessId, accessKey, token
 	}
 }
 
+func NewTunnelClientWithExternalHeader(endpoint, instanceName, accessId, accessKey, token string, header map[string]string) TunnelClient {
+	return NewTunnelClientWithConfigAndExternalHeader(endpoint, instanceName, accessId, accessKey, token, nil, header)
+}
+
+func NewTunnelClientWithConfigAndExternalHeader(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig, header map[string]string) TunnelClient {
+	return &DefaultTunnelClient{
+		api: NewTunnelApiWithExternalHeader(endpoint, instanceName, accessId, accessKey, token, conf, header),
+	}
+}
+
 func (c *DefaultTunnelClient) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelResponse, error) {
 	return c.api.CreateTunnel(req)
 }
@@ -43,6 +53,10 @@ func (c *DefaultTunnelClient) DescribeTunnel(req *DescribeTunnelRequest) (*Descr
 
 func (c *DefaultTunnelClient) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {
 	return c.api.GetRpo(req)
+}
+
+func (c *DefaultTunnelClient) GetRpoByOffset(req *GetRpoRequest) (*GetRpoResponse, error) {
+	return c.api.GetRpoByOffset(req)
 }
 
 func (c *DefaultTunnelClient) Schedule(req *ScheduleRequest) (*ScheduleResponse, error) {

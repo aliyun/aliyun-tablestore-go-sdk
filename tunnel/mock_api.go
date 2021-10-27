@@ -136,6 +136,19 @@ func (mr *MockTunnelMetaApiMockRecorder) GetRpo(req interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRpo", reflect.TypeOf((*MockTunnelMetaApi)(nil).GetRpo), req)
 }
 
+// GetRpoByOffset mocks base method
+func (m *MockTunnelMetaApi) GetRpoByOffset(req *GetRpoRequest) (*GetRpoResponse, error) {
+	ret := m.ctrl.Call(m, "GetRpoByOffset", req)
+	ret0, _ := ret[0].(*GetRpoResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRpoByOffset indicates an expected call of GetRpoByOffset
+func (mr *MockTunnelMetaApiMockRecorder) GetRpoByOffset(req interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRpoByOffset", reflect.TypeOf((*MockTunnelMetaApi)(nil).GetRpoByOffset), req)
+}
+
 // Schedule mocks base method
 func (m *MockTunnelMetaApi) Schedule(req *ScheduleRequest) (*ScheduleResponse, error) {
 	ret := m.ctrl.Call(m, "Schedule", req)

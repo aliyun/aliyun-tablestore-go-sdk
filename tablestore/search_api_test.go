@@ -493,6 +493,7 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
 	accessKeyId := os.Getenv("OTS_TEST_KEYID")
 	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	//clear old environment

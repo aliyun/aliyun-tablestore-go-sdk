@@ -5,6 +5,7 @@ import (
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
 	"math"
+	"math/rand"
 	"testing"
 )
 
@@ -110,6 +111,26 @@ func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
+	{
+		var value int64 = 1
+		var key = rand.Int63()
+		items := []*otsprotocol.GroupByHistogramItem{
+			{
+				Key:                  VTInteger(key),
+				Value:                &value,
+			},
+		}
+
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByHistogramResult{
+			GroupByHistograItems: items,
+		})
+		groupByResult := otsprotocol.GroupByResult{
+			Name:          proto.String("group_by5"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_HISTOGRAM.Enum(),
+			GroupByResult: groupByBodyBytes,
+		}
+		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
+	}
 
 	return &pbGroupBysResults
 }
@@ -117,7 +138,7 @@ func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 func TestParseGroupByResultsFromPB(t *testing.T) {
 	pbGroupBysResult := genPBGroupBysResult()
 	groupByResults, _ := ParseGroupByResultsFromPB(pbGroupBysResult.GroupByResults)
-	assert.Equal(t, 4, len(groupByResults.resultMap))
+	assert.Equal(t, 5, len(groupByResults.resultMap))
 	assert.Equal(t, false, groupByResults.Empty())
 
 	{
@@ -171,5 +192,12 @@ func TestParseGroupByResultsFromPB(t *testing.T) {
 		assert.Equal(t, float64(5), groupByResult.Items[2].From)
 		assert.Equal(t, math.Inf(1), groupByResult.Items[2].To)
 		assert.Equal(t, int64(999), groupByResult.Items[2].RowCount)
+	}
+	{
+		groupByResult, err := groupByResults.GroupByHistogram("group_by5")
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(groupByResult.Items))
+
+		assert.Equal(t, int64(1), groupByResult.Items[0].Value)
 	}
 }

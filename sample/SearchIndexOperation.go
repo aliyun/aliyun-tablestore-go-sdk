@@ -3,10 +3,10 @@ package sample
 import (
 	"encoding/json"
 	"fmt"
-	"sync"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
+	"sync"
 	"time"
 )
 
@@ -56,6 +56,74 @@ func CreateSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	schemas = append(schemas, field1, field2)
+
+	request.IndexSchema = &tablestore.IndexSchema{
+		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+	}
+	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	if err != nil {
+		fmt.Println("error :", err)
+		return
+	}
+	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+}
+
+/**
+ *创建一个含虚拟列SearchIndex
+ *包含Col_Keyword和Col_Long两个基础列，类型分别设置为字符串(KEYWORD)和整型(LONG)。
+ *Col_long_str 为虚拟列，类型为字符串（KEYWORD）映射原始列为Col_long
+ */
+func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to create table:", tableName)
+	createtableRequest := new(tablestore.CreateTableRequest)
+
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	_, err := client.CreateTable(createtableRequest)
+	if err != nil {
+		fmt.Println("Failed to create table with error:", err)
+	} else {
+		fmt.Println("Create table finished")
+	}
+
+	fmt.Println("Begin to create index:", indexName)
+	request := &tablestore.CreateSearchIndexRequest{}
+	request.TableName = tableName // 设置表名
+	request.IndexName = indexName // 设置索引名
+
+	schemas := []*tablestore.FieldSchema{}
+	field1 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+	}
+	field2 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Long"),
+		FieldType:        tablestore.FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field3 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Long_str"),
+		FieldType:        tablestore.FieldType_KEYWORD,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+		IsVirtualField:   proto.Bool(true), //设置字段类型为虚拟列
+		SourceFieldNames: []string{"Col_Long"}, //设置虚拟列映射的原始列
+	}
+	schemas = append(schemas, field1, field2, field3)
 
 	request.IndexSchema = &tablestore.IndexSchema{
 		FieldSchemas: schemas, // 设置SearchIndex包含的字段
@@ -1057,28 +1125,41 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 	}
 }
 
-
 /**
  * Aggregation示例
  */
 func AggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
+	var percentiles = make([]float64, 3)
+	percentiles[0] = 0.0
+	percentiles[1] = 50.0
+	percentiles[2] = 100.0
 
 	searchRequest.
-		SetTableName(tableName).	//设置表名
-		SetIndexName(indexName).	//设置多元索引名
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).	//匹配所有行
-			SetLimit(100).	//限制返回前100行结果
-			Aggregation(search.NewAvgAggregation("agg1", "Col_Long")).				//计算Col_Long字段的平均值
-			Aggregation(search.NewDistinctCountAggregation("agg2", "Col_Long")).	//计算Col_Long字段不同取值的个数
-			Aggregation(search.NewMaxAggregation("agg3", "Col_Long")).				//计算Col_Long字段的最大值
-			Aggregation(search.NewSumAggregation("agg4", "Col_Long")).				//计算Col_Long字段的和
-			Aggregation(search.NewCountAggregation("agg5", "Col_Long")))			//计算存在Col_Long字段的行数
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+			Aggregation(search.NewAvgAggregation("agg1", "Col_Long")).           //计算Col_Long字段的平均值
+			Aggregation(search.NewDistinctCountAggregation("agg2", "Col_Long")). //计算Col_Long字段不同取值的个数
+			Aggregation(search.NewMaxAggregation("agg3", "Col_Long")).           //计算Col_Long字段的最大值
+			Aggregation(search.NewSumAggregation("agg4", "Col_Long")).           //计算Col_Long字段的和
+			Aggregation(search.NewCountAggregation("agg5", "Col_Long")).         //计算存在Col_Long字段的行数
+			Aggregation(search.NewTopRowsAggregation("agg6").SetLimit(1).SetSort(&search.Sort{
+				Sorters: []search.Sorter{
+					&search.FieldSort{
+						FieldName: "Col_Long",
+						Order:     search.SortOrder_DESC.Enum(),
+					},
+				},
+			})).
+			Aggregation(search.NewPercentilesAggregation("agg7","Col_Long").SetMissing(10).SetPercents(percentiles)))
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
-		ReturnAll: true,
+		ReturnAll: false,
+		ReturnAllFromIndex: true,
 	})
 	searchResponse, err := client.Search(searchRequest)
 	if err != nil {
@@ -1138,7 +1219,27 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(count) agg6: ", agg5.Value)	//打印存在Col_Long字段的个数
+	fmt.Println("(count) agg5: ", agg5.Value)  //打印存在Col_Long字段的个数
+
+	//topRows agg
+	agg6, err := aggResults.TopRows("agg6")   //获取名字为"agg5"的Aggregation结果，类型为TopRows
+	if err != nil {
+		panic(err)
+	}
+	jsonBody, err := json.Marshal(agg6.Value)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("TowRow: ", string(jsonBody))	 //打印返回的row
+
+	//percentiles agg
+	agg7, err := aggResults.Percentiles("agg7") //获取名字为"agg5"的Aggregation结果，类型为Percentiles
+	if err != nil {
+		panic(err)
+	}
+	for _, item := range agg7.PercentilesAggregationItems {
+		fmt.Println("\t(percentiles)key: ", item.Key, ", value: ", item.Value.Value) 	//打印返回的value
+	}
 }
 
 /**
@@ -1176,7 +1277,12 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon:120.08681}).	//对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
 				Range(search.NegInf, 10000).			//第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
 				Range(10000, 15000).		//第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-				Range(15000, search.Inf)))			//第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+				Range(15000, search.Inf)).			//第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+			GroupBy(search.NewGroupByHistogram("group5", "Col_Long").
+				SetInterval(10).
+				SetMinDocCount(1).
+				SetFiledRange(0, 100).
+				SetMissing(3)))
 
 
 	// 设置返回所有列
@@ -1260,6 +1366,17 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 	for _, item := range group4.Items {	//遍历返回的所有分桶
 		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount)	//打印本次分桶的行数
 	}
+
+	//group by histogram
+	group5, err := groupByResults.GroupByHistogram("group5")		//获取名字为"group5"的GroupBy结果，类型为GroupByHistogram
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group5: ")
+	for _, item := range group5.Items {
+		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value)		//打印返回的value
+	}
+
 }
 
 func computeSplits(client *tablestore.TableStoreClient, tableName string, indexName string) (*tablestore.ComputeSplitsResponse, error) {

@@ -9,7 +9,7 @@ type ScanQuery interface {
 	Serialize() ([]byte, error)
 }
 
-type ScanQueryBase struct {
+type scanQuery struct {
 	Query		Query
 	Limit		*int32
 	AliveTime	*int32	//in seconds, 60s by default
@@ -18,41 +18,41 @@ type ScanQueryBase struct {
 	MaxParallel			*int32
 }
 
-func NewScanQuery() *ScanQueryBase {
-	return &ScanQueryBase{}
+func NewScanQuery() *scanQuery {
+	return &scanQuery{}
 }
 
-func (s *ScanQueryBase) SetQuery(query Query)  *ScanQueryBase {
+func (s *scanQuery) SetQuery(query Query)  *scanQuery {
 	s.Query = query
 	return s
 }
 
-func (s *ScanQueryBase) SetLimit(limit int32) *ScanQueryBase {
+func (s *scanQuery) SetLimit(limit int32) *scanQuery {
 	s.Limit = proto.Int32(limit)
 	return s
 }
 
-func (s *ScanQueryBase) SetAliveTime(aliveTime int32) *ScanQueryBase {
+func (s *scanQuery) SetAliveTime(aliveTime int32) *scanQuery {
 	s.AliveTime = proto.Int32(aliveTime)
 	return s
 }
 
-func (s *ScanQueryBase) SetToken(token []byte) *ScanQueryBase {
+func (s *scanQuery) SetToken(token []byte) *scanQuery {
 	s.Token = token
 	return s
 }
 
-func (s *ScanQueryBase) SetCurrentParallelID(currentParallelID int32) *ScanQueryBase {
+func (s *scanQuery) SetCurrentParallelID(currentParallelID int32) *scanQuery {
 	s.CurrentParallelID = proto.Int32(currentParallelID)
 	return s
 }
 
-func (s *ScanQueryBase) SetMaxParallel(maxParallel int32) *ScanQueryBase {
+func (s *scanQuery) SetMaxParallel(maxParallel int32) *scanQuery {
 	s.MaxParallel = proto.Int32(maxParallel)
 	return s
 }
 
-func (s *ScanQueryBase) Serialize() ([]byte, error) {
+func (s *scanQuery) Serialize() ([]byte, error) {
 	scanQuery := &otsprotocol.ScanQuery{}
 
 	if s.Query != nil {

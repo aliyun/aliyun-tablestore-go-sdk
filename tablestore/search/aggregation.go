@@ -16,6 +16,8 @@ const (
 	AggregationMinType           AggregationType = 4
 	AggregationSumType           AggregationType = 5
 	AggregationCountType         AggregationType = 6
+	AggregationTopRowsType       AggregationType = 7
+	AggregationPercentilesType	 AggregationType = 8
 )
 
 func (a AggregationType) Enum() *AggregationType {
@@ -37,6 +39,10 @@ func (a AggregationType) String() string {
 		return "sum"
 	case AggregationCountType:
 		return "count"
+	case AggregationTopRowsType:
+		return "top_rows"
+	case AggregationPercentilesType:
+		return "percentiles"
 	default:
 		return "unknown"
 	}
@@ -58,6 +64,10 @@ func (a AggregationType) ToPB() *otsprotocol.AggregationType {
 		return otsprotocol.AggregationType_AGG_SUM.Enum()
 	case AggregationCountType:
 		return otsprotocol.AggregationType_AGG_COUNT.Enum()
+	case AggregationTopRowsType:
+		return otsprotocol.AggregationType_AGG_TOP_ROWS.Enum()
+	case AggregationPercentilesType:
+		return otsprotocol.AggregationType_AGG_PERCENTILES.Enum()
 	default:
 		panic("unexpected")
 	}
@@ -69,7 +79,7 @@ message Aggregation {
     optional AggregationType type = 2;
     optional bytes body = 3;
 }
- */
+*/
 type Aggregation interface {
 	//get agg name
 	GetName() string

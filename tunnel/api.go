@@ -36,6 +36,7 @@ const (
 	readRecordsUri    = "/tunnel/readrecords"
 	checkpointUri     = "/tunnel/checkpoint"
 	getRpoUri         = "/tunnel/getrpo"
+	getRpoByOffsetUri = "/tunnel/getrpobyoffset"
 	scheduleUri       = "/tunnel/schedule"
 )
 
@@ -50,6 +51,7 @@ type TunnelMetaApi interface {
 	DescribeTunnel(req *DescribeTunnelRequest) (resp *DescribeTunnelResponse, err error)
 	DeleteTunnel(req *DeleteTunnelRequest) (resp *DeleteTunnelResponse, err error)
 	GetRpo(req *GetRpoRequest) (resp *GetRpoResponse, err error)
+	GetRpoByOffset(req *GetRpoRequest) (resp *GetRpoResponse, err error)
 	Schedule(req *ScheduleRequest) (resp *ScheduleResponse, err error)
 }
 
@@ -63,6 +65,8 @@ type TunnelApi struct {
 	httpClient *http.Client
 
 	retryMaxElapsedTime time.Duration
+
+	externalHeader map[string]string
 }
 
 func NewTunnelApi(endpoint, instanceName, accessKeyId, accessKeySecret string, conf *TunnelConfig) *TunnelApi {
@@ -85,6 +89,12 @@ func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret,
 		Timeout:   conf.RequestTimeout,
 	}
 	tunnelApi.retryMaxElapsedTime = conf.MaxRetryElapsedTime
+	return tunnelApi
+}
+
+func NewTunnelApiWithExternalHeader(endpoint, instanceName, accessKeyId, accessKeySecret, token string, conf *TunnelConfig, header map[string]string) *TunnelApi {
+	tunnelApi := NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, token, conf)
+	tunnelApi.externalHeader = header
 	return tunnelApi
 }
 
@@ -150,6 +160,11 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 	hreq.Header.Set(xOtsApiversion, apiVersion)
 	hreq.Header.Set(xOtsAccesskeyid, api.accessKeyId)
 	hreq.Header.Set(xOtsInstanceName, api.instanceName)
+	for key, value := range api.externalHeader {
+		if strings.HasPrefix(key, xOtsPrefix) {
+			hreq.Header.Set(key, value)
+		}
+	}
 
 	md5Byte := md5.Sum(body)
 	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
@@ -169,6 +184,12 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 
 	otshead.set(xOtsContentmd5, md5Base64)
 	otshead.set(xOtsInstanceName, api.instanceName)
+	for key, value := range api.externalHeader {
+		if strings.HasPrefix(key, xOtsPrefix) {
+			otshead.set(key, value)
+		}
+	}
+
 	sign, err := otshead.signature(uri, "POST", api.accessKeySecret)
 
 	if err != nil {
@@ -356,6 +377,30 @@ func (api *TunnelApi) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {
 	if err := json.Unmarshal(getRpoResponse.TunnelRpoInfos, &(resp.TunnelRpoInfos)); err != nil {
 		return nil, err
 	}
+	return resp, nil
+}
+
+func (api *TunnelApi) GetRpoByOffset(req *GetRpoRequest) (*GetRpoResponse, error) {
+	getRpoRequest := &protocol.GetRpoRequest{
+		TunnelId: &req.TunnelId,
+	}
+
+	getRpoResponse := new(protocol.GetRpoResponse)
+	_, _, err := api.doRequest(getRpoByOffsetUri, getRpoRequest, getRpoResponse)
+	if err != nil {
+		return nil, err
+	}
+
+	resp := &GetRpoResponse{}
+	if err := json.Unmarshal(getRpoResponse.RpoInfos, &(resp.RpoInfos)); err != nil {
+		return nil, err
+	}
+
+	if err := json.Unmarshal(getRpoResponse.TunnelRpoInfos, &(resp.TunnelRpoInfos)); err != nil {
+		return nil, err
+	}
+
+	resp.TunnelId = *(getRpoResponse.TunnelId)
 	return resp, nil
 }
 

@@ -14,6 +14,7 @@ const (
 	GroupByRangeType       GroupByType = 2
 	GroupByFilterType      GroupByType = 3
 	GroupByGeoDistanceType GroupByType = 4
+	GroupByHistogramType   GroupByType = 5
 )
 
 func (g GroupByType) Enum() *GroupByType {
@@ -31,6 +32,8 @@ func (a GroupByType) String() string {
 		return "group_by_filter"
 	case GroupByGeoDistanceType:
 		return "group_by_geo_distance"
+	case GroupByHistogramType:
+		return "group_by_histogram"
 	default:
 		return "unknown"
 	}
@@ -46,6 +49,8 @@ func (g GroupByType) ToPB() *otsprotocol.GroupByType {
 		return otsprotocol.GroupByType_GROUP_BY_FILTER.Enum()
 	case GroupByGeoDistanceType:
 		return otsprotocol.GroupByType_GROUP_BY_GEO_DISTANCE.Enum()
+	case GroupByHistogramType:
+		return otsprotocol.GroupByType_GROUP_BY_HISTOGRAM.Enum()
 	default:
 		return nil
 	}

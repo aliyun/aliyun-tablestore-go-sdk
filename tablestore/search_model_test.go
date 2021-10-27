@@ -449,6 +449,171 @@ func TestConvertFieldSchemaToPBFieldSchema_NoAnalyzerWithParam(t *testing.T) {
 	assert.Nil(t, pbSchemas[0].AnalyzerParameter)
 }
 
+func TestConvertFieldSchemaToPBFieldSchema_VirtualField(t *testing.T) {
+	{
+		analyzerParam := SingleWordAnalyzerParameter{CaseSensitive: proto.Bool(true)}
+		schemas := []*FieldSchema{
+			{
+				FieldName:         proto.String("Col_Analyzer"),
+				FieldType:         FieldType_TEXT,
+				AnalyzerParameter: analyzerParam,
+			},
+		}
+
+		// convert to pb
+		var pbSchemas []*otsprotocol.FieldSchema
+		pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+		// expect result
+		pbSchemaExpected := new(otsprotocol.FieldSchema)
+		pbSchemaExpected.FieldName = proto.String("Col_Analyzer")
+		pbSchemaExpected.FieldType = otsprotocol.FieldType_TEXT.Enum()
+
+		// assert
+		t.Log("pb actural ==> ", pbSchemas)
+		assert.Equal(t, len(pbSchemas), 1)
+
+		assert.Equal(t, *pbSchemaExpected.FieldName, *pbSchemas[0].FieldName)
+		assert.Equal(t, *pbSchemaExpected.FieldType, *pbSchemas[0].FieldType)
+		assert.Nil(t, pbSchemas[0].Analyzer)
+		assert.Nil(t, pbSchemas[0].AnalyzerParameter)
+	}
+	{
+		analyzerParam := SingleWordAnalyzerParameter{CaseSensitive: proto.Bool(true)}
+		schemas := []*FieldSchema{
+			{
+				FieldName:         proto.String("Col_Analyzer"),
+				FieldType:         FieldType_TEXT,
+				AnalyzerParameter: analyzerParam,
+				IsVirtualField:    proto.Bool(true),
+			},
+		}
+
+		// convert to pb
+		var pbSchemas []*otsprotocol.FieldSchema
+		pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+		// expect result
+		pbSchemaExpected := new(otsprotocol.FieldSchema)
+		pbSchemaExpected.FieldName = proto.String("Col_Analyzer")
+		pbSchemaExpected.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbSchemaExpected.IsVirtualField = proto.Bool(true)
+		pbSchemaExpected.SourceFieldNames = []string{"sourceField"}
+
+		// assert
+		t.Log("pb actural ==> ", pbSchemas)
+		assert.Equal(t, len(pbSchemas), 1)
+
+		assert.Equal(t, *pbSchemaExpected.FieldName, *pbSchemas[0].FieldName)
+		assert.Equal(t, *pbSchemaExpected.FieldType, *pbSchemas[0].FieldType)
+		assert.Equal(t, *pbSchemaExpected.IsVirtualField, *pbSchemas[0].IsVirtualField)
+		assert.NotEqual(t, pbSchemaExpected.SourceFieldNames, pbSchemas[0].SourceFieldNames)
+		assert.Nil(t, pbSchemas[0].Analyzer)
+		assert.Nil(t, pbSchemas[0].AnalyzerParameter)
+	}
+	{
+		analyzerParam := SingleWordAnalyzerParameter{CaseSensitive: proto.Bool(true)}
+		schemas := []*FieldSchema{
+			{
+				FieldName:         proto.String("Col_Analyzer"),
+				FieldType:         FieldType_TEXT,
+				AnalyzerParameter: analyzerParam,
+				IsVirtualField:    proto.Bool(false),
+			},
+		}
+
+		// convert to pb
+		var pbSchemas []*otsprotocol.FieldSchema
+		pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+		// expect result
+		pbSchemaExpected := new(otsprotocol.FieldSchema)
+		pbSchemaExpected.FieldName = proto.String("Col_Analyzer")
+		pbSchemaExpected.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbSchemaExpected.IsVirtualField = proto.Bool(false)
+		pbSchemaExpected.SourceFieldNames = []string{"sourceField"}
+
+		// assert
+		t.Log("pb actural ==> ", pbSchemas)
+		assert.Equal(t, len(pbSchemas), 1)
+
+		assert.Equal(t, *pbSchemaExpected.FieldName, *pbSchemas[0].FieldName)
+		assert.Equal(t, *pbSchemaExpected.FieldType, *pbSchemas[0].FieldType)
+		assert.Equal(t, *pbSchemaExpected.IsVirtualField, *pbSchemas[0].IsVirtualField)
+		assert.NotEqual(t, pbSchemaExpected.SourceFieldNames, pbSchemas[0].SourceFieldNames)
+		assert.Nil(t, pbSchemas[0].Analyzer)
+		assert.Nil(t, pbSchemas[0].AnalyzerParameter)
+	}
+	{
+		analyzerParam := SingleWordAnalyzerParameter{CaseSensitive: proto.Bool(true)}
+		schemas := []*FieldSchema{
+			{
+				FieldName:         proto.String("Col_Analyzer"),
+				FieldType:         FieldType_TEXT,
+				AnalyzerParameter: analyzerParam,
+				IsVirtualField:    proto.Bool(true),
+				SourceFieldNames: []string{"sourceField"},
+			},
+		}
+
+		// convert to pb
+		var pbSchemas []*otsprotocol.FieldSchema
+		pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+		// expect result
+		pbSchemaExpected := new(otsprotocol.FieldSchema)
+		pbSchemaExpected.FieldName = proto.String("Col_Analyzer")
+		pbSchemaExpected.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbSchemaExpected.IsVirtualField = proto.Bool(true)
+		pbSchemaExpected.SourceFieldNames = []string{"sourceField"}
+
+		// assert
+		t.Log("pb actural ==> ", pbSchemas)
+		assert.Equal(t, len(pbSchemas), 1)
+
+		assert.Equal(t, *pbSchemaExpected.FieldName, *pbSchemas[0].FieldName)
+		assert.Equal(t, *pbSchemaExpected.FieldType, *pbSchemas[0].FieldType)
+		assert.Equal(t, *pbSchemaExpected.IsVirtualField, *pbSchemas[0].IsVirtualField)
+		assert.Equal(t, pbSchemaExpected.SourceFieldNames, pbSchemas[0].SourceFieldNames)
+		assert.Nil(t, pbSchemas[0].Analyzer)
+		assert.Nil(t, pbSchemas[0].AnalyzerParameter)
+	}
+	{
+		analyzerParam := SingleWordAnalyzerParameter{CaseSensitive: proto.Bool(true)}
+		schemas := []*FieldSchema{
+			{
+				FieldName:         proto.String("Col_Analyzer"),
+				FieldType:         FieldType_TEXT,
+				AnalyzerParameter: analyzerParam,
+				IsVirtualField:    proto.Bool(true),
+				SourceFieldNames:  []string{"sourceField"},
+			},
+		}
+
+		// convert to pb
+		var pbSchemas []*otsprotocol.FieldSchema
+		pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+		// expect result
+		pbSchemaExpected := new(otsprotocol.FieldSchema)
+		pbSchemaExpected.FieldName = proto.String("Col_Analyzer")
+		pbSchemaExpected.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbSchemaExpected.IsVirtualField = proto.Bool(true)
+		pbSchemaExpected.SourceFieldNames = []string{"sourceField"}
+
+		// assert
+		t.Log("pb actural ==> ", pbSchemas)
+		assert.Equal(t, len(pbSchemas), 1)
+
+		assert.Equal(t, *pbSchemaExpected.FieldName, *pbSchemas[0].FieldName)
+		assert.Equal(t, *pbSchemaExpected.FieldType, *pbSchemas[0].FieldType)
+		assert.Equal(t, *pbSchemaExpected.IsVirtualField, *pbSchemas[0].IsVirtualField)
+		assert.Equal(t, pbSchemaExpected.SourceFieldNames, pbSchemas[0].SourceFieldNames)
+		assert.Nil(t, pbSchemas[0].Analyzer)
+		assert.Nil(t, pbSchemas[0].AnalyzerParameter)
+	}
+}
+
 // parseFieldSchemaFromPb
 
 func TestParseFieldSchemaFromPb_SingleWord(t *testing.T) {
@@ -902,6 +1067,97 @@ func TestParseFieldSchemaFromPb_NoAnalyzerNoParam(t *testing.T) {
 
 	assert.Nil(t, fieldSchemas[0].Analyzer)
 	assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+}
+
+func TestParseFieldSchemaFromPb_VirtualField(t *testing.T) {
+	{
+		// build pb
+		pbFieldSchema := new(otsprotocol.FieldSchema)
+		pbFieldSchema.FieldName = proto.String("Col_Analyzer")
+		pbFieldSchema.FieldType = otsprotocol.FieldType_TEXT.Enum()
+
+		pbFieldSchemas := []*otsprotocol.FieldSchema{
+			pbFieldSchema,
+		}
+
+		// pb -> model
+		fieldSchemas := parseFieldSchemaFromPb(pbFieldSchemas)
+
+		// assert
+		t.Log("fieldSchemas ==> ", fieldSchemas)
+		assert.Equal(t, len(fieldSchemas), 1)
+
+		assert.Nil(t, fieldSchemas[0].Analyzer)
+		assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+	}
+	{
+		// build pb
+		pbFieldSchema := new(otsprotocol.FieldSchema)
+		pbFieldSchema.FieldName = proto.String("Col_Analyzer")
+		pbFieldSchema.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbFieldSchema.IsVirtualField = proto.Bool(true)
+
+		pbFieldSchemas := []*otsprotocol.FieldSchema{
+			pbFieldSchema,
+		}
+
+		// pb -> model
+		fieldSchemas := parseFieldSchemaFromPb(pbFieldSchemas)
+
+		// assert
+		t.Log("fieldSchemas ==> ", fieldSchemas)
+		assert.Equal(t, len(fieldSchemas), 1)
+
+		assert.Nil(t, fieldSchemas[0].Analyzer)
+		assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+		assert.Equal(t, *fieldSchemas[0].IsVirtualField, true)
+	}
+	{
+		// build pb
+		pbFieldSchema := new(otsprotocol.FieldSchema)
+		pbFieldSchema.FieldName = proto.String("Col_Analyzer")
+		pbFieldSchema.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbFieldSchema.IsVirtualField = proto.Bool(false)
+
+		pbFieldSchemas := []*otsprotocol.FieldSchema{
+			pbFieldSchema,
+		}
+
+		// pb -> model
+		fieldSchemas := parseFieldSchemaFromPb(pbFieldSchemas)
+
+		// assert
+		t.Log("fieldSchemas ==> ", fieldSchemas)
+		assert.Equal(t, len(fieldSchemas), 1)
+
+		assert.Nil(t, fieldSchemas[0].Analyzer)
+		assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+		assert.Equal(t, *fieldSchemas[0].IsVirtualField, false)
+	}
+	{
+		// build pb
+		pbFieldSchema := new(otsprotocol.FieldSchema)
+		pbFieldSchema.FieldName = proto.String("Col_Analyzer")
+		pbFieldSchema.FieldType = otsprotocol.FieldType_TEXT.Enum()
+		pbFieldSchema.IsVirtualField = proto.Bool(false)
+		pbFieldSchema.SourceFieldNames = []string{"sourceField"}
+
+		pbFieldSchemas := []*otsprotocol.FieldSchema{
+			pbFieldSchema,
+		}
+
+		// pb -> model
+		fieldSchemas := parseFieldSchemaFromPb(pbFieldSchemas)
+
+		// assert
+		t.Log("fieldSchemas ==> ", fieldSchemas)
+		assert.Equal(t, len(fieldSchemas), 1)
+
+		assert.Nil(t, fieldSchemas[0].Analyzer)
+		assert.Nil(t, fieldSchemas[0].AnalyzerParameter)
+		assert.Equal(t, *fieldSchemas[0].IsVirtualField, false)
+		assert.Equal(t, fieldSchemas[0].SourceFieldNames, []string{"sourceField"})
+	}
 }
 
 func TestParallelScanRequest_ProtoBuffer(t *testing.T) {

@@ -16,11 +16,11 @@ const (
 	xOtsContentmd5          = "x-ots-contentmd5"
 	xOtsHeaderStsToken      = "x-ots-ststoken"
 	xOtsHeaderChargeAdmin   = "x-ots-charge-for-admin"
-	xOtsHeaderChargeTunnel  = "x-ots-tunnel-name"
 	xOtsSignature           = "x-ots-signature"
 	xOtsRequestCompressType = "x-ots-request-compress-type"
 	xOtsRequestCompressSize = "x-ots-request-compress-size"
 	xOtsResponseCompressTye = "x-ots-response-compress-type"
+	xOtsHeaderTunnelType	= "x-ots-tunnel-type"
 	xOtsPrefix              = "x-ots"
 )
 
@@ -50,7 +50,7 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsRequestCompressType, must: false},
 		&otsHeader{name: xOtsHeaderStsToken, must: false},
 		&otsHeader{name: xOtsHeaderChargeAdmin, must: false},
-		&otsHeader{name: xOtsHeaderChargeTunnel, must: false},
+		&otsHeader{name: xOtsHeaderTunnelType, must: false},
 	}
 
 	sort.Sort(h)
@@ -121,9 +121,7 @@ func (h *otsHeaders) signature(uri, method, accessKey string) (string, error) {
 	h.hmacSha1.Reset()
 	h.hmacSha1.Write([]byte(stringToSign))
 
-	// fmt.Println("stringToSign:" + stringToSign)
 	sign := base64.StdEncoding.EncodeToString(h.hmacSha1.Sum(nil))
 	h.set(xOtsSignature, sign)
-	// fmt.Println("sign:" + sign)
 	return sign, nil
 }

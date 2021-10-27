@@ -3,14 +3,15 @@ package tablestore
 import (
 	"bytes"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/golang/protobuf/proto"
 	"io"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"reflect"
 	"sort"
+	"strings"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/golang/protobuf/proto"
 )
 
 const (
@@ -42,6 +43,15 @@ type ColumnValue struct {
 	Type  ColumnType
 	Value interface{}
 }
+
+func NewColumnValue(columnType ColumnType , value interface{}) *ColumnValue {
+	return &ColumnValue{
+		Type: columnType,
+		Value: value,
+	}
+}
+
+
 
 func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	writeTag(w, TAG_CELL_VALUE)
@@ -578,34 +588,6 @@ func NewPaginationFilter(filter *PaginationFilter) *otsprotocol.ColumnPagination
 	return pageFilter
 }
 
-func (otsClient *TableStoreClient) postReq(req *http.Request, url string) ([]byte, error, string) {
-	resp, err := otsClient.httpClient.Do(req)
-	if err != nil {
-		return nil, err, ""
-	}
-	defer resp.Body.Close()
-
-	reqId := getRequestId(resp)
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err, reqId
-	}
-
-	if (resp.StatusCode >= 200 && resp.StatusCode < 300) == false {
-		var retErr *OtsError
-		perr := new(otsprotocol.Error)
-		errUm := proto.Unmarshal(body, perr)
-		if errUm != nil {
-			retErr = rawHttpToOtsError(resp.StatusCode, body, reqId)
-		} else {
-			retErr = pbErrToOtsError(resp.StatusCode, perr, reqId)
-		}
-		return nil, retErr, reqId
-	}
-
-	return body, nil, reqId
-}
-
 func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
 	oerr := &OtsError{
 		Message: string(body),
@@ -1034,4 +1016,87 @@ func ConvertPbIndexMetaToIndexMeta(meta *otsprotocol.IndexMeta) *IndexMeta {
 
 func (request *AddDefinedColumnRequest) AddDefinedColumn(name string, definedType DefinedColumnType) {
 	request.DefinedColumns = append(request.DefinedColumns, &DefinedColumnSchema{Name: name, ColumnType: definedType})
+}
+
+// implement sortedMap : map[string]string
+func SortedMapString(Map map[string]string) ([]string , []string) {
+	n := len(Map)
+	keys := make([]string , 0 , n)
+	values := make([]string , 0 , n)
+	for tag_key , _ := range Map {
+		keys = append(keys , tag_key)
+	}
+	sort.Strings(keys)
+	for _ , key := range keys {
+		values = append(values , Map[key])
+	}
+
+	return keys , values
+}
+
+// implement sorted map[string]ColumnValue
+func SortedMapColumnValue(Map map[string]*ColumnValue) ([]string , []*ColumnValue) {
+	n := len(Map)
+	keys := make([]string ,0 , n)
+	values := make([]*ColumnValue, 0, n)
+
+	for fieldKey , _ := range Map {
+		keys = append(keys , fieldKey)
+	}
+	sort.Strings(keys)
+	for i := 0; i < n; i++ {
+		values = append(values , Map[keys[i]])
+	}
+	return keys , values
+}
+
+func CheckTagKeyOrValue(s string) error {
+	if s == "" {
+		return fmt.Errorf("Tag or attribute key/value is empty")
+	}
+
+	for i := 0; i < len(s); i++ {
+		if !(s[i] >= '!' && s[i] <= '~' && s[i] != '"' || s[i] != '=') {
+			return fmt.Errorf("Tag or attribute key/value [%v] include illegal character" , s)
+		}
+	}
+	return nil
+}
+
+func BuildTagString(tags map[string]string) (string  , error) {
+	var capacity int = 2
+	n := len(tags)
+	keys := make([]string , 0 , n)
+	for key, value := range tags {
+		err := CheckTagKeyOrValue(key)
+		if err != nil {
+			return "", err
+		}
+		err = CheckTagKeyOrValue(value)
+		if err != nil {
+			return "", err
+		}
+		keys = append(keys, key)
+		capacity += len(key) + len(value) + 3
+	}
+
+	sort.Strings(keys)
+
+	sb := strings.Builder{}
+	sb.Grow(capacity)
+	sb.WriteByte('[')
+	for i := 0; i < len(keys); i++{
+		key, value := keys[i], tags[keys[i]]
+		sb.WriteByte('"')
+		sb.WriteString(key)
+		sb.WriteByte('=')
+		sb.WriteString(value)
+		sb.WriteByte('"')
+
+		if i != len(keys) - 1{
+			sb.WriteByte(',')
+		}
+	}
+	sb.WriteByte(']')
+	return sb.String(), nil
 }

@@ -3,16 +3,16 @@ package tablestore
 import (
 	"fmt"
 	. "gopkg.in/check.v1"
+	"io"
 	"math/rand"
 	"net/http"
 	"os"
 	"runtime"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
-	"io"
-	"syscall"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -39,6 +39,7 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
 	accessKeyId := os.Getenv("OTS_TEST_KEYID")
 	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	tableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
@@ -1409,66 +1410,66 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	errorCode := INTERNAL_SERVER_ERROR
 	tsClient := client.(*TableStoreClient)
-	value := getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 10, time.Now().Add(time.Second*1), 10, getRowUri)
+	value := tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 10, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = ROW_OPERATION_CONFLICT
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value == 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value > 0, Equals, true)
 
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri)
 	c.Check(value == MaxRetryInterval, Equals, true)
 
 	// stream api
 	errorCode = STORAGE_TIMEOUT
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
 	c.Check(value > 0, Equals, true)
 
 	// 502
 	errorCode = SERVER_UNAVAILABLE
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, getStreamRecordUri)
 	c.Check(value > 0, Equals, true)
 
 	// 502 write
 	errorCode = SERVER_UNAVAILABLE
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: "bad gateway"}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value == 0, Equals, true)
 
 	// 400 normal
 	errorCode = "OTSPermissionDenied"
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value == 0, Equals, true)
 
 	// 400 raw http
 	errorCode = OTS_CLIENT_UNKNOWN
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, getRowUri)
 	c.Check(value == 0, Equals, true)
 
 	// storage 503 put
 	errorCode = STORAGE_SERVER_BUSY
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value > 0, Equals, true)
 
 	// storage 503 desc stream
 	errorCode = STORAGE_SERVER_BUSY
-	value = getNextPause(tsClient, &OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, describeStreamUri)
+	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), 10, describeStreamUri)
 	c.Check(value > 0, Equals, true)
 
 	// EOF
-	value = getNextPause(tsClient, io.EOF, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(io.EOF, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value > 0, Equals, true)
 
 	// connection rest
-	value = getNextPause(tsClient, syscall.ECONNRESET, 1, time.Now().Add(time.Second*1), 10, putRowUri)
+	value = tsClient.getNextPause(syscall.ECONNRESET, 1, time.Now().Add(time.Second*1), 10, putRowUri)
 	c.Check(value > 0, Equals, true)
 
 	getResp := &GetRowResponse{}

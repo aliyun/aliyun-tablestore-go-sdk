@@ -1,9 +1,11 @@
 package search
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
 	"github.com/golang/protobuf/proto"
 )
 
@@ -91,10 +93,29 @@ func (a AggregationResults) Count(name string) (*CountAggregationResult, error){
 	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
 }
 
+func (a AggregationResults) TopRows(name string) (*TopRowsAggregationResult, error) {
+	if result, ok := a.resultMap[name]; ok {
+		if result.GetType() != AggregationTopRowsType {
+			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationTopRowsType.String()))
+		}
+		return result.(*TopRowsAggregationResult), nil
+	}
+	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
+}
+
+func (a AggregationResults) Percentiles(name string) (*PercentilesAggregationResult, error) {
+	if result, ok := a.resultMap[name]; ok {
+		if result.GetType() != AggregationPercentilesType {
+			return nil, errors.New(fmt.Sprintf("wrong agg type: [%v] needed, [%v] provided", result.GetType().String(), AggregationPercentilesType.String()))
+		}
+		return result.(*PercentilesAggregationResult), nil
+	}
+	return nil, errors.New(fmt.Sprintf("agg [%v] not found", name))
+}
+
 func (a AggregationResults) Empty() bool {
 	return len(a.resultMap) == 0
 }
-
 
 func ParseAvgAggregationResultFromPB(pbAggResult *otsprotocol.AggregationResult) (*AvgAggregationResult, error) {
 	aggResult := new(AvgAggregationResult)
@@ -187,6 +208,73 @@ func ParseCountAggregationResultFromPB(pbAggResult *otsprotocol.AggregationResul
 	return aggResult, nil
 }
 
+func ParseTopRowsAggregationResultFromPB(pbAggResult *otsprotocol.AggregationResult) (*TopRowsAggregationResult, error) {
+	aggResult := new(TopRowsAggregationResult)
+	aggResult.Name = *pbAggResult.Name
+	pbAggResultBody := new(otsprotocol.TopRowsAggregationResult)
+
+	if err := proto.Unmarshal(pbAggResult.AggResult, pbAggResultBody); err != nil {
+		return nil, err
+	}
+	if pbAggResultBody == nil {
+		return nil, errors.New("parse pb error")
+	}
+
+	rows := make([]*model.PlainBufferRow, 0)
+	for _, buf := range pbAggResultBody.Rows {
+		row, err := model.ReadRowsWithHeader(bytes.NewReader(buf))
+		if err != nil {
+			return nil, err
+		}
+		if len(row) == 1 {
+			rows = append(rows, row[0])
+		}
+	}
+
+	for _, row := range rows {
+		currentRow := new(model.Row)
+		currentPk := new(model.PrimaryKey)
+		for _, pk := range row.PrimaryKey {
+			pkColumn := &model.PrimaryKeyColumn{ColumnName: string(pk.CellName), Value: pk.CellValue.Value}
+			currentPk.PrimaryKeys = append(currentPk.PrimaryKeys, pkColumn)
+		}
+		currentRow.PrimaryKey = currentPk
+		for _, cell := range row.Cells {
+			dataColumn := &model.AttributeColumn{ColumnName: string(cell.CellName), Value: cell.CellValue.Value, Timestamp: cell.CellTimestamp}
+			currentRow.Columns = append(currentRow.Columns, dataColumn)
+		}
+		aggResult.Value = append(aggResult.Value, *currentRow)
+	}
+
+	return aggResult, nil
+}
+
+func ParsePercentilesAggregationResultFromPB(pbAggResult *otsprotocol.AggregationResult) (*PercentilesAggregationResult, error) {
+	aggResult := new(PercentilesAggregationResult)
+	aggResult.Name = *pbAggResult.Name
+	pbAggResultBody := new(otsprotocol.PercentilesAggregationResult)
+
+	if err := proto.Unmarshal(pbAggResult.AggResult, pbAggResultBody); err != nil {
+		return nil, err
+	}
+	if pbAggResultBody == nil {
+		return nil, errors.New("parse pb error")
+	}
+	aggResult.PercentilesAggregationItems = make([]PercentilesAggregationItem, len(pbAggResultBody.GetPercentilesAggregationItems()))
+	for index, percentAggItem := range pbAggResultBody.PercentilesAggregationItems {
+		aggResult.PercentilesAggregationItems[index].Key = percentAggItem.GetKey()
+		var err error
+		var valuePtr *model.ColumnValue
+		valuePtr, err = ForceConvertToDestColumnValue(percentAggItem.GetValue())
+		if err == nil {
+			aggResult.PercentilesAggregationItems[index].Value = *valuePtr
+		} else {
+			return nil, err
+		}
+	}
+	return aggResult, nil
+}
+
 func ParseAggregationResultsFromPB(pbAggregationResults []*otsprotocol.AggregationResult) (*AggregationResults, error) {
 	aggregationResults := AggregationResults{}
 
@@ -229,6 +317,20 @@ func ParseAggregationResultsFromPB(pbAggregationResults []*otsprotocol.Aggregati
 			break
 		case otsprotocol.AggregationType_AGG_COUNT:
 			aggResult, err := ParseCountAggregationResultFromPB(pbAggResult)
+			if err != nil {
+				return nil, err
+			}
+			aggregationResults.Put(aggResult.Name, aggResult)
+			break
+		case otsprotocol.AggregationType_AGG_TOP_ROWS:
+			aggResult, err := ParseTopRowsAggregationResultFromPB(pbAggResult)
+			if err != nil {
+				return nil, err
+			}
+			aggregationResults.Put(aggResult.Name, aggResult)
+			break
+		case otsprotocol.AggregationType_AGG_PERCENTILES:
+			aggResult, err := ParsePercentilesAggregationResultFromPB(pbAggResult)
 			if err != nil {
 				return nil, err
 			}
