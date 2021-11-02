@@ -404,9 +404,12 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 
 	// 创建用于测试UpdateTimeseriesMeta接口的时序表
-	PrepareTimeseriesTable(curTimeseriesTableName)
+	err := PrepareTimeseriesTable(curTimeseriesTableName)
+	if err != nil {
+		c.Fatal(err)
+	}
 
-	time.Sleep(30 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	timeseriesKey := NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("CPU")

@@ -67,6 +67,9 @@ func parseTimeseriesMeta(pbResponseMeta *otsprotocol.TimeseriesMeta) (*Timeserie
 		}
 		timeseriesMeta.attributes = attrs
 	}
+	if pbResponseMeta.UpdateTime != nil {
+		timeseriesMeta.updateTimeInUs = *pbResponseMeta.UpdateTime
+	}
 	return timeseriesMeta, nil
 }
 
