@@ -108,7 +108,14 @@ func TestChannelConn_NotifyStatus(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	request := &ReadRecordRequest{
+		TunnelId:         "tunnelId",
+		ChannelId:        "channelId",
+		ClientId:         "clientId",
+		Token:            "token",
+		NeedBinaryRecord: false,
+	}
+	bypassApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: "token", ResponseInfo: ResponseInfo{"traceId"}}, nil).AnyTimes()
 
 	Convey("nil state channel notify status", t, func() {
 		cases := []struct {
@@ -340,13 +347,20 @@ func TestChannelConn_NotifyStatus_ProcessRecords(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	request := &ReadRecordRequest{
+		TunnelId:         "tunnelId",
+		ChannelId:        "channelId",
+		ClientId:         "clientId",
+		Token:            "token",
+		NeedBinaryRecord: false,
+	}
+	bypassApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: "token", ResponseInfo: ResponseInfo{"traceId"}}, nil).AnyTimes()
 
 	failApi := NewMocktunnelDataApi(mockCtrl)
-	failApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, errors.New("abc")).Times(1)
+	failApi.EXPECT().ReadRecords(request).Return(nil, errors.New("abc")).Times(1)
 
 	finishApi := NewMocktunnelDataApi(mockCtrl)
-	finishApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, FinishTag, "traceId", 0, nil).Times(1)
+	finishApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: FinishTag, ResponseInfo: ResponseInfo{"traceId"}}, nil).Times(1)
 
 	cases := []struct {
 		desc        string
@@ -390,7 +404,14 @@ func TestChannelConn_Close(t *testing.T) {
 	lg, _ := testLogConfig.Build()
 	state := NewTunnelStateMachine("", "", nil, nil, nil, lg)
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", "channelId", "token").Return(nil, "token", "traceId", 0, nil).AnyTimes()
+	request := &ReadRecordRequest{
+		TunnelId:         "tunnelId",
+		ChannelId:        "channelId",
+		ClientId:         "clientId",
+		Token:            "token",
+		NeedBinaryRecord: false,
+	}
+	bypassApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: "token", ResponseInfo: ResponseInfo{"traceId"}}, nil).AnyTimes()
 
 	Convey("open tunnel is closed", t, func() {
 		openState := newChannel(0, protocol.ChannelStatus_OPEN)
@@ -426,7 +447,7 @@ func newTestProcessor(dur time.Duration) *testProcessor {
 	return &testProcessor{dur, false, false}
 }
 
-func (p *testProcessor) Process(records []*Record, nextToken, traceId string) error {
+func (p *testProcessor) Process(records []*Record, binaryRecords []byte, recordCount int, nextToken, traceId string, isStreamChannel bool, manager ParallelReleaseManager) error {
 	if nextToken == FinishTag {
 		p.finished = true
 	}
@@ -446,9 +467,13 @@ func (p *testProcessor) Error() bool {
 	return false
 }
 
+func (p *testProcessor) CommitToken(token string) error {
+	return nil
+}
+
 type failProcessor struct{}
 
-func (p *failProcessor) Process(records []*Record, nextToken, traceId string) error {
+func (p *failProcessor) Process(records []*Record, binaryRecords []byte, recordCount int, nextToken, traceId string, isStreamChannel bool, manager ParallelReleaseManager) error {
 	return errors.New("failed")
 }
 
@@ -460,6 +485,10 @@ func (p *failProcessor) Finished() bool {
 
 func (p *failProcessor) Error() bool {
 	return false
+}
+
+func (p *failProcessor) CommitToken(token string) error {
+	return nil
 }
 
 //todo test async failProcessor

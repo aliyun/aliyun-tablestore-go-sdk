@@ -326,7 +326,6 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 
 		putTimeseriesDataRep.AddTimeseriesRows(timeseriesRow)
 	}
-
 	putTimeseriesDataResp , err := timeseriesClient.PutTimeseriesData(putTimeseriesDataRep)
 	c.Assert(err , Equals , nil)
 	c.Assert(len(putTimeseriesDataResp.GetFailedRowResults()) , Equals , 0)
@@ -466,4 +465,69 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 	c.Assert(err , Equals , nil)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) , Equals , 1)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()) , Equals , 1)
+}
+
+
+func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
+	fmt.Println("[Info]: TestDeleteTimeseriesMeta start !")
+
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
+
+	// 创建用于测试DeleteTimeseriesMeta接口的时序表
+	err := PrepareTimeseriesTable(curTimeseriesTableName)
+	if err != nil {
+		c.Fatal(err)
+	}
+	time.Sleep(60 * time.Second)
+
+	putTimeseriesDataRequest := NewPutTimeseriesDataRequest(curTimeseriesTableName)
+	for i := 0; i < 100; i++ {
+		timeseriesKey := NewTimeseriesKey()
+		timeseriesKey.SetMeasurementName("CPU")
+		timeseriesKey.SetDataSource("source_" + strconv.Itoa(i))
+		timeseriesKey.AddTag("Province" , "浙江")
+		timeseriesKey.AddTag("City" , "杭州")
+
+		timeseriesRow := NewTimeseriesRow(timeseriesKey)
+		timeseriesRow.SetTimeInus(time.Now().UnixNano() / 1000)
+		timeseriesRow.AddField("temperature" , NewColumnValue(ColumnType_DOUBLE , 98.5))
+		timeseriesRow.AddField("status" , NewColumnValue(ColumnType_BOOLEAN , true))
+		putTimeseriesDataRequest.AddTimeseriesRows(timeseriesRow)
+	}
+	putTimeseriesDataResponse , err := timeseriesClient.PutTimeseriesData(putTimeseriesDataRequest)
+	c.Assert(err , Equals , nil)
+	c.Assert(len(putTimeseriesDataResponse.GetFailedRowResults()) , Equals , 0)
+
+	time.Sleep(20 * time.Second)
+
+	// 查询meta
+	measurementQueryCondition := NewMeasurementQueryCondition(OP_EQUAL , "CPU")
+	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
+	queryTimeseriesMetaRequest.SetLimit(-1)
+	queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
+
+	queryTimeseriesMetaResponse , err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+	c.Assert(err , Equals , nil)
+	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) , Equals , 100)
+
+	// 删除meta
+	deleteTimeseriesMetaRequest := NewDeleteTimeseriesMetaRequest(curTimeseriesTableName)
+	for i := 0; i < len(queryTimeseriesMetaResponse.GetTimeseriesMetas()); i++ {
+		deleteTimeseriesMetaRequest.AddTimeseriesKeys(queryTimeseriesMetaResponse.GetTimeseriesMetas()[i].GetTimeseriesKey())
+	}
+	deleteTimeseriesMetaResponse , err := timeseriesClient.DeleteTimeseriesMeta(deleteTimeseriesMetaRequest)
+	c.Assert(err , Equals , nil)
+	c.Assert(len(deleteTimeseriesMetaResponse.GetFailedRowResults()) , Equals , 0)
+
+	time.Sleep(20 * time.Second)
+
+	// 再次查询meta
+	measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL , "CPU")
+	queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
+	queryTimeseriesMetaRequest.SetLimit(-1)
+	queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
+
+	queryTimeseriesMetaResponse , err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+	c.Assert(err , Equals , nil)
+	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) , Equals , 0)
 }

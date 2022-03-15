@@ -29,4 +29,5 @@ type TableStoreApi interface {
 
 	ComputeSplits(request *ComputeSplitsRequest) (*ComputeSplitsResponse, error)
 	ParallelScan(request *ParallelScanRequest) (*ParallelScanResponse, error)
+	SQLQuery(req *SQLQueryRequest) (*SQLQueryResponse, error)
 }

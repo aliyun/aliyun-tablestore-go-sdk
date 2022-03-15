@@ -1,6 +1,7 @@
 package search
 
 import (
+	"encoding/json"
 	"errors"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
@@ -46,6 +47,69 @@ func (a AggregationType) String() string {
 	default:
 		return "unknown"
 	}
+}
+
+func UnmarshalAggregation(name string, data json.RawMessage) (Aggregation, error) {
+	var err error
+	switch name {
+	case "avg":
+		q := &AvgAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "distinct_count":
+		q := &DistinctCountAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "max":
+		q := &MaxAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "min":
+		q := &MinAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "sum":
+		q := &SumAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "count":
+		q := &CountAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "top_rows":
+		q := &TopRowsAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	case "percentiles":
+		q := &PercentilesAggregation{}
+		err = json.Unmarshal(data, q)
+		return q, err
+	}
+
+	return nil, nil
+}
+
+func ToAggregationType(q string) AggregationType {
+	switch q {
+	case "avg":
+		return AggregationAvgType
+	case "distinct_count":
+		return AggregationDistinctCountType
+	case "max":
+		return AggregationMaxType
+	case "min":
+		return AggregationMinType
+	case "sum":
+		return AggregationSumType
+	case "count":
+		return AggregationCountType
+	case "top_rows":
+		return AggregationTopRowsType
+	case "percentiles":
+		return AggregationPercentilesType
+	}
+
+	return AggregationNoneType
 }
 
 func (a AggregationType) ToPB() *otsprotocol.AggregationType {

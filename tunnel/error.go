@@ -1,6 +1,7 @@
 package tunnel
 
 import (
+	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 )
@@ -14,6 +15,11 @@ const (
 	ErrCodeTunnelExpired     = "OTSTunnelExpired"
 	ErrCodePermissionDenied  = "OTSPermissionDenied"
 	ErrCodeTunnelExist       = "OTSTunnelExist"
+)
+
+var (
+	ErrUnExpectBinaryRecordTag = errors.New("UnexpectBinaryRecordTag")
+	ErrUnSupportRecordVersion  = errors.New("UnSupportRecordVersion")
 )
 
 type TunnelError struct {

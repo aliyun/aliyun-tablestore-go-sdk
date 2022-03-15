@@ -91,9 +91,19 @@ func (s *TunnelStateMachine) Close() {
 	s.closeOnce.Do(func() {
 		close(s.closeCh)
 		s.wg.Wait()
+		var syncCloseResource bool
+		if factory, ok := s.pFactory.(*SimpleProcessFactory); ok {
+			syncCloseResource = factory.SyncCloseResource
+		} else if factory, ok := s.pFactory.(*AsyncProcessFactory); ok {
+			syncCloseResource = factory.SyncCloseResource
+		}
 		for _, conn := range s.channelConn {
 			conn := conn
-			go conn.Close()
+			if syncCloseResource {
+				conn.Close()
+			} else {
+				go conn.Close()
+			}
 		}
 		s.lg.Info("state machine is closed")
 	})

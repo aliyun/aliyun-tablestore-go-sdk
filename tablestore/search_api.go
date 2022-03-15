@@ -14,6 +14,9 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 	req := new(otsprotocol.CreateSearchIndexRequest)
 	req.TableName = proto.String(request.TableName)
 	req.IndexName = proto.String(request.IndexName)
+	if request.TimeToLive != nil {
+		req.TimeToLive = proto.Int32(*request.TimeToLive)
+	}
 	var err error
 	req.Schema, err = convertToPbSchema(request.IndexSchema)
 	if err != nil {
@@ -70,7 +73,7 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 	if err := tableStoreClient.doRequestWithRetry(describeSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
-	schema, err := parseFromPbSchema(resp.Schema)
+	schema, err := ParseFromPbSchema(resp.Schema)
 	if err != nil {
 		return nil, err
 	}
@@ -90,6 +93,35 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 			return nil, errors.New(fmt.Sprintf("unknown SyncPhase: %v", syncPhase))
 		}
 	}
+
+	if resp.MeteringInfo != nil {
+		response.MeteringInfo = &MeteringInfo{}
+
+		if resp.MeteringInfo.StorageSize != nil {
+			response.MeteringInfo.StorageSize = *resp.MeteringInfo.StorageSize
+		}
+
+		if resp.MeteringInfo.RowCount != nil {
+			response.MeteringInfo.RowCount = *resp.MeteringInfo.RowCount
+		}
+
+		if resp.MeteringInfo.ReservedReadCu != nil {
+			response.MeteringInfo.ReservedReadCU = *resp.MeteringInfo.ReservedReadCu
+		}
+
+		if resp.MeteringInfo.Timestamp != nil {
+			response.MeteringInfo.LastUpdateTime = *resp.MeteringInfo.Timestamp
+		}
+	}
+
+	if resp.CreateTime != nil {
+		response.CreateTime = *resp.CreateTime
+	}
+
+	if resp.TimeToLive != nil {
+		response.TimeToLive = *resp.TimeToLive
+	}
+
 	return response, nil
 }
 

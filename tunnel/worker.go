@@ -48,6 +48,9 @@ func newTunnelWorker(tunnelId string, api *TunnelApi, conf *TunnelWorkerConfig) 
 	if conf.ProcessorFactory == nil {
 		return nil, &TunnelError{Code: ErrCodeClientError, Message: "TunnelWorkerConfig ProcessorFactory can not be nil"}
 	}
+	if conf.MaxChannelParallel < 0 {
+		return nil, &TunnelError{Code: ErrCodeClientError, Message: "TunnelWorkerConfig MaxChannelParallel can not less than 0"}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cloneConf := *conf
 	initExceptDialerConfig(&cloneConf)
@@ -56,11 +59,17 @@ func newTunnelWorker(tunnelId string, api *TunnelApi, conf *TunnelWorkerConfig) 
 		return nil, &TunnelError{Code: ErrCodeClientError, Message: err.Error()}
 	}
 	if cloneConf.ChannelDialer == nil {
-		cloneConf.ChannelDialer = &channelDialer{
+		dialer := &channelDialer{
 			api: api,
 			lg:  lg,
 			bc:  cloneConf.BackoffConfig,
 		}
+		if cloneConf.MaxChannelParallel != 0 {
+			dialer.channelParallelChan = make(chan bool, cloneConf.MaxChannelParallel)
+			dialer.needManualRelease = cloneConf.NeedManualRelease
+		}
+		dialer.syncReadRecords = cloneConf.SyncReadRecords
+		cloneConf.ChannelDialer = dialer
 	}
 	return &tunnelWorker{
 		tunnelId:          tunnelId,

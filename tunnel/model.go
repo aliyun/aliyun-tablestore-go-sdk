@@ -92,6 +92,23 @@ type GetRpoResponse struct {
 	TunnelId       string
 }
 
+type ReadRecordRequest struct {
+	TunnelId         string
+	ChannelId        string
+	ClientId         string
+	Token            string
+	NeedBinaryRecord bool
+}
+
+type ReadRecordResponse struct {
+	Records       []*Record
+	BinaryRecords []byte
+	NextToken     string
+	Size          int
+	RecordCount   int
+	ResponseInfo
+}
+
 type RpoLatency struct {
 	ChannelTyp ChannelType
 	Status     string
@@ -191,28 +208,28 @@ func ParseSerializedSeqInfo(hexedSeqStr string) (*SequenceInfo, error) {
 	seqTags := strings.Split(hexedSeqStr, sequenceSep)
 	if len(seqTags) != 3 {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: "invalid hexed sequence info",
 		}
 	}
 	epoch, err := strconv.ParseInt(seqTags[0], 16, 32)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}
 	timestamp, err := strconv.ParseInt(seqTags[1], 16, 64)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}
 	index, err := strconv.ParseInt(seqTags[2], 16, 32)
 	if err != nil {
 		return nil, &TunnelError{
-			Code: ErrCodeClientError,
+			Code:    ErrCodeClientError,
 			Message: err.Error(),
 		}
 	}

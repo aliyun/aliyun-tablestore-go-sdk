@@ -60,4 +60,7 @@ func main() {
 
 	sample.ParallelScanSingleConcurrency(client, "scan_sample_table", "scan_sample_index")
 	sample.ParallelScanMultiConcurrency(client, "scan_sample_table", "scan_sample_index")
+
+	// SQL sample
+	sample.SQLQuerySample(client)
 }

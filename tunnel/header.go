@@ -29,8 +29,8 @@ const (
 	xOtsRequestCompressSize = "x-ots-request-compress-size"
 	xOtsResponseCompressTye = "x-ots-response-compress-type"
 	xOtsHeaderTraceID       = "x-ots-trace-id"
-	xOtsHeaderTunnelType	= "x-ots-tunnel-type"
-	xOtsPrefix				= "x-ots"
+	xOtsHeaderTunnelType    = "x-ots-tunnel-type"
+	xOtsPrefix              = "x-ots"
 )
 
 type otsHeader struct {
@@ -59,7 +59,7 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsRequestCompressType, must: false},
 		&otsHeader{name: xOtsHeaderStsToken, must: false},
 		&otsHeader{name: xOtsHeaderTraceID, must: false},
-		&otsHeader{name: xOtsHeaderTunnelType, must:false},
+		&otsHeader{name: xOtsHeaderTunnelType, must: false},
 	}
 
 	sort.Sort(h)

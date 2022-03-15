@@ -614,6 +614,42 @@ func TestConvertFieldSchemaToPBFieldSchema_VirtualField(t *testing.T) {
 	}
 }
 
+func TestConvertFieldSchemaToPBFieldSchema_Date(t *testing.T) {
+	schemas := []*FieldSchema{
+		{
+			FieldName:   proto.String("date"),
+			FieldType:   FieldType_DATE,
+			DateFormats: []string{"format1", "format2"},
+		},
+		{
+			FieldName: proto.String("nested"),
+			FieldType: FieldType_NESTED,
+			FieldSchemas: []*FieldSchema{
+				{
+					FieldName: proto.String("nested_date"),
+					FieldType: FieldType_DATE,
+				},
+			},
+		},
+	}
+	// convert to pb
+	var pbSchemas []*otsprotocol.FieldSchema
+	pbSchemas = convertFieldSchemaToPBFieldSchema(schemas)
+
+	// assert
+	t.Log("pb actual ==> ", pbSchemas)
+	assert.Equal(t, len(pbSchemas), 2)
+
+	assert.Equal(t, "date", *pbSchemas[0].FieldName)
+	assert.Equal(t, *otsprotocol.FieldType_DATE.Enum(), *pbSchemas[0].FieldType)
+	assert.Equal(t, []string{"format1", "format2"}, pbSchemas[0].DateFormats)
+
+	assert.Equal(t, len(pbSchemas[1].FieldSchemas), 1)
+	assert.Equal(t, "nested_date", *pbSchemas[1].FieldSchemas[0].FieldName)
+	assert.Equal(t, *otsprotocol.FieldType_DATE.Enum(), *pbSchemas[1].FieldSchemas[0].FieldType)
+	assert.Equal(t, 0, len(pbSchemas[1].FieldSchemas[0].DateFormats))
+}
+
 // parseFieldSchemaFromPb
 
 func TestParseFieldSchemaFromPb_SingleWord(t *testing.T) {
@@ -1158,6 +1194,36 @@ func TestParseFieldSchemaFromPb_VirtualField(t *testing.T) {
 		assert.Equal(t, *fieldSchemas[0].IsVirtualField, false)
 		assert.Equal(t, fieldSchemas[0].SourceFieldNames, []string{"sourceField"})
 	}
+}
+
+func TestParseFieldSchemaFromPb_Date(t *testing.T) {
+	// build pb
+	pbFieldSchemas := []*otsprotocol.FieldSchema{
+		{
+			FieldName:   proto.String("date"),
+			FieldType:   otsprotocol.FieldType_DATE.Enum(),
+			DateFormats: []string{"format1", "format2"},
+		},
+		{
+			FieldName: proto.String("date2"),
+			FieldType: otsprotocol.FieldType_DATE.Enum(),
+		},
+	}
+
+	// pb -> model
+	fieldSchemas := parseFieldSchemaFromPb(pbFieldSchemas)
+
+	// assert
+	t.Log("fieldSchemas ==> ", fieldSchemas)
+	assert.Equal(t, len(fieldSchemas), 2)
+
+	assert.Equal(t, "date", *fieldSchemas[0].FieldName)
+	assert.Equal(t, FieldType_DATE, fieldSchemas[0].FieldType)
+	assert.Equal(t, []string{"format1", "format2"}, fieldSchemas[0].DateFormats)
+
+	assert.Equal(t, "date2", *fieldSchemas[1].FieldName)
+	assert.Equal(t, FieldType_DATE, fieldSchemas[1].FieldType)
+	assert.Equal(t, 0, len(fieldSchemas[1].DateFormats))
 }
 
 func TestParallelScanRequest_ProtoBuffer(t *testing.T) {

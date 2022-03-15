@@ -82,15 +82,19 @@ func setDefault(bc *ChannelBackoffConfig) {
 }
 
 type ChannelContext struct {
-	TunnelId  string
-	ClientId  string
-	ChannelId string
-
-	TraceId string
+	TunnelId        string
+	ClientId        string
+	ChannelId       string
+	IsStreamChannel bool
+	TraceId         string
 
 	NextToken string
 
-	CustomValue interface{}
+	RecordCount            int
+	BinaryRecords          []byte
+	Processor              ChannelProcessor
+	CustomValue            interface{}
+	ParallelReleaseManager ParallelReleaseManager
 }
 
 func (c *ChannelContext) String() string {
@@ -111,6 +115,13 @@ type TunnelWorkerConfig struct {
 	LogConfig      *zap.Config
 	LogWriteSyncer zapcore.WriteSyncer
 	BackoffConfig  *ChannelBackoffConfig
+
+	//Maximum concurrency of channels that read and process data, Concurrency is not limited by default
+	MaxChannelParallel int
+	//whether to manually manage concurrent channel switching
+	NeedManualRelease bool
+	//Whether to read data synchronously
+	SyncReadRecords bool
 }
 
 // hack replace zap config build core with lumberjack logger

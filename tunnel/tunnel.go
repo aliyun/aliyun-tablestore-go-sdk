@@ -9,19 +9,19 @@ type DefaultTunnelClient struct {
 	api *TunnelApi
 }
 
-func NewTunnelClient(endpoint, instanceName, accessId, accessKey string) TunnelClient {
-	return NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey, nil)
+func NewTunnelClient(endpoint, instanceName, accessId, accessKey string, options ...ClientOption) TunnelClient {
+	return NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey, nil, options...)
 }
 
-func NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey string, conf *TunnelConfig) TunnelClient {
+func NewTunnelClientWithConfig(endpoint, instanceName, accessId, accessKey string, conf *TunnelConfig, options ...ClientOption) TunnelClient {
 	return &DefaultTunnelClient{
-		api: NewTunnelApi(endpoint, instanceName, accessId, accessKey, conf),
+		api: NewTunnelApi(endpoint, instanceName, accessId, accessKey, conf, options...),
 	}
 }
 
-func NewTunnelClientWithToken(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig) TunnelClient {
+func NewTunnelClientWithToken(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig, options ...ClientOption) TunnelClient {
 	return &DefaultTunnelClient{
-		api: NewTunnelApiWithToken(endpoint, instanceName, accessId, accessKey, token, conf),
+		api: NewTunnelApiWithToken(endpoint, instanceName, accessId, accessKey, token, conf, options...),
 	}
 }
 

@@ -1,6 +1,7 @@
 package tablestore
 
 import (
+	"bytes"
 	"fmt"
 	. "gopkg.in/check.v1"
 	"io"
@@ -28,13 +29,13 @@ var _ = Suite(&TableStoreSuite{})
 
 var defaultTableName = "defaulttable"
 var rangeQueryTableName = "rangetable"
+var sqlTableName = "test_http_query"
 
 // Todo: use config
 var client TableStoreApi
 var invalidClient TableStoreApi
 
 func (s *TableStoreSuite) SetUpSuite(c *C) {
-
 	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
 	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
 	accessKeyId := os.Getenv("OTS_TEST_KEYID")
@@ -47,6 +48,7 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	rangeQueryTableName = tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
 	PrepareTable2(rangeQueryTableName)
+	PrepareSQLTable(sqlTableName)
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
 }
 
@@ -85,6 +87,75 @@ func PrepareTable2(tableName string) error {
 	createtableRequest.ReservedThroughput = reservedThroughput
 	_, error := client.CreateTable(createtableRequest)
 	return error
+}
+
+func PrepareSQLTable(tableName string) {
+	_, _ = client.DeleteTable(&DeleteTableRequest{
+		TableName: tableName,
+	})
+	createtableRequest := new(CreateTableRequest)
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("a", PrimaryKeyType_INTEGER)
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+	_, _ = client.CreateTable(createtableRequest)
+
+	time.Sleep(2 * time.Second)
+	batchReq := new(BatchWriteRowRequest)
+	rowChange := new(PutRowChange)
+	rowChange.TableName = tableName
+	rowChange.PrimaryKey = new(PrimaryKey)
+	rowChange.PrimaryKey.AddPrimaryKeyColumn("a", int64(0))
+	rowChange.AddColumn("b", 0.0)
+	rowChange.AddColumn("c", "0")
+	rowChange.AddColumn("d", []byte("0"))
+	rowChange.AddColumn("e", false)
+	rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	batchReq.AddRowChange(rowChange)
+
+	rowChange = new(PutRowChange)
+	rowChange.TableName = tableName
+	rowChange.PrimaryKey = new(PrimaryKey)
+	rowChange.PrimaryKey.AddPrimaryKeyColumn("a", int64(1))
+	rowChange.AddColumn("b", 1.0)
+	rowChange.AddColumn("c", "1")
+	rowChange.AddColumn("d", []byte("1"))
+	rowChange.AddColumn("e", true)
+	rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	batchReq.AddRowChange(rowChange)
+
+	rowChange = new(PutRowChange)
+	rowChange.TableName = tableName
+	rowChange.PrimaryKey = new(PrimaryKey)
+	rowChange.PrimaryKey.AddPrimaryKeyColumn("a", int64(2))
+	rowChange.AddColumn("b", 2.0)
+	rowChange.AddColumn("c", "2")
+	rowChange.AddColumn("d", []byte("2"))
+	rowChange.AddColumn("e", false)
+	rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	batchReq.AddRowChange(rowChange)
+
+	rowChange = new(PutRowChange)
+	rowChange.TableName = tableName
+	rowChange.PrimaryKey = new(PrimaryKey)
+	rowChange.PrimaryKey.AddPrimaryKeyColumn("a", int64(3))
+	rowChange.AddColumn("b", 3.0)
+	rowChange.AddColumn("e", true)
+	rowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	batchReq.AddRowChange(rowChange)
+
+	_, err := client.BatchWriteRow(batchReq)
+	if err != nil {
+		println("batchwriterow failed", err.Error())
+	}
 }
 
 func (s *TableStoreSuite) TestCreateTable(c *C) {
@@ -944,8 +1015,8 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
 
-	for i:=0; i<10; i++ {
-		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+	for i := 0; i < 10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_"+strconv.Itoa(i), "colVal1_"+strconv.Itoa(i), rangeQueryTableName)
 		batchWriteReq.AddRowChange(rowChange)
 	}
 
@@ -993,11 +1064,11 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithDiffPartitionKey(c *C) {
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
 
-	for i:=0; i<10; i++ {
-		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_" + strconv.Itoa(i), "colVal1_" + strconv.Itoa(i), rangeQueryTableName)
+	for i := 0; i < 10; i++ {
+		rowChange := CreatePutRowChangeV2("atomicPk1", "atomicPk2_"+strconv.Itoa(i), "colVal1_"+strconv.Itoa(i), rangeQueryTableName)
 		batchWriteReq.AddRowChange(rowChange)
 	}
-	rowChange := CreatePutRowChangeV2("atomicPk1_1", "atomicPk2_" + strconv.Itoa(10), "colVal1_" + strconv.Itoa(10), rangeQueryTableName)
+	rowChange := CreatePutRowChangeV2("atomicPk1_1", "atomicPk2_"+strconv.Itoa(10), "colVal1_"+strconv.Itoa(10), rangeQueryTableName)
 	batchWriteReq.AddRowChange(rowChange)
 
 	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
@@ -1918,4 +1989,222 @@ func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamR
 		iter = nextIter
 	}
 	return iter, records
+}
+
+func (s *TableStoreSuite) TestSQL(c *C) {
+	//queries := []string{
+	//	"create table if not exists test_http_query (a bigint not null, b double not null, c mediumtext not null, d mediumblob not null, e bool not null, primary key (`a`));",
+	//	"insert ignore into test_http_query values(0, 0.0, '0', '0', false);",
+	//	"insert ignore into test_http_query values(1, 1.0, '1', '1', true);",
+	//	"insert ignore into test_http_query values(2, 2.0, '2', '2', false);",
+	//	"insert ignore into test_http_query (a, b, e) values(3, 3.0, true);",
+	//}
+	//for _, query := range queries {
+	//	resp, err := client.SQLQuery(&SQLQueryRequest{Query: query})
+	//	c.Assert(err, IsNil)
+	//	c.Assert(resp.Rows, IsNil)
+	//}
+	resp, err := client.SQLQuery(&SQLQueryRequest{
+		Query: "create table if not exists test_http_query (a bigint not null, b double not null, c mediumtext not null, d mediumblob not null, e bool not null, primary key (`a`));",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_CREATE_TABLE)
+	c.Assert(resp.ResultSet, IsNil)
+
+	resp, err = client.SQLQuery(&SQLQueryRequest{
+		Query: "show tables;",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_SHOW_TABLE)
+	hasTable := false
+	for resp.ResultSet.HasNext() {
+		row := resp.ResultSet.Next()
+		tblName, err := row.GetString(0)
+		c.Assert(err, IsNil)
+		if tblName == "test_http_query" {
+			hasTable = true
+		}
+	}
+	c.Assert(hasTable, Equals, true)
+
+	resp, err = client.SQLQuery(&SQLQueryRequest{
+		Query: "drop mapping table test_http_query;",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_DROP_TABLE)
+	c.Assert(resp.ResultSet, IsNil)
+
+	resp, err = client.SQLQuery(&SQLQueryRequest{
+		Query: "create table if not exists test_http_query (a bigint not null, b double not null, c mediumtext not null, d mediumblob not null, e bool not null, primary key (`a`));",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_CREATE_TABLE)
+	c.Assert(resp.ResultSet, IsNil)
+
+	resp, err = client.SQLQuery(&SQLQueryRequest{
+		Query: "desc test_http_query",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_DESCRIBE_TABLE)
+	c.Assert(len(resp.ResultSet.Columns()), Equals, 6)
+	for resp.ResultSet.HasNext() {
+		println(resp.ResultSet.Next().DebugString())
+	}
+
+	println("sql query via FLAT_BUFFERS")
+	resp, err = client.SQLQuery(&SQLQueryRequest{Query: "select * from test_http_query"})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_SELECT)
+	resultSet := resp.ResultSet
+	c.Assert(len(resultSet.Columns()), Equals, 5)
+	i := 0
+	for resultSet.HasNext() {
+		sqlRow := resultSet.Next()
+		println(sqlRow.DebugString())
+
+		val, err := sqlRow.GetInt64(0)
+		c.Assert(err, IsNil)
+		c.Assert(val, Equals, int64(i))
+		val, err = sqlRow.GetInt64ByName("a")
+		c.Assert(err, IsNil)
+		c.Assert(val, Equals, int64(i))
+
+		_, err = sqlRow.GetFloat64(0)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not DOUBLE")
+		_, err = sqlRow.GetBytes(0)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BINARY")
+		_, err = sqlRow.GetBool(0)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BOOLEAN")
+		_, err = sqlRow.GetString(0)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not STRING")
+
+		val2, err := sqlRow.GetFloat64(1)
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, float64(i))
+		val2, err = sqlRow.GetFloat64ByName("b")
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, float64(i))
+		_, err = sqlRow.GetBytes(1)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BINARY")
+		_, err = sqlRow.GetBool(1)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BOOLEAN")
+		_, err = sqlRow.GetString(1)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not STRING")
+		_, err = sqlRow.GetInt64(1)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not INTEGER")
+
+		if i == 3 {
+			val, err := sqlRow.IsNull(2)
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, true)
+			val, err = sqlRow.IsNull(3)
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, true)
+		} else {
+			val, err := sqlRow.GetString(2)
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, strconv.Itoa(i))
+			val, err = sqlRow.GetStringByName("c")
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, strconv.Itoa(i))
+			_, err = sqlRow.GetBytes(2)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not BINARY")
+			_, err = sqlRow.GetBool(2)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not BOOLEAN")
+			_, err = sqlRow.GetFloat64(2)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not DOUBLE")
+			_, err = sqlRow.GetInt64(2)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not INTEGER")
+
+			val2, err := sqlRow.GetBytes(3)
+			c.Assert(err, IsNil)
+			c.Assert(bytes.Equal(val2, []byte(strconv.Itoa(i))), Equals, true)
+			val2, err = sqlRow.GetBytesByName("d")
+			c.Assert(err, IsNil)
+			c.Assert(bytes.Equal(val2, []byte(strconv.Itoa(i))), Equals, true)
+			_, err = sqlRow.GetString(3)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not STRING")
+			_, err = sqlRow.GetBool(3)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not BOOLEAN")
+			_, err = sqlRow.GetFloat64(3)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not DOUBLE")
+			_, err = sqlRow.GetInt64(3)
+			c.Assert(err, NotNil)
+			c.Assert(err.Error(), Equals, "the type of column is not INTEGER")
+		}
+
+		val4, err := sqlRow.GetBool(4)
+		c.Assert(err, IsNil)
+		c.Assert(val4, Equals, i%2 == 1)
+
+		// test out of bound
+		_, err = sqlRow.GetBool(5)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 4))
+		_, err = sqlRow.GetInt64(5)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 4))
+		_, err = sqlRow.GetString(5)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 4))
+		_, err = sqlRow.GetFloat64(5)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 4))
+		_, err = sqlRow.GetBytes(5)
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 4))
+
+		i++
+	}
+}
+
+func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
+	// devops_25w is timeseries table
+	resp, err := client.SQLQuery(&SQLQueryRequest{Query: "select * from devops_25w limit 10"})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_SELECT)
+	resultSet := resp.ResultSet
+	c.Assert(len(resultSet.Columns()), Equals, 11)
+	for resultSet.HasNext() {
+		sqlRow := resultSet.Next()
+		println(sqlRow.DebugString())
+		isnull, err := sqlRow.IsNullByName("_m_name")
+		c.Assert(err, IsNil)
+		c.Assert(isnull, Equals, false)
+		_, err = sqlRow.GetBytesByName("_m_name")
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BINARY")
+		_, err = sqlRow.GetInt64ByName("_m_name")
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not INTEGER")
+		name, err := sqlRow.GetStringByName("_m_name")
+		c.Assert(name, Equals, "kernel")
+		c.Assert(err, IsNil)
+		_, err = sqlRow.GetBoolByName("_m_name")
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not BOOLEAN")
+		_, err = sqlRow.GetFloat64ByName("_m_name")
+		c.Assert(err, NotNil)
+		c.Assert(err.Error(), Equals, "the type of column is not DOUBLE")
+
+		// test nil
+		isnull, err = sqlRow.IsNullByName("_string_value")
+		c.Assert(err, IsNil)
+		c.Assert(isnull, Equals, true)
+	}
 }

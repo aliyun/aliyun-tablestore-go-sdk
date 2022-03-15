@@ -1,6 +1,8 @@
 package search
 
 import (
+	"encoding/json"
+	"errors"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 )
@@ -9,16 +11,153 @@ type SearchQuery interface {
 	Serialize() ([]byte, error)
 }
 
+type queryAlias struct {
+	Name string
+	Query Query
+}
+
+type aggregationAlias struct {
+	Name string
+	Aggregation Aggregation
+}
+
 type searchQuery struct {
 	Offset        int32
 	Limit         int32
-	Query         Query
+	Query         Query `json:"-"`
 	Collapse      *Collapse
 	Sort          *Sort
 	GetTotalCount bool
 	Token         []byte
-	Aggregations  []Aggregation
-	GroupBys      []GroupBy
+	Aggregations  []Aggregation `json:"-"`
+	GroupBys      []GroupBy `json:"-"`
+
+	// for json marshal and unmarshal
+	QueryAlias    queryAlias `json:"Query"`
+	AggregationAlias []aggregationAlias `json:"Aggregations"`
+}
+
+func (q *searchQuery) MarshalJSON() (data []byte, err error) {
+	type searchQueryAlias searchQuery
+	query := searchQueryAlias(*q)
+	if q.Query != nil {
+		query.QueryAlias = queryAlias{
+			Name:  q.Query.Type().String(),
+			Query: q.Query,
+		}
+	}
+
+	if q.Aggregations != nil {
+		aggs := make([]aggregationAlias, 0)
+		for _, agg := range q.Aggregations {
+			aggs = append(aggs, aggregationAlias{
+				Name:        agg.GetType().String(),
+				Aggregation: agg,
+			})
+		}
+
+		query.AggregationAlias = aggs
+	}
+
+	data, err = json.Marshal(query)
+	return
+}
+
+func (q *searchQuery) UnmarshalJSON(data []byte) (err error) {
+	type searchQueryAlias searchQuery
+	sqAlias := &searchQueryAlias{}
+	err = json.Unmarshal(data, sqAlias)
+	if err != nil {
+		return
+	}
+
+	q.Offset = sqAlias.Offset
+	q.Limit = sqAlias.Limit
+	q.Query = sqAlias.QueryAlias.Query
+	q.Collapse = sqAlias.Collapse
+	q.Sort = sqAlias.Sort
+	q.GetTotalCount = sqAlias.GetTotalCount
+	q.Token = sqAlias.Token
+
+	// aggregations
+	if sqAlias.AggregationAlias != nil {
+		aggs := make([]Aggregation, 0)
+		for _, agg := range sqAlias.AggregationAlias {
+			aggs = append(aggs, agg.Aggregation)
+		}
+
+		q.Aggregations = aggs
+	}
+
+	return
+}
+
+func (q *queryAlias) UnmarshalJSON(data []byte) (err error) {
+	jm := make(map[string]json.RawMessage)
+	err = json.Unmarshal(data, &jm)
+	if err != nil {
+		return
+	}
+
+	nameRM, ok := jm["Name"]
+	if !ok {
+		err = errors.New("Field 'Name' is missing.")
+		return
+	}
+
+	var name string
+	err = json.Unmarshal(nameRM, &name)
+	if err != nil {
+		return
+	}
+
+	query, ok := jm["Query"]
+	if !ok {
+		err = errors.New("Field 'Query' is missing.")
+		return
+	}
+
+	q.Name = name
+	q.Query, err = UnmarshalQuery(name, query)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (q *aggregationAlias) UnmarshalJSON(data []byte) (err error) {
+	jm := make(map[string]json.RawMessage)
+	err = json.Unmarshal(data, &jm)
+	if err != nil {
+		return
+	}
+
+	nameRM, ok := jm["Name"]
+	if !ok {
+		err = errors.New("Field 'Name' is missing.")
+		return
+	}
+
+	var name string
+	err = json.Unmarshal(nameRM, &name)
+	if err != nil {
+		return
+	}
+
+	agg, ok := jm["Aggregation"]
+	if !ok {
+		err = errors.New("Field 'Aggregation' is missing.")
+		return
+	}
+
+	q.Name = name
+	q.Aggregation, err = UnmarshalAggregation(name, agg)
+	if err != nil {
+		return
+	}
+
+	return
 }
 
 func NewSearchQuery() *searchQuery {

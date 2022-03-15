@@ -12,6 +12,7 @@ import (
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
 const (
@@ -44,14 +45,12 @@ type ColumnValue struct {
 	Value interface{}
 }
 
-func NewColumnValue(columnType ColumnType , value interface{}) *ColumnValue {
+func NewColumnValue(columnType ColumnType, value interface{}) *ColumnValue {
 	return &ColumnValue{
-		Type: columnType,
+		Type:  columnType,
 		Value: value,
 	}
 }
-
-
 
 func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	writeTag(w, TAG_CELL_VALUE)
@@ -493,16 +492,16 @@ func (comparatorType *ComparatorType) ConvertToPbComparatorType() otsprotocol.Co
 
 func (columnType DefinedColumnType) ConvertToPbDefinedColumnType() otsprotocol.DefinedColumnType {
 	switch columnType {
-		case DefinedColumn_INTEGER:
-			return otsprotocol.DefinedColumnType_DCT_INTEGER
-		case DefinedColumn_DOUBLE:
-			return otsprotocol.DefinedColumnType_DCT_DOUBLE
-		case DefinedColumn_BOOLEAN:
-			return otsprotocol.DefinedColumnType_DCT_BOOLEAN
-		case DefinedColumn_STRING:
-			return otsprotocol.DefinedColumnType_DCT_STRING
-		default:
-			return otsprotocol.DefinedColumnType_DCT_BLOB
+	case DefinedColumn_INTEGER:
+		return otsprotocol.DefinedColumnType_DCT_INTEGER
+	case DefinedColumn_DOUBLE:
+		return otsprotocol.DefinedColumnType_DCT_DOUBLE
+	case DefinedColumn_BOOLEAN:
+		return otsprotocol.DefinedColumnType_DCT_BOOLEAN
+	case DefinedColumn_STRING:
+		return otsprotocol.DefinedColumnType_DCT_STRING
+	default:
+		return otsprotocol.DefinedColumnType_DCT_BLOB
 	}
 }
 
@@ -534,18 +533,18 @@ func (loType *LogicalOperator) ConvertToPbLoType() otsprotocol.LogicalOperator {
 
 func ConvertToPbCastType(variantType VariantType) *otsprotocol.VariantType {
 	switch variantType {
-		case Variant_INTEGER:
-			return otsprotocol.VariantType_VT_INTEGER.Enum()
-		case Variant_DOUBLE:
-			return otsprotocol.VariantType_VT_DOUBLE.Enum()
-		case Variant_STRING:
-			return otsprotocol.VariantType_VT_STRING.Enum()
-		default:
-			panic("invalid VariantType")
+	case Variant_INTEGER:
+		return otsprotocol.VariantType_VT_INTEGER.Enum()
+	case Variant_DOUBLE:
+		return otsprotocol.VariantType_VT_DOUBLE.Enum()
+	case Variant_STRING:
+		return otsprotocol.VariantType_VT_STRING.Enum()
+	default:
+		panic("invalid VariantType")
 	}
 }
 
-func NewValueTransferRule(regex string, vt VariantType) *ValueTransferRule{
+func NewValueTransferRule(regex string, vt VariantType) *ValueTransferRule {
 	return &ValueTransferRule{Regex: regex, Cast_type: vt}
 }
 
@@ -564,7 +563,7 @@ func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.S
 	filter.FilterIfMissing = proto.Bool(condition.FilterIfMissing)
 	filter.LatestVersionOnly = proto.Bool(condition.LatestVersionOnly)
 	if condition.TransferRule != nil {
-		filter.ValueTransRule = &otsprotocol.ValueTransferRule{ Regex: proto.String(condition.TransferRule.Regex), CastType: ConvertToPbCastType(condition.TransferRule.Cast_type) }
+		filter.ValueTransRule = &otsprotocol.ValueTransferRule{Regex: proto.String(condition.TransferRule.Regex), CastType: ConvertToPbCastType(condition.TransferRule.Cast_type)}
 	}
 	return filter
 }
@@ -590,8 +589,8 @@ func NewPaginationFilter(filter *PaginationFilter) *otsprotocol.ColumnPagination
 
 func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
 	oerr := &OtsError{
-		Message: string(body),
-		RequestId: reqId,
+		Message:        string(body),
+		RequestId:      reqId,
 		HttpStatusCode: code,
 	}
 	if code >= 500 && code < 600 {
@@ -604,10 +603,10 @@ func rawHttpToOtsError(code int, body []byte, reqId string) *OtsError {
 
 func pbErrToOtsError(statusCode int, pbErr *otsprotocol.Error, reqId string) *OtsError {
 	return &OtsError{
-		Code:    pbErr.GetCode(),
-		Message: pbErr.GetMessage(),
-		RequestId: reqId,
-		HttpStatusCode : statusCode,
+		Code:           pbErr.GetCode(),
+		Message:        pbErr.GetMessage(),
+		RequestId:      reqId,
+		HttpStatusCode: statusCode,
 	}
 }
 
@@ -962,12 +961,12 @@ func (request *CreateTableRequest) AddIndexMeta(meta *IndexMeta) {
 }
 
 func (meta *IndexMeta) ConvertToPbIndexMeta() *otsprotocol.IndexMeta {
-	return &otsprotocol.IndexMeta {
-		Name: &meta.IndexName,
-		PrimaryKey:  meta.Primarykey,
-		DefinedColumn:  meta.DefinedColumns,
-		IndexUpdateMode:  ConvertIndexTypeToPBIndexUpdateMode(meta.IndexType).Enum(),
-		IndexType:        ConvertIndexTypeToPBIndexType(meta.IndexType).Enum(),
+	return &otsprotocol.IndexMeta{
+		Name:            &meta.IndexName,
+		PrimaryKey:      meta.Primarykey,
+		DefinedColumn:   meta.DefinedColumns,
+		IndexUpdateMode: ConvertIndexTypeToPBIndexUpdateMode(meta.IndexType).Enum(),
+		IndexType:       ConvertIndexTypeToPBIndexType(meta.IndexType).Enum(),
 	}
 }
 
@@ -998,7 +997,7 @@ func ConvertPbIndexTypeToIndexType(indexType *otsprotocol.IndexType) IndexType {
 	}
 }
 func ConvertPbIndexMetaToIndexMeta(meta *otsprotocol.IndexMeta) *IndexMeta {
-	indexmeta := &IndexMeta {
+	indexmeta := &IndexMeta{
 		IndexName: *meta.Name,
 		IndexType: ConvertPbIndexTypeToIndexType(meta.IndexType),
 	}
@@ -1019,35 +1018,35 @@ func (request *AddDefinedColumnRequest) AddDefinedColumn(name string, definedTyp
 }
 
 // implement sortedMap : map[string]string
-func SortedMapString(Map map[string]string) ([]string , []string) {
+func SortedMapString(Map map[string]string) ([]string, []string) {
 	n := len(Map)
-	keys := make([]string , 0 , n)
-	values := make([]string , 0 , n)
-	for tag_key , _ := range Map {
-		keys = append(keys , tag_key)
+	keys := make([]string, 0, n)
+	values := make([]string, 0, n)
+	for tag_key, _ := range Map {
+		keys = append(keys, tag_key)
 	}
 	sort.Strings(keys)
-	for _ , key := range keys {
-		values = append(values , Map[key])
+	for _, key := range keys {
+		values = append(values, Map[key])
 	}
 
-	return keys , values
+	return keys, values
 }
 
 // implement sorted map[string]ColumnValue
-func SortedMapColumnValue(Map map[string]*ColumnValue) ([]string , []*ColumnValue) {
+func SortedMapColumnValue(Map map[string]*ColumnValue) ([]string, []*ColumnValue) {
 	n := len(Map)
-	keys := make([]string ,0 , n)
+	keys := make([]string, 0, n)
 	values := make([]*ColumnValue, 0, n)
 
-	for fieldKey , _ := range Map {
-		keys = append(keys , fieldKey)
+	for fieldKey, _ := range Map {
+		keys = append(keys, fieldKey)
 	}
 	sort.Strings(keys)
 	for i := 0; i < n; i++ {
-		values = append(values , Map[keys[i]])
+		values = append(values, Map[keys[i]])
 	}
-	return keys , values
+	return keys, values
 }
 
 func CheckTagKeyOrValue(s string) error {
@@ -1056,17 +1055,17 @@ func CheckTagKeyOrValue(s string) error {
 	}
 
 	for i := 0; i < len(s); i++ {
-		if !(s[i] >= '!' && s[i] <= '~' && s[i] != '"' || s[i] != '=') {
-			return fmt.Errorf("Tag or attribute key/value [%v] include illegal character" , s)
+		if s[i] == '"' || s[i] == '=' {
+			return fmt.Errorf("Tag or attribute key/value [%v] include illegal character", s)
 		}
 	}
 	return nil
 }
 
-func BuildTagString(tags map[string]string) (string  , error) {
+func BuildTagString(tags map[string]string) (string, error) {
 	var capacity int = 2
 	n := len(tags)
-	keys := make([]string , 0 , n)
+	keys := make([]string, 0, n)
 	for key, value := range tags {
 		err := CheckTagKeyOrValue(key)
 		if err != nil {
@@ -1085,7 +1084,7 @@ func BuildTagString(tags map[string]string) (string  , error) {
 	sb := strings.Builder{}
 	sb.Grow(capacity)
 	sb.WriteByte('[')
-	for i := 0; i < len(keys); i++{
+	for i := 0; i < len(keys); i++ {
 		key, value := keys[i], tags[keys[i]]
 		sb.WriteByte('"')
 		sb.WriteString(key)
@@ -1093,10 +1092,17 @@ func BuildTagString(tags map[string]string) (string  , error) {
 		sb.WriteString(value)
 		sb.WriteByte('"')
 
-		if i != len(keys) - 1{
+		if i != len(keys)-1 {
 			sb.WriteByte(',')
 		}
 	}
 	sb.WriteByte(']')
 	return sb.String(), nil
+}
+
+// SetCredentialsProvider sets funciton for get the user's ak
+func SetCredentialsProvider(provider common.CredentialsProvider) ClientOption {
+	return func(client *TableStoreClient) {
+		client.credentialsProvider = provider
+	}
 }

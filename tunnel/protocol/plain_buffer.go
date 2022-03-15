@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"io"
 	"math"
 )
@@ -303,7 +302,7 @@ type PlainBufferRow struct {
 	PrimaryKey      []*PlainBufferCell
 	Cells           []*PlainBufferCell
 	HasDeleteMarker bool
-	Extension       *tablestore.RecordSequenceInfo // optional
+	Extension       *RecordSequenceInfo // optional
 }
 
 func (row *PlainBufferRow) writeRow(w io.Writer) {
@@ -550,7 +549,7 @@ func ReadRowsWithHeader(r *bytes.Reader) (rows []*PlainBufferRow, err error) {
 	return rows, nil
 }
 
-func readRowExtension(r *bytes.Reader) *tablestore.RecordSequenceInfo {
+func readRowExtension(r *bytes.Reader) *RecordSequenceInfo {
 	readRawLittleEndian32(r) // useless
 	tag := readTag(r)
 	if tag != TAG_SEQ_INFO {
@@ -576,7 +575,7 @@ func readRowExtension(r *bytes.Reader) *tablestore.RecordSequenceInfo {
 	}
 	rowIndex := readRawLittleEndian32(r)
 
-	ext := tablestore.RecordSequenceInfo{}
+	ext := RecordSequenceInfo{}
 	ext.Epoch = epoch
 	ext.Timestamp = ts
 	ext.RowIndex = rowIndex

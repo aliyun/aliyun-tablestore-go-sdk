@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
@@ -45,6 +46,8 @@ var (
 	maxRetryInterval  = time.Second
 )
 
+type ClientOption func(api *TunnelApi)
+
 type TunnelMetaApi interface {
 	CreateTunnel(req *CreateTunnelRequest) (resp *CreateTunnelResponse, err error)
 	ListTunnel(req *ListTunnelRequest) (resp *ListTunnelResponse, err error)
@@ -66,14 +69,15 @@ type TunnelApi struct {
 
 	retryMaxElapsedTime time.Duration
 
-	externalHeader map[string]string
+	externalHeader      map[string]string
+	credentialsProvider common.CredentialsProvider
 }
 
-func NewTunnelApi(endpoint, instanceName, accessKeyId, accessKeySecret string, conf *TunnelConfig) *TunnelApi {
-	return NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, "", conf)
+func NewTunnelApi(endpoint, instanceName, accessKeyId, accessKeySecret string, conf *TunnelConfig, options ...ClientOption) *TunnelApi {
+	return NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, "", conf, options...)
 }
 
-func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, token string, conf *TunnelConfig) *TunnelApi {
+func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, token string, conf *TunnelConfig, options ...ClientOption) *TunnelApi {
 	tunnelApi := &TunnelApi{
 		endpoint:        endpoint,
 		instanceName:    instanceName,
@@ -81,6 +85,13 @@ func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret,
 		accessKeySecret: accessKeySecret,
 		securityToken:   token,
 	}
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: token}
+	tunnelApi.credentialsProvider = provider
+	for _, option := range options {
+		option(tunnelApi)
+	}
+
 	if conf == nil {
 		conf = DefaultTunnelConfig
 	}
@@ -151,6 +162,7 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 	if err != nil {
 		return nil, err, ""
 	}
+	akInfo := api.credentialsProvider.GetCredentials()
 	/* set headers */
 	hreq.Header.Set("User-Agent", userAgent)
 
@@ -158,7 +170,7 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 
 	hreq.Header.Set(xOtsDate, date)
 	hreq.Header.Set(xOtsApiversion, apiVersion)
-	hreq.Header.Set(xOtsAccesskeyid, api.accessKeyId)
+	hreq.Header.Set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
 	hreq.Header.Set(xOtsInstanceName, api.instanceName)
 	for key, value := range api.externalHeader {
 		if strings.HasPrefix(key, xOtsPrefix) {
@@ -170,13 +182,13 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
 	hreq.Header.Set(xOtsContentmd5, md5Base64)
 
-	otshead := createOtsHeaders(api.accessKeySecret)
+	otshead := createOtsHeaders(akInfo.GetAccessKeySecret())
 	otshead.set(xOtsDate, date)
 	otshead.set(xOtsApiversion, apiVersion)
-	otshead.set(xOtsAccesskeyid, api.accessKeyId)
-	if api.securityToken != "" {
-		hreq.Header.Set(xOtsHeaderStsToken, api.securityToken)
-		otshead.set(xOtsHeaderStsToken, api.securityToken)
+	otshead.set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
+	if akInfo.GetSecurityToken() != "" {
+		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
+		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 	}
 	traceId := uuid.NewV4()
 	hreq.Header.Set(xOtsHeaderTraceID, traceId.String())
@@ -190,7 +202,7 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 		}
 	}
 
-	sign, err := otshead.signature(uri, "POST", api.accessKeySecret)
+	sign, err := otshead.signature(uri, "POST", akInfo.GetAccessKeySecret())
 
 	if err != nil {
 		return nil, err, ""
@@ -483,34 +495,53 @@ func (api *TunnelApi) ReadRows(tunnelId, clientId string, channelId string, toke
 	return readRecordsResponse.Records, nextToken, traceId, size, nil
 }
 
-func (api *TunnelApi) ReadRecords(tunnelId, clientId string, channelId string, token string) ([]*Record, string, string, int, error) {
+// ReadRecords needBinaryRecord: whether to provide binaryRecord
+// Only one of binaryRecord and record is not null
+func (api *TunnelApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, error) {
 	readRecordsRequest := &protocol.ReadRecordsRequest{
-		TunnelId:  &tunnelId,
-		ClientId:  &clientId,
-		ChannelId: &channelId,
-		Token:     &token,
+		TunnelId:  &req.TunnelId,
+		ClientId:  &req.ClientId,
+		ChannelId: &req.ChannelId,
+		Token:     &req.Token,
 	}
 
 	readRecordsResponse := new(protocol.ReadRecordsResponse)
 	traceId, size, err := api.doRequest(readRecordsUri, readRecordsRequest, readRecordsResponse)
 	if err != nil {
-		return nil, "", traceId, 0, err
+		return nil, err
+	}
+	records := readRecordsResponse.GetRecords()
+	response := &ReadRecordResponse{
+		NextToken:    *readRecordsResponse.NextToken,
+		Size:         size,
+		RecordCount:  len(records),
+		ResponseInfo: ResponseInfo{traceId},
 	}
 
-	records := make([]*Record, 0)
-	for _, record := range readRecordsResponse.Records {
-		typ, err := ParseActionType(record.ActionType)
-		if err != nil {
-			return nil, "", traceId, 0, err
+	if req.NeedBinaryRecord {
+		b := new(bytes.Buffer)
+		writeHeaderInfo(b, int32(len(records))) // version + recordCount
+		for _, record := range records {
+			serializeBinaryRecord(b, record) // actionType + recordLength + record
 		}
-		record, err := DeserializeRecordFromRawBytes(record.Record, typ)
-		if err != nil {
-			return nil, "", traceId, 0, err
+		response.BinaryRecords = b.Bytes()
+		return response, nil
+	} else {
+		tunnelRecords := make([]*Record, 0)
+		for _, record := range records {
+			typ, err := ParseActionType(record.ActionType)
+			if err != nil {
+				return nil, err
+			}
+			tunnelRecord, err := DeserializeRecordFromRawBytes(record.Record, typ)
+			if err != nil {
+				return nil, err
+			}
+			tunnelRecords = append(tunnelRecords, tunnelRecord)
 		}
-		records = append(records, record)
+		response.Records = tunnelRecords
+		return response, nil
 	}
-	nextToken := *readRecordsResponse.NextToken
-	return records, nextToken, traceId, size, nil
 }
 
 func (api *TunnelApi) Checkpoint(tunnelId, clientId string, channelId string, token string, sequenceNumber int64) error {

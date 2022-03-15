@@ -19,13 +19,13 @@ func TestTunnelStateMachine_BatchUpdateStatus(t *testing.T) {
 	cidMu := new(sync.Mutex)
 	cidTokenMap := map[string]string{}
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).DoAndReturn(func(tid, cid, ccid, token string) ([]*Record, string, string, int, error) {
+	bypassApi.EXPECT().ReadRecords(gomock.Any()).DoAndReturn(func(req *ReadRecordRequest) (*ReadRecordResponse, error) {
 		cidMu.Lock()
 		defer cidMu.Unlock()
-		if tk, ok := cidTokenMap[ccid]; ok {
-			return nil, tk, "traceId", 0, nil
+		if tk, ok := cidTokenMap[req.ChannelId]; ok {
+			return &ReadRecordResponse{NextToken: tk, ResponseInfo: ResponseInfo{"traceId"}}, nil
 		}
-		return make([]*Record, 100), "token", "traceId", 1000 * 1024, nil
+		return &ReadRecordResponse{Records: make([]*Record, 100), NextToken: "token", ResponseInfo: ResponseInfo{"traceId"}, Size: 1000 * 1024, RecordCount: 100}, nil
 	}).AnyTimes()
 	bc := &ChannelBackoffConfig{MaxDelay: time.Second}
 	setDefault(bc)
@@ -216,7 +216,7 @@ func TestTunnelStateMachine_UpdateStatus(t *testing.T) {
 	defer mockCtrl.Finish()
 	lg, _ := testLogConfig.Build()
 	bypassApi := NewMocktunnelDataApi(mockCtrl)
-	bypassApi.EXPECT().ReadRecords("tunnelId", "clientId", gomock.Any(), gomock.Any()).Return(nil, "token", "trace", 0, nil).AnyTimes()
+	bypassApi.EXPECT().ReadRecords(gomock.Any()).Return(&ReadRecordResponse{NextToken: "token", ResponseInfo: ResponseInfo{"trace"}}, nil).AnyTimes()
 	dialer := &channelDialer{
 		api: bypassApi,
 		lg:  lg,

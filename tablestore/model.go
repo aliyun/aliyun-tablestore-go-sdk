@@ -1,6 +1,8 @@
 package tablestore
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
@@ -12,9 +14,11 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	lruCache "github.com/hashicorp/golang-lru"
+	"sync"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
-type internalClient struct{
+type internalClient struct {
 	endPoint        string
 	instanceName    string
 	accessKeyId     string
@@ -24,11 +28,13 @@ type internalClient struct{
 	httpClient IHttpClient
 	config     *TableStoreConfig
 	random     *rand.Rand
+	mu         *sync.Mutex
 
 	externalHeader      map[string]string
 	CustomizedRetryFunc CustomizedRetryNotMatterActions
 
 	timeseriesConfiguration *TimeseriesConfiguration
+	credentialsProvider common.CredentialsProvider
 }
 
 const initMapLen int = 8
@@ -148,6 +154,7 @@ type PrimaryKey struct {
 type TableOption struct {
 	TimeToAlive, MaxVersion   int
 	DeviationCellVersionInSec int64
+	AllowUpdate               *bool
 }
 
 type ReservedThroughput struct {
@@ -239,8 +246,8 @@ const (
 )
 
 const (
-	DefaultRetryInterval = 10
-	MaxRetryInterval     = 320
+	DefaultRetryInterval      = 10
+	MaxRetryInterval          = 320
 )
 
 type PrimaryKeyOption int32
@@ -634,7 +641,9 @@ type SQLQueryRequest struct {
 }
 
 type SQLQueryResponse struct {
-	Rows                 []*Row
+	ResultSet            SQLResultSet
+	StmtType             SQLStatementType
+	PayloadVersion       SQLPayloadVersion
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	ResponseInfo
 }
@@ -962,11 +971,11 @@ func (timeseriesTableOptions *TimeseriesTableOptions) GetTimeToLive() int64 {
 }
 
 type TimeseriesTableMeta struct {
-	timeseriesTableName      string
+	timeseriesTableName    string
 	timeseriesTableOptions *TimeseriesTableOptions
 }
 
-func NewTimeseriesTableMeta(timeseriesTableName string) *TimeseriesTableMeta{
+func NewTimeseriesTableMeta(timeseriesTableName string) *TimeseriesTableMeta {
 	return &TimeseriesTableMeta{
 		timeseriesTableName: timeseriesTableName,
 	}
@@ -1000,7 +1009,7 @@ func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetTimeseriesT
 	createTimeseriesTableRequest.timeseriesTableMeta = timeseriesTableMeta
 }
 
-func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetTimeseriesTableMeta() *TimeseriesTableMeta{
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetTimeseriesTableMeta() *TimeseriesTableMeta {
 	return createTimeseriesTableRequest.timeseriesTableMeta
 }
 
@@ -1010,13 +1019,13 @@ type CreateTimeseriesTableResponse struct {
 
 type PutTimeseriesDataRequest struct {
 	timeseriesTableName string
-	rows []*TimeseriesRow
+	rows                []*TimeseriesRow
 }
 
 func NewPutTimeseriesDataRequest(timeseriesTableName string) *PutTimeseriesDataRequest {
 	return &PutTimeseriesDataRequest{
 		timeseriesTableName: timeseriesTableName,
-		rows: make([]*TimeseriesRow , 0 , initMapLen),
+		rows:                make([]*TimeseriesRow, 0, initMapLen),
 	}
 }
 
@@ -1030,7 +1039,7 @@ func (putTimeseriesDataRequest *PutTimeseriesDataRequest) GetTimeseriesTableName
 
 func (putTimeseriesDataRequest *PutTimeseriesDataRequest) AddTimeseriesRows(timeseriesRows ...*TimeseriesRow) {
 	for i := 0; i < len(timeseriesRows); i++ {
-		putTimeseriesDataRequest.rows = append(putTimeseriesDataRequest.rows , timeseriesRows[i])
+		putTimeseriesDataRequest.rows = append(putTimeseriesDataRequest.rows, timeseriesRows[i])
 	}
 }
 
@@ -1042,16 +1051,16 @@ func (putTimeseriesDataRequest *PutTimeseriesDataRequest) GetTimeseriesRows() []
 }
 
 type TimeseriesRow struct {
-	timeseriesKey *TimeseriesKey
-	timeInUs int64
-	fields map[string]*ColumnValue
+	timeseriesKey     *TimeseriesKey
+	timeInUs          int64
+	fields            map[string]*ColumnValue
 	timeseriesMetaKey *string
 }
 
 func NewTimeseriesRow(timeseriesKey *TimeseriesKey) *TimeseriesRow {
 	return &TimeseriesRow{
 		timeseriesKey: timeseriesKey,
-		fields: make(map[string]*ColumnValue , initMapLen),
+		fields:        make(map[string]*ColumnValue, initMapLen),
 	}
 }
 
@@ -1067,11 +1076,11 @@ func (timeseriesRow *TimeseriesRow) GetFieldsMap() map[string]*ColumnValue {
 	return timeseriesRow.fields
 }
 
-func (timeseriesRow  *TimeseriesRow) GetFieldsSlice() []string {
+func (timeseriesRow *TimeseriesRow) GetFieldsSlice() []string {
 	n := len(timeseriesRow.GetFieldsSlice())
-	key := make([]string , 0 , n)
-	for field_key , _ := range timeseriesRow.GetFieldsMap() {
-		key = append(key , field_key)
+	key := make([]string, 0, n)
+	for field_key, _ := range timeseriesRow.GetFieldsMap() {
+		key = append(key, field_key)
 	}
 	sort.Strings(key)
 	for i := 0; i < len(key); i++ {
@@ -1084,21 +1093,21 @@ func (timeseriesRow  *TimeseriesRow) GetFieldsSlice() []string {
 			key[i] = key[i] + "=" + strconv.Itoa(int(field_value.Value.(int64)))
 			break
 		case ColumnType_BOOLEAN:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v" , field_value.Value.(bool))
+			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.(bool))
 			break
 		case ColumnType_DOUBLE:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v" ,field_value.Value.(float64))
+			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.(float64))
 			break
 		case ColumnType_BINARY:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v" , field_value.Value.([]byte))
+			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.([]byte))
 		default:
-			panic("Unknow field value type")
+			panic("Unknow field Value type")
 		}
 	}
 	return key
 }
 
-func (timeseriesRow *TimeseriesRow) AddField(fieldName string , fieldValue *ColumnValue ) {
+func (timeseriesRow *TimeseriesRow) AddField(fieldName string, fieldValue *ColumnValue) {
 	if fieldValue == nil {
 		return
 	}
@@ -1111,7 +1120,7 @@ func (timeseriesRow *TimeseriesRow) AddFields(fieldsMap map[string]*ColumnValue)
 		return
 	}
 
-	for field_key , field_value := range fieldsMap {
+	for field_key, field_value := range fieldsMap {
 		if field_value == nil {
 			continue
 		}
@@ -1130,18 +1139,18 @@ func (timeseriesRow *TimeseriesRow) GetTimeInus() int64 {
 
 type TimeseriesKey struct {
 	measurement string
-	source string
-	tags map[string]string
-	tagsString *string
+	source      string
+	tags        map[string]string
+	tagsString  *string
 }
 
 func NewTimeseriesKey() *TimeseriesKey {
 	return &TimeseriesKey{
-		tags: make(map[string]string , initMapLen),
+		tags: make(map[string]string, initMapLen),
 	}
 }
 
-func (timeseriesKey *TimeseriesKey) AddTag(tagName string , tagValue string) {
+func (timeseriesKey *TimeseriesKey) AddTag(tagName string, tagValue string) {
 	timeseriesKey.tags[tagName] = tagValue
 	timeseriesKey.tagsString = nil
 }
@@ -1150,7 +1159,7 @@ func (timeseriesKey *TimeseriesKey) AddTags(tagsMap map[string]string) {
 	if tagsMap == nil {
 		return
 	}
-	for tagName , tagValue := range tagsMap {
+	for tagName, tagValue := range tagsMap {
 		timeseriesKey.tags[tagName] = tagValue
 	}
 	timeseriesKey.tagsString = nil
@@ -1160,7 +1169,7 @@ func (timeseriesKey *TimeseriesKey) GetTags() map[string]string {
 	return timeseriesKey.tags
 }
 
-func (timeseriesKey *TimeseriesKey) buildTimeseriesMetaKey(timeseriesTableName string) (string , error) {
+func (timeseriesKey *TimeseriesKey) buildTimeseriesMetaKey(timeseriesTableName string) (string, error) {
 	var capacity int
 	var err error
 	capacity += len(timeseriesTableName)
@@ -1168,8 +1177,8 @@ func (timeseriesKey *TimeseriesKey) buildTimeseriesMetaKey(timeseriesTableName s
 	capacity += len(timeseriesKey.source)
 	if timeseriesKey.tagsString == nil {
 		timeseriesKey.tagsString = new(string)
-		if *timeseriesKey.tagsString , err = BuildTagString(timeseriesKey.tags); err != nil {
-			return "" , err
+		if *timeseriesKey.tagsString, err = BuildTagString(timeseriesKey.tags); err != nil {
+			return "", err
 		}
 	}
 	capacity += len(*timeseriesKey.tagsString)
@@ -1186,7 +1195,7 @@ func (timeseriesKey *TimeseriesKey) buildTimeseriesMetaKey(timeseriesTableName s
 	sb.WriteString("\t")
 	sb.WriteString(*timeseriesKey.tagsString)
 
-	return sb.String() , nil
+	return sb.String(), nil
 }
 
 func (timeseriesKey *TimeseriesKey) SetMeasurementName(measurementName string) {
@@ -1213,6 +1222,7 @@ type PutTimeseriesDataResponse struct {
 type FailedRowResult struct {
 	Index int32
 	Error error
+	ErrorCode string
 }
 
 func (putTimeseriesDataResponse *PutTimeseriesDataResponse) GetFailedRowResults() []*FailedRowResult {
@@ -1221,17 +1231,17 @@ func (putTimeseriesDataResponse *PutTimeseriesDataResponse) GetFailedRowResults(
 
 type GetTimeseriesDataRequest struct {
 	timeseriesTableName string
-	timeseriesKey *TimeseriesKey
-	beginTimeInUs int64
-	endTimeInUs int64
-	nextToken []byte
-	limit int32
+	timeseriesKey       *TimeseriesKey
+	beginTimeInUs       int64
+	endTimeInUs         int64
+	nextToken           []byte
+	limit               int32
 }
 
 func NewGetTimeseriesDataRequest(timeseriesTableName string) *GetTimeseriesDataRequest {
 	return &GetTimeseriesDataRequest{
 		timeseriesTableName: timeseriesTableName,
-		limit: -1,
+		limit:               -1,
 	}
 }
 
@@ -1251,13 +1261,13 @@ func (getDataRequest *GetTimeseriesDataRequest) GetTimeseriesKey() *TimeseriesKe
 	return getDataRequest.timeseriesKey
 }
 
-func (getDataRequest *GetTimeseriesDataRequest) SetTimeRange(beginTimeInUs int64 , endTimeInUs int64) {
+func (getDataRequest *GetTimeseriesDataRequest) SetTimeRange(beginTimeInUs int64, endTimeInUs int64) {
 	getDataRequest.beginTimeInUs = beginTimeInUs
 	getDataRequest.endTimeInUs = endTimeInUs
 }
 
-func (getDataRequest *GetTimeseriesDataRequest) GetTimeRange() (int64 , int64) {
-	return getDataRequest.beginTimeInUs , getDataRequest.endTimeInUs
+func (getDataRequest *GetTimeseriesDataRequest) GetTimeRange() (int64, int64) {
+	return getDataRequest.beginTimeInUs, getDataRequest.endTimeInUs
 }
 
 func (getDataRequest *GetTimeseriesDataRequest) GetBeginTimeInUs() int64 {
@@ -1269,23 +1279,23 @@ func (getDataRequest *GetTimeseriesDataRequest) GetEndTimeInUs() int64 {
 }
 
 func (getDataRequest *GetTimeseriesDataRequest) SetNextToken(nextToken []byte) {
-	getDataRequest.nextToken = append([]byte{} , nextToken...)
+	getDataRequest.nextToken = append([]byte{}, nextToken...)
 }
 
 func (getDataRequest *GetTimeseriesDataRequest) GetNextToken() []byte {
-	return append([]byte{} , getDataRequest.nextToken...)
+	return append([]byte{}, getDataRequest.nextToken...)
 }
 
 func (getDataRequest *GetTimeseriesDataRequest) SetLimit(limit int32) {
 	getDataRequest.limit = limit
 }
 
-func (getDataRequest *GetTimeseriesDataRequest) GetLimit()int32 {
+func (getDataRequest *GetTimeseriesDataRequest) GetLimit() int32 {
 	return getDataRequest.limit
 }
 
 type GetTimeseriesDataResponse struct {
-	rows []*TimeseriesRow
+	rows      []*TimeseriesRow
 	nextToken []byte
 	ResponseInfo
 }
@@ -1297,7 +1307,6 @@ func (getTimeseriesDataResp *GetTimeseriesDataResponse) GetRows() []*TimeseriesR
 func (getTimeseriesDataResp *GetTimeseriesDataResponse) GetNextToken() []byte {
 	return getTimeseriesDataResp.nextToken
 }
-
 
 type DescribeTimeseriesTableRequest struct {
 	timeseriesTableName string
@@ -1345,7 +1354,7 @@ func (listTimeseriesTableResponse *ListTimeseriesTableResponse) GetTimeseriesTab
 func (listTimeseriesTableResponse *ListTimeseriesTableResponse) GetTimeseriesTableNames() []string {
 	timeseriesTableNames := []string{}
 	for i := 0; i < len(listTimeseriesTableResponse.timeseriesTableMetas); i++ {
-		timeseriesTableNames = append(timeseriesTableNames , listTimeseriesTableResponse.timeseriesTableMetas[i].GetTimeseriesTableName())
+		timeseriesTableNames = append(timeseriesTableNames, listTimeseriesTableResponse.timeseriesTableMetas[i].GetTimeseriesTableName())
 	}
 	return timeseriesTableNames
 }
@@ -1374,10 +1383,10 @@ type DeleteTimeseriesTableResponse struct {
 
 type UpdateTimeseriesMetaRequest struct {
 	timeseriesTableName string
-	metas []*TimeseriesMeta
+	metas               []*TimeseriesMeta
 }
 
-func NewUpdateTimeseriesMetaRequest(timeseriesTableName string) *UpdateTimeseriesMetaRequest{
+func NewUpdateTimeseriesMetaRequest(timeseriesTableName string) *UpdateTimeseriesMetaRequest {
 	return &UpdateTimeseriesMetaRequest{
 		timeseriesTableName: timeseriesTableName,
 	}
@@ -1392,9 +1401,7 @@ func (updateTimeseriesMetaRequest *UpdateTimeseriesMetaRequest) GetTimeseriesTab
 }
 
 func (updateTimeseriesMetaRequest *UpdateTimeseriesMetaRequest) AddTimeseriesMetas(metas ...*TimeseriesMeta) {
-	for i := 0; i < len(metas); i++ {
-		updateTimeseriesMetaRequest.metas = append(updateTimeseriesMetaRequest.metas , metas[i])
-	}
+	updateTimeseriesMetaRequest.metas = append(updateTimeseriesMetaRequest.metas, metas...)
 }
 
 func (updateTimeseriesMetaRequest *UpdateTimeseriesMetaRequest) GetTimeseriesMetas() []*TimeseriesMeta {
@@ -1410,22 +1417,58 @@ func (updateTimeseriesMetaResponse *UpdateTimeseriesMetaResponse) GetFailedRowRe
 	return updateTimeseriesMetaResponse.failedRowResults
 }
 
+type DeleteTimeseriesMetaRequest struct {
+	timeseriesTableName string
+	keys                []*TimeseriesKey
+}
+
+func NewDeleteTimeseriesMetaRequest(timeseriesTableName string) *DeleteTimeseriesMetaRequest {
+	return &DeleteTimeseriesMetaRequest{
+		timeseriesTableName: timeseriesTableName,
+	}
+}
+
+func (deleteTimeseriesMetaRequest *DeleteTimeseriesMetaRequest) SetTimeseriesTableName(timeseriesTableName string) {
+	deleteTimeseriesMetaRequest.timeseriesTableName = timeseriesTableName
+}
+
+func (deleteTimeseriesMetaRequest *DeleteTimeseriesMetaRequest) GetTimeseriesTableName() string {
+	return deleteTimeseriesMetaRequest.timeseriesTableName
+}
+
+func (deleteTimeseriesMetaRequest *DeleteTimeseriesMetaRequest) AddTimeseriesKeys(keys ...*TimeseriesKey) {
+	deleteTimeseriesMetaRequest.keys = append(deleteTimeseriesMetaRequest.keys, keys...)
+}
+
+func (deleteTimeseriesMetaRequest *DeleteTimeseriesMetaRequest) GetTimeseriesKeys() []*TimeseriesKey {
+	return deleteTimeseriesMetaRequest.keys
+}
+
+type DeleteTimeseriesMetaResponse struct {
+	failedRowResults []*FailedRowResult
+	ResponseInfo
+}
+
+func (deleteTimeseriesMetaResponse *DeleteTimeseriesMetaResponse) GetFailedRowResults() []*FailedRowResult {
+	return deleteTimeseriesMetaResponse.failedRowResults
+}
+
 type QueryTimeseriesMetaRequest struct {
 	timeseriesTableName string
-	condition MetaQueryCondition
-	getTotalHits bool
-	nextToken []byte
-	limit int32
+	condition           MetaQueryCondition
+	getTotalHits        bool
+	nextToken           []byte
+	limit               int32
 }
 
 func NewQueryTimeseriesMetaRequest(timeseriesTableName string) *QueryTimeseriesMetaRequest {
 	return &QueryTimeseriesMetaRequest{
 		timeseriesTableName: timeseriesTableName,
-		limit: -1,
+		limit:               -1,
 	}
 }
 
-func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) SetTimeseriesTableName(timeseriesTableName string){
+func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) SetTimeseriesTableName(timeseriesTableName string) {
 	queryTimeseriesMetaRequest.timeseriesTableName = timeseriesTableName
 }
 
@@ -1450,11 +1493,11 @@ func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) GetTotalHits() boo
 }
 
 func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) SetNextToken(nextToken []byte) {
-	queryTimeseriesMetaRequest.nextToken = append([]byte{} , nextToken...)
+	queryTimeseriesMetaRequest.nextToken = append([]byte{}, nextToken...)
 }
 
 func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) GetNextToken() []byte {
-	return append([]byte{} , queryTimeseriesMetaRequest.nextToken...)
+	return append([]byte{}, queryTimeseriesMetaRequest.nextToken...)
 }
 
 func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) SetLimit(limit int32) {
@@ -1468,47 +1511,272 @@ func (queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest) GetLimit() int32 {
 type MetaQueryConditionType int32
 
 const (
-	COMPOSITE_CONDITION MetaQueryConditionType = 1
+	COMPOSITE_CONDITION   MetaQueryConditionType = 1
 	MEASUREMENT_CONDITION MetaQueryConditionType = 2
-	SOURCE_CONDITION MetaQueryConditionType = 3
-	TAG_CONDITION MetaQueryConditionType = 4
+	SOURCE_CONDITION      MetaQueryConditionType = 3
+	TAG_CONDITION         MetaQueryConditionType = 4
 	UPDATE_TIME_CONDITION MetaQueryConditionType = 5
-	ATTRIBUTE_CONDITION MetaQueryConditionType = 6
+	ATTRIBUTE_CONDITION   MetaQueryConditionType = 6
 )
+
+func (condType MetaQueryConditionType) String() string {
+	switch condType {
+	case COMPOSITE_CONDITION:
+		return "COMPOSITE"
+	case MEASUREMENT_CONDITION:
+		return "MEASUREMENT"
+	case SOURCE_CONDITION:
+		return "SOURCE"
+	case TAG_CONDITION:
+		return "TAG"
+	case UPDATE_TIME_CONDITION:
+		return "UPDATE_TIME"
+	case ATTRIBUTE_CONDITION:
+		return "ATTRIBUTE"
+	default:
+		return string(condType)
+	}
+}
+
+func ToMetaQueryConditionType(condType string) (MetaQueryConditionType, error) {
+	switch strings.ToUpper(condType) {
+	case "COMPOSITE":
+		return COMPOSITE_CONDITION, nil
+	case "MEASUREMENT":
+		return MEASUREMENT_CONDITION, nil
+	case "SOURCE":
+		return SOURCE_CONDITION, nil
+	case "TAG":
+		return TAG_CONDITION, nil
+	case "UPDATE_TIME":
+		return UPDATE_TIME_CONDITION, nil
+	case "ATTRIBUTE":
+		return ATTRIBUTE_CONDITION, nil
+	default:
+		return COMPOSITE_CONDITION, errors.New("Invalid condition type: " + condType)
+	}
+}
+
+func (op *MetaQueryConditionType) UnmarshalJSON(data []byte) (err error) {
+	var opStr string
+	err = json.Unmarshal(data, &opStr)
+	if err != nil {
+		return
+	}
+
+	*op, err = ToMetaQueryConditionType(opStr)
+	if err != nil {
+		return err
+	}
+	return
+}
+
+func (op *MetaQueryConditionType) MarshalJSON() (data []byte, err error) {
+	data, err = json.Marshal(op.String())
+	return
+}
 
 type MetaQuerySingleOperator int32
 
 const (
-	OP_EQUAL MetaQuerySingleOperator = 1
-	OP_GREATER_THAN MetaQuerySingleOperator = 2
+	OP_EQUAL         MetaQuerySingleOperator = 1
+	OP_GREATER_THAN  MetaQuerySingleOperator = 2
 	OP_GREATER_EQUAL MetaQuerySingleOperator = 3
-	OP_LESS_THAN MetaQuerySingleOperator = 4
-	OP_LESS_EQUAL MetaQuerySingleOperator = 5
-	OP_PREFIX MetaQuerySingleOperator = 6
+	OP_LESS_THAN     MetaQuerySingleOperator = 4
+	OP_LESS_EQUAL    MetaQuerySingleOperator = 5
+	OP_PREFIX        MetaQuerySingleOperator = 6
 )
+
+func (op MetaQuerySingleOperator) String() string {
+	switch op {
+	case OP_EQUAL:
+		return "EQUAL"
+	case OP_GREATER_THAN:
+		return "GREATER_THAN"
+	case OP_GREATER_EQUAL:
+		return "GREATER_EQUAL"
+	case OP_LESS_THAN:
+		return "LESS_THAN"
+	case OP_LESS_EQUAL:
+		return "LESS_EQUAL"
+	case OP_PREFIX:
+		return "PREFIX"
+	default:
+		return string(op)
+	}
+}
+
+func ToMetaQuerySingleOperator(op string) (MetaQuerySingleOperator, error) {
+	switch strings.ToUpper(op) {
+	case "EQUAL":
+		return OP_EQUAL, nil
+	case "GREATER_THAN":
+		return OP_GREATER_THAN, nil
+	case "GREATER_EQUAL":
+		return OP_GREATER_EQUAL, nil
+	case "LESS_THAN":
+		return OP_LESS_THAN, nil
+	case "LESS_EQUAL":
+		return OP_LESS_EQUAL, nil
+	case "PREFIX":
+		return OP_PREFIX, nil
+	default:
+		return OP_EQUAL, errors.New("Invalid operator: " + op)
+	}
+}
+
+func (op *MetaQuerySingleOperator) UnmarshalJSON(data []byte) (err error) {
+	var opStr string
+	err = json.Unmarshal(data, &opStr)
+	if err != nil {
+		return
+	}
+
+	*op, err = ToMetaQuerySingleOperator(opStr)
+	if err != nil {
+		return err
+	}
+	return
+}
+
+func (op *MetaQuerySingleOperator) MarshalJSON() (data []byte, err error) {
+	data, err = json.Marshal(op.String())
+	return
+}
 
 type MetaQueryCompositeOperator int32
 
 const (
 	OP_AND MetaQueryCompositeOperator = 1
-	OP_OR MetaQueryCompositeOperator = 2
+	OP_OR  MetaQueryCompositeOperator = 2
 	OP_NOT MetaQueryCompositeOperator = 3
 )
+
+func (op MetaQueryCompositeOperator) String() string {
+	switch op {
+	case OP_AND:
+		return "AND"
+	case OP_OR:
+		return "OR"
+	case OP_NOT:
+		return "NOT"
+	default:
+		return string(op)
+	}
+}
+
+func ToMetaQueryCompositeOperator(op string) (MetaQueryCompositeOperator, error) {
+	switch strings.ToUpper(op) {
+	case "AND":
+		return OP_AND, nil
+	case "OR":
+		return OP_OR, nil
+	case "NOT":
+		return OP_NOT, nil
+	default:
+		return OP_AND, errors.New("Invalid operator: " + op)
+	}
+}
+
+func (op *MetaQueryCompositeOperator) UnmarshalJSON(data []byte) (err error) {
+	var opStr string
+	err = json.Unmarshal(data, &opStr)
+	if err != nil {
+		return
+	}
+
+	*op, err = ToMetaQueryCompositeOperator(opStr)
+	if err != nil {
+		return err
+	}
+	return
+}
+
+func (op *MetaQueryCompositeOperator) MarshalJSON() (data []byte, err error) {
+	data, err = json.Marshal(op.String())
+	return
+}
 
 type MetaQueryCondition interface {
 	GetType() MetaQueryConditionType
 	Serialize() []byte
 }
 
-type MeasurementMetaQueryCondition struct {
-	operator MetaQuerySingleOperator
-	value string
+type MetaQueryConditionWrapper struct {
+	Type           MetaQueryConditionType
+	QueryCondition MetaQueryCondition
 }
 
-func NewMeasurementQueryCondition(operator MetaQuerySingleOperator , value string) *MeasurementMetaQueryCondition {
+func (op *MetaQueryConditionWrapper) UnmarshalJSON(data []byte) (err error) {
+	rawData := make(map[string]json.RawMessage)
+	err = json.Unmarshal(data, &rawData)
+	if err != nil {
+		return
+	}
+
+	var condTypeStr string
+	condTypeRD, ok := rawData["Type"]
+	if !ok {
+		err = errors.New("type information is missing")
+		return
+	}
+
+	err = json.Unmarshal(condTypeRD, &condTypeStr)
+	if err != nil {
+		return
+	}
+
+	condType, err := ToMetaQueryConditionType(condTypeStr)
+	if err != nil {
+		return
+	}
+
+	condRM, ok := rawData["QueryCondition"]
+	if !ok {
+		err = errors.New("query condition is missing")
+		return
+	}
+
+	op.Type = condType
+	switch condType {
+	case COMPOSITE_CONDITION:
+		rc := CompositeMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	case MEASUREMENT_CONDITION:
+		rc := MeasurementMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	case SOURCE_CONDITION:
+		rc := DataSourceMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	case TAG_CONDITION:
+		rc := TagMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	case UPDATE_TIME_CONDITION:
+		rc := UpdateTimeMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	case ATTRIBUTE_CONDITION:
+		rc := AttributeMetaQueryCondition{}
+		err = json.Unmarshal(condRM, &rc)
+		op.QueryCondition = &rc
+	}
+
+	return
+}
+
+type MeasurementMetaQueryCondition struct {
+	Operator MetaQuerySingleOperator
+	Value    string
+}
+
+func NewMeasurementQueryCondition(operator MetaQuerySingleOperator, value string) *MeasurementMetaQueryCondition {
 	return &MeasurementMetaQueryCondition{
-		operator: operator,
-		value:  value,
+		Operator: operator,
+		Value:    value,
 	}
 }
 
@@ -1518,12 +1786,12 @@ func (measurementMetaQueryCondition *MeasurementMetaQueryCondition) GetType() Me
 
 func (measurementMetaQueryCondition *MeasurementMetaQueryCondition) Serialize() []byte {
 	metaQueryMeasurementCondition := new(otsprotocol.MetaQueryMeasurementCondition)
-	metaQueryMeasurementCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(measurementMetaQueryCondition.operator)).Enum()
-	metaQueryMeasurementCondition.Value = proto.String(measurementMetaQueryCondition.value)
+	metaQueryMeasurementCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(measurementMetaQueryCondition.Operator)).Enum()
+	metaQueryMeasurementCondition.Value = proto.String(measurementMetaQueryCondition.Value)
 
-	result , err := proto.Marshal(metaQueryMeasurementCondition)
+	result, err := proto.Marshal(metaQueryMeasurementCondition)
 	if err != nil {
-		panic(fmt.Errorf("MeasurementMetaQueryCondition serialize failed with err : %s" , err))
+		panic(fmt.Errorf("MeasurementMetaQueryCondition serialize failed with err : %s", err))
 		return nil
 	}
 
@@ -1531,14 +1799,14 @@ func (measurementMetaQueryCondition *MeasurementMetaQueryCondition) Serialize() 
 }
 
 type DataSourceMetaQueryCondition struct {
-	operator MetaQuerySingleOperator
-	value string
+	Operator MetaQuerySingleOperator
+	Value    string
 }
 
-func NewDataSourceMetaQueryCondition(operator MetaQuerySingleOperator , value string) *DataSourceMetaQueryCondition {
+func NewDataSourceMetaQueryCondition(operator MetaQuerySingleOperator, value string) *DataSourceMetaQueryCondition {
 	return &DataSourceMetaQueryCondition{
-		operator: operator,
-		value: value,
+		Operator: operator,
+		Value:    value,
 	}
 }
 
@@ -1548,28 +1816,28 @@ func (sourceMetaQueryCondition *DataSourceMetaQueryCondition) GetType() MetaQuer
 
 func (sourceMetaQueryCondition *DataSourceMetaQueryCondition) Serialize() []byte {
 	metaQuerySourceCondition := new(otsprotocol.MetaQuerySourceCondition)
-	metaQuerySourceCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(sourceMetaQueryCondition.operator)).Enum()
-	metaQuerySourceCondition.Value = proto.String(sourceMetaQueryCondition.value)
+	metaQuerySourceCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(sourceMetaQueryCondition.Operator)).Enum()
+	metaQuerySourceCondition.Value = proto.String(sourceMetaQueryCondition.Value)
 
-	result , err := proto.Marshal(metaQuerySourceCondition)
+	result, err := proto.Marshal(metaQuerySourceCondition)
 	if err != nil {
-		panic(fmt.Errorf("SourceMetaQueryCondition serialize failed with err : %s" , err))
+		panic(fmt.Errorf("SourceMetaQueryCondition serialize failed with err : %s", err))
 		return nil
 	}
 	return result
 }
 
 type TagMetaQueryCondition struct {
-	operator MetaQuerySingleOperator
-	tagName string
-	value string
+	Operator MetaQuerySingleOperator
+	TagName  string
+	Value    string
 }
 
-func NewTagMetaQueryCondition(operator MetaQuerySingleOperator , tagName string , value string) *TagMetaQueryCondition {
+func NewTagMetaQueryCondition(operator MetaQuerySingleOperator, tagName string, value string) *TagMetaQueryCondition {
 	return &TagMetaQueryCondition{
-		operator: operator,
-		tagName: tagName,
-		value: value,
+		Operator: operator,
+		TagName:  tagName,
+		Value:    value,
 	}
 }
 
@@ -1579,27 +1847,27 @@ func (TagMetaQueryCondition *TagMetaQueryCondition) GetType() MetaQueryCondition
 
 func (tagMetaQueryCondition *TagMetaQueryCondition) Serialize() []byte {
 	metaQueryTagCondition := new(otsprotocol.MetaQueryTagCondition)
-	metaQueryTagCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(tagMetaQueryCondition.operator)).Enum()
-	metaQueryTagCondition.TagName = proto.String(tagMetaQueryCondition.tagName)
-	metaQueryTagCondition.Value = proto.String(tagMetaQueryCondition.value)
+	metaQueryTagCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(tagMetaQueryCondition.Operator)).Enum()
+	metaQueryTagCondition.TagName = proto.String(tagMetaQueryCondition.TagName)
+	metaQueryTagCondition.Value = proto.String(tagMetaQueryCondition.Value)
 
-	result , err := proto.Marshal(metaQueryTagCondition)
+	result, err := proto.Marshal(metaQueryTagCondition)
 	if err != nil {
-		panic(fmt.Errorf("TagMetaQueryCondition serialize failed with err : %s" , err))
+		panic(fmt.Errorf("TagMetaQueryCondition serialize failed with err : %s", err))
 		return nil
 	}
 	return result
 }
 
 type UpdateTimeMetaQueryCondition struct {
-	operator MetaQuerySingleOperator
-	timeInUs int64
+	Operator MetaQuerySingleOperator
+	TimeInUs int64
 }
 
-func NewUpdateTimeMetaQueryCondition(operator MetaQuerySingleOperator , timeInUs int64) *UpdateTimeMetaQueryCondition{
+func NewUpdateTimeMetaQueryCondition(operator MetaQuerySingleOperator, timeInUs int64) *UpdateTimeMetaQueryCondition {
 	return &UpdateTimeMetaQueryCondition{
-		operator: operator,
-		timeInUs:  timeInUs,
+		Operator: operator,
+		TimeInUs: timeInUs,
 	}
 }
 
@@ -1609,28 +1877,28 @@ func (updateTimeMetaQueryCondition *UpdateTimeMetaQueryCondition) GetType() Meta
 
 func (updateTimeMetaQueryCondition *UpdateTimeMetaQueryCondition) Serialize() []byte {
 	metaQueryUpdateTimeCondition := new(otsprotocol.MetaQueryUpdateTimeCondition)
-	metaQueryUpdateTimeCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(updateTimeMetaQueryCondition.operator)).Enum()
-	metaQueryUpdateTimeCondition.Value = proto.Int64(updateTimeMetaQueryCondition.timeInUs)
+	metaQueryUpdateTimeCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(updateTimeMetaQueryCondition.Operator)).Enum()
+	metaQueryUpdateTimeCondition.Value = proto.Int64(updateTimeMetaQueryCondition.TimeInUs)
 
-	result , err := proto.Marshal(metaQueryUpdateTimeCondition)
+	result, err := proto.Marshal(metaQueryUpdateTimeCondition)
 	if err != nil {
-		panic(fmt.Errorf("UpdateTimeMetaQueryCondition serialize failed with err : %s" , err))
+		panic(fmt.Errorf("UpdateTimeMetaQueryCondition serialize failed with err : %s", err))
 		return nil
 	}
 	return result
 }
 
 type AttributeMetaQueryCondition struct {
-	operator MetaQuerySingleOperator
-	attributeName string
-	value string
+	Operator      MetaQuerySingleOperator
+	AttributeName string
+	Value         string
 }
 
-func NewAttributeMetaQueryCondition(operator MetaQuerySingleOperator , attributeName string , value string) *AttributeMetaQueryCondition {
-	return & AttributeMetaQueryCondition{
-		operator: operator,
-		attributeName: attributeName,
-		value: value,
+func NewAttributeMetaQueryCondition(operator MetaQuerySingleOperator, attributeName string, value string) *AttributeMetaQueryCondition {
+	return &AttributeMetaQueryCondition{
+		Operator:      operator,
+		AttributeName: attributeName,
+		Value:         value,
 	}
 }
 
@@ -1638,32 +1906,69 @@ func (attributeMetaQueryCondition *AttributeMetaQueryCondition) GetType() MetaQu
 	return ATTRIBUTE_CONDITION
 }
 
-func (attributeMetaQueryCondition *AttributeMetaQueryCondition) Serialize() []byte{
+func (attributeMetaQueryCondition *AttributeMetaQueryCondition) Serialize() []byte {
 	metaQueryAttributeCondition := new(otsprotocol.MetaQueryAttributeCondition)
-	metaQueryAttributeCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(attributeMetaQueryCondition.operator)).Enum()
-	metaQueryAttributeCondition.AttrName = proto.String(attributeMetaQueryCondition.attributeName)
-	metaQueryAttributeCondition.Value = proto.String(attributeMetaQueryCondition.value)
+	metaQueryAttributeCondition.Op = otsprotocol.MetaQuerySingleOperator(int32(attributeMetaQueryCondition.Operator)).Enum()
+	metaQueryAttributeCondition.AttrName = proto.String(attributeMetaQueryCondition.AttributeName)
+	metaQueryAttributeCondition.Value = proto.String(attributeMetaQueryCondition.Value)
 
-	result , err := proto.Marshal(metaQueryAttributeCondition)
+	result, err := proto.Marshal(metaQueryAttributeCondition)
 	if err != nil {
-		panic(fmt.Errorf("AttributeMetaQueryCondition serialize failed with err : %s" , err))
+		panic(fmt.Errorf("AttributeMetaQueryCondition serialize failed with err : %s", err))
 		return nil
 	}
 	return result
 }
 
 type CompositeMetaQueryCondition struct {
-	operator MetaQueryCompositeOperator
-	subConditions []*MetaQueryCondition
+	Operator      MetaQueryCompositeOperator
+	SubConditions []*MetaQueryCondition `json:"-"`
+
+	// for json marshal and unmarshal
+	SubConditionsAlias []*MetaQueryConditionWrapper `json:"SubConditions"`
 }
 
-func NewCompositeMetaQueryCondition(operator MetaQueryCompositeOperator , subConditions ...MetaQueryCondition) *CompositeMetaQueryCondition {
-	compositeMetaQueryCondition :=  &CompositeMetaQueryCondition{
-		operator: operator,
+func (op *CompositeMetaQueryCondition) UnmarshalJSON(data []byte) (err error) {
+	type CompositeMetaQueryConditionAlias CompositeMetaQueryCondition
+	condAlias := CompositeMetaQueryConditionAlias{}
+	err = json.Unmarshal(data, &condAlias)
+	if err != nil {
+		return
+	}
+
+	op.Operator = condAlias.Operator
+	op.SubConditions = make([]*MetaQueryCondition, 0)
+	for _, cond := range condAlias.SubConditionsAlias {
+		op.SubConditions = append(op.SubConditions, &cond.QueryCondition)
+	}
+
+	return
+}
+
+func (op *CompositeMetaQueryCondition) MarshalJSON() (data []byte, err error) {
+	type CompositeMetaQueryConditionAlias CompositeMetaQueryCondition
+	condAlias := CompositeMetaQueryConditionAlias(*op)
+	condAlias.Operator = op.Operator
+	condAlias.SubConditionsAlias = make([]*MetaQueryConditionWrapper, 0)
+	for _, cond := range condAlias.SubConditions {
+		condAlias.SubConditionsAlias = append(condAlias.SubConditionsAlias,
+			&MetaQueryConditionWrapper{
+				Type:           (*cond).GetType(),
+				QueryCondition: *cond,
+			})
+	}
+
+	data, err = json.Marshal(&condAlias)
+	return
+}
+
+func NewCompositeMetaQueryCondition(operator MetaQueryCompositeOperator, subConditions ...MetaQueryCondition) *CompositeMetaQueryCondition {
+	compositeMetaQueryCondition := &CompositeMetaQueryCondition{
+		Operator: operator,
 	}
 	if len(subConditions) > 0 {
 		for i := 0; i < len(subConditions); i++ {
-			compositeMetaQueryCondition.subConditions = append(compositeMetaQueryCondition.subConditions , &subConditions[i])
+			compositeMetaQueryCondition.SubConditions = append(compositeMetaQueryCondition.SubConditions, &subConditions[i])
 		}
 
 	}
@@ -1676,8 +1981,8 @@ func (compositeMetaQueryCondition *CompositeMetaQueryCondition) GetType() MetaQu
 
 func (compositemetaQueryCondition *CompositeMetaQueryCondition) Serialize() []byte {
 	metaQueryCompositeCondition := new(otsprotocol.MetaQueryCompositeCondition)
-	metaQueryCompositeCondition.Op = otsprotocol.MetaQueryCompositeOperator(int32(compositemetaQueryCondition.operator)).Enum()
-	for i := 0; i < len(compositemetaQueryCondition.subConditions); i++ {
+	metaQueryCompositeCondition.Op = otsprotocol.MetaQueryCompositeOperator(int32(compositemetaQueryCondition.Operator)).Enum()
+	for i := 0; i < len(compositemetaQueryCondition.SubConditions); i++ {
 		metaQueryCondition := new(otsprotocol.MetaQueryCondition)
 		switch value := (*compositemetaQueryCondition.getSubConditions()[i]).(type) {
 		case *MeasurementMetaQueryCondition:
@@ -1704,12 +2009,12 @@ func (compositemetaQueryCondition *CompositeMetaQueryCondition) Serialize() []by
 			panic("Unknow singleMetaQueryConditionType in compositeMetaQueryCondition!")
 			return nil
 		}
-		metaQueryCompositeCondition.SubConditions = append(metaQueryCompositeCondition.SubConditions , metaQueryCondition)
+		metaQueryCompositeCondition.SubConditions = append(metaQueryCompositeCondition.SubConditions, metaQueryCondition)
 	}
 
-	result , err := proto.Marshal(metaQueryCompositeCondition)
+	result, err := proto.Marshal(metaQueryCompositeCondition)
 	if err != nil {
-		panic(fmt.Errorf("otsprotocol.MetaQueryCompositeCondition Serialize Failed with err : %s" , err))
+		panic(fmt.Errorf("otsprotocol.MetaQueryCompositeCondition Serialize Failed with err : %s", err))
 		return nil
 	}
 	return result
@@ -1717,34 +2022,33 @@ func (compositemetaQueryCondition *CompositeMetaQueryCondition) Serialize() []by
 
 func (compositeMetaQueryCondition *CompositeMetaQueryCondition) AddSubConditions(subconditions ...MetaQueryCondition) {
 	for i := 0; i < len(subconditions); i++ {
-		compositeMetaQueryCondition.subConditions = append(compositeMetaQueryCondition.subConditions , &subconditions[i])
+		compositeMetaQueryCondition.SubConditions = append(compositeMetaQueryCondition.SubConditions, &subconditions[i])
 	}
 
 }
 
 func (compositeMetaQueryCondition *CompositeMetaQueryCondition) getSubConditions() []*MetaQueryCondition {
-	return compositeMetaQueryCondition.subConditions
+	return compositeMetaQueryCondition.SubConditions
 }
 
 func (compositeMetaQueryCondition *CompositeMetaQueryCondition) SetOperator(operator MetaQueryCompositeOperator) {
-	compositeMetaQueryCondition.operator = operator
+	compositeMetaQueryCondition.Operator = operator
 }
 
 func (compositeMetaQueryCondition *CompositeMetaQueryCondition) GetOperator() MetaQueryCompositeOperator {
-	return compositeMetaQueryCondition.operator
+	return compositeMetaQueryCondition.Operator
 }
 
-
 type TimeseriesMeta struct {
-	timeseriesKey *TimeseriesKey
-	attributes map[string]string
+	timeseriesKey  *TimeseriesKey
+	attributes     map[string]string
 	updateTimeInUs int64
 }
 
-func NewTimeseriesMeta(timeseriesKey *TimeseriesKey) *TimeseriesMeta{
+func NewTimeseriesMeta(timeseriesKey *TimeseriesKey) *TimeseriesMeta {
 	return &TimeseriesMeta{
 		timeseriesKey: timeseriesKey,
-		attributes: map[string]string{},
+		attributes:    map[string]string{},
 	}
 }
 
@@ -1756,19 +2060,19 @@ func (timeseriesMeta *TimeseriesMeta) GetTimeseriesKey() *TimeseriesKey {
 	return timeseriesMeta.timeseriesKey
 }
 
-func (timeseriesMeta *TimeseriesMeta) AddAttribute(attr_key string , attr_value string) {
+func (timeseriesMeta *TimeseriesMeta) AddAttribute(attr_key string, attr_value string) {
 	timeseriesMeta.attributes[attr_key] = attr_value
 }
 
 func (timeseriesMeta *TimeseriesMeta) AddAttributes(attributes map[string]string) {
-	for key , value := range attributes {
+	for key, value := range attributes {
 		timeseriesMeta.attributes[key] = value
 	}
 }
 
 func (timeseriesMeta *TimeseriesMeta) GetAttributes() map[string]string {
 	attributes := map[string]string{}
-	for key , value := range timeseriesMeta.attributes {
+	for key, value := range timeseriesMeta.attributes {
 		attributes[key] = value
 	}
 	return attributes
@@ -1776,7 +2080,7 @@ func (timeseriesMeta *TimeseriesMeta) GetAttributes() map[string]string {
 
 func (timeseriesMeta *TimeseriesMeta) GetAttributeSlice() string {
 	if len(timeseriesMeta.attributes) > 0 {
-		Atrributes , _ := BuildTagString(timeseriesMeta.attributes)
+		Atrributes, _ := BuildTagString(timeseriesMeta.attributes)
 		return Atrributes
 	}
 	return ""
@@ -1792,8 +2096,8 @@ func (timeseriesMeta *TimeseriesMeta) GetUpdateTimeInUs() int64 {
 
 type QueryTimeseriesMetaResponse struct {
 	timeseriesMetas []*TimeseriesMeta
-	totalHits int64
-	nextToken []byte
+	totalHits       int64
+	nextToken       []byte
 	ResponseInfo
 }
 
@@ -1815,10 +2119,9 @@ func (queryTimeseriesMetaResponse *QueryTimeseriesMetaResponse) GetNextToken() [
 	return queryTimeseriesMetaResponse.nextToken
 }
 
-
 // UpdateTimeseriesTableRequest
 type UpdateTimeseriesTableRequest struct {
-	timeseriesTableName string
+	timeseriesTableName    string
 	timeseriesTableOptions *TimeseriesTableOptions
 }
 

@@ -196,3 +196,12 @@ message UpdateTimeseriesMetaRequest {
 message UpdateTimeseriesMetaResponse {
   repeated FailedRowInfo failed_rows = 1;
 }
+
+message DeleteTimeseriesMetaRequest {
+  required string table_name = 1;
+  repeated TimeseriesKey timeseries_key = 2;
+}
+
+message DeleteTimeseriesMetaResponse {
+  repeated FailedRowInfo failed_rows = 1;
+}

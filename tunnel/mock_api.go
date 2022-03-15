@@ -9,45 +9,6 @@ import (
 	reflect "reflect"
 )
 
-// MocktunnelDataApi is a mock of tunnelDataApi interface
-type MocktunnelDataApi struct {
-	ctrl     *gomock.Controller
-	recorder *MocktunnelDataApiMockRecorder
-}
-
-// MocktunnelDataApiMockRecorder is the mock recorder for MocktunnelDataApi
-type MocktunnelDataApiMockRecorder struct {
-	mock *MocktunnelDataApi
-}
-
-// NewMocktunnelDataApi creates a new mock instance
-func NewMocktunnelDataApi(ctrl *gomock.Controller) *MocktunnelDataApi {
-	mock := &MocktunnelDataApi{ctrl: ctrl}
-	mock.recorder = &MocktunnelDataApiMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use
-func (m *MocktunnelDataApi) EXPECT() *MocktunnelDataApiMockRecorder {
-	return m.recorder
-}
-
-// readRecords mocks base method
-func (m *MocktunnelDataApi) ReadRecords(tunnelId, clientId, channelId, token string) ([]*Record, string, string, int, error) {
-	ret := m.ctrl.Call(m, "ReadRecords", tunnelId, clientId, channelId, token)
-	ret0, _ := ret[0].([]*Record)
-	ret1, _ := ret[1].(string)
-	ret2, _ := ret[2].(string)
-	ret3, _ := ret[3].(int)
-	ret4, _ := ret[4].(error)
-	return ret0, ret1, ret2, ret3, ret4
-}
-
-// readRecords indicates an expected call of readRecords
-func (mr *MocktunnelDataApiMockRecorder) ReadRecords(tunnelId, clientId, channelId, token interface{}) *gomock.Call {
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRecords", reflect.TypeOf((*MocktunnelDataApi)(nil).ReadRecords), tunnelId, clientId, channelId, token)
-}
-
 // MockTunnelMetaApi is a mock of TunnelMetaApi interface
 type MockTunnelMetaApi struct {
 	ctrl     *gomock.Controller
@@ -218,4 +179,40 @@ func (m *MockTunnelWorker) Shutdown() {
 // Shutdown indicates an expected call of Shutdown
 func (mr *MockTunnelWorkerMockRecorder) Shutdown() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockTunnelWorker)(nil).Shutdown))
+}
+
+// MocktunnelDataApi is a mock of tunnelDataApi interface
+type MocktunnelDataApi struct {
+	ctrl     *gomock.Controller
+	recorder *MocktunnelDataApiMockRecorder
+}
+
+// MocktunnelDataApiMockRecorder is the mock recorder for MocktunnelDataApi
+type MocktunnelDataApiMockRecorder struct {
+	mock *MocktunnelDataApi
+}
+
+// NewMocktunnelDataApi creates a new mock instance
+func NewMocktunnelDataApi(ctrl *gomock.Controller) *MocktunnelDataApi {
+	mock := &MocktunnelDataApi{ctrl: ctrl}
+	mock.recorder = &MocktunnelDataApiMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use
+func (m *MocktunnelDataApi) EXPECT() *MocktunnelDataApiMockRecorder {
+	return m.recorder
+}
+
+// ReadRecords mocks base method
+func (m *MocktunnelDataApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, error) {
+	ret := m.ctrl.Call(m, "ReadRecords", req)
+	ret0, _ := ret[0].(*ReadRecordResponse)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReadRecords indicates an expected call of ReadRecords
+func (mr *MocktunnelDataApiMockRecorder) ReadRecords(req interface{}) *gomock.Call {
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReadRecords", reflect.TypeOf((*MocktunnelDataApi)(nil).ReadRecords), req)
 }

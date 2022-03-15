@@ -153,7 +153,7 @@ func TestDoRequest_AddExternalHeader(t *testing.T) {
 	defer ts.Close()
 
 	ep := ts.URL
-	header :=  make(map[string]string)
+	header := make(map[string]string)
 	header["x-ots-tunnel-type"] = "type/datadelivery"
 	api := NewTunnelApiWithExternalHeader(ep, "testInstance", "testAkId", "testAkSec",
 		"", nil, header)

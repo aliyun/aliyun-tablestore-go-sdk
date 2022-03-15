@@ -3,17 +3,29 @@ package tunnel
 import (
 	"bytes"
 	"encoding/base64"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
+	"io"
 	"time"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
 var (
 	randomizationFactor = 0.33
 	backOffMultiplier   = 2.0
+)
+
+const (
+	//for serialize binary record
+	TAG_VERSION       = 0x1
+	TAG_RECORD_COUNT  = 0x2
+	TAG_ACTION_TYPE   = 0x3
+	TAG_RECORD_LENGTH = 0x4
+	TAG_RECORD        = 0x5
 )
 
 func StreamRecordSequenceLess(a, b *SequenceInfo) bool {
@@ -177,5 +189,140 @@ func parseProtoTunnelStreamConfig(pbConfig *protocol.StreamTunnelConfig) *Stream
 		Flag:        pbConfig.GetFlag(),
 		StartOffset: pbConfig.GetStartOffset(),
 		EndOffset:   pbConfig.GetEndOffset(),
+	}
+}
+
+func UnSerializeBatchBinaryRecordFromBytes(data []byte) (record []*Record, err error) {
+	defer func() {
+		if err2 := recover(); err2 != nil {
+			if _, ok := err2.(error); ok {
+				err = err2.(error)
+			}
+			return
+		}
+	}()
+	records := make([]*Record, 0)
+	r := bytes.NewReader(data)
+	recordCount := readHeaderInfo(r)
+	for ; recordCount > 0; recordCount-- {
+		rec, err := UnSerializeBinaryRecordFromBytes(r)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, rec)
+	}
+	return records, nil
+}
+
+func UnSerializeBinaryRecordFromBytes(r *bytes.Reader) (*Record, error) {
+	tag := readTag(r)
+	if tag != TAG_ACTION_TYPE {
+		panic(ErrUnExpectBinaryRecordTag)
+	}
+	typ := readRawDataInt32(r)
+	tag = readTag(r)
+	if tag != TAG_RECORD_LENGTH {
+		panic(ErrUnExpectBinaryRecordTag)
+	}
+	length := readRawDataInt32(r)
+	tag = readTag(r)
+	if tag != TAG_RECORD {
+		panic(ErrUnExpectBinaryRecordTag)
+	}
+	b := readBytes(r, length)
+	pbActionTyp := protocol.ActionType(typ)
+	actionTyp, err := ParseActionType(&pbActionTyp)
+	if err != nil {
+		return nil, err
+	}
+	rec, err := DeserializeRecordFromRawBytes(b, actionTyp)
+	if err != nil {
+		return nil, err
+	}
+	return rec, nil
+}
+
+func serializeBinaryRecord(b *bytes.Buffer, record *protocol.Record) []byte {
+	writeTag(b, TAG_ACTION_TYPE)
+	writeRawDataInt32(b, int32(*record.ActionType))
+	writeTag(b, TAG_RECORD_LENGTH)
+	writeRawDataInt32(b, int32(len(record.Record)))
+	writeTag(b, TAG_RECORD)
+	b.Write(record.GetRecord())
+	return b.Bytes()
+}
+
+func writeHeaderInfo(b *bytes.Buffer, count int32) {
+	writeTag(b, TAG_VERSION)
+	writeRawDataInt32(b, 0)
+	writeTag(b, TAG_RECORD_COUNT)
+	writeRawDataInt32(b, count)
+}
+
+func writeRawDataInt32(w io.Writer, value int32) {
+	w.Write([]byte{byte((value) & 0xFF)})
+	w.Write([]byte{byte((value >> 8) & 0xFF)})
+	w.Write([]byte{byte((value >> 16) & 0xFF)})
+	w.Write([]byte{byte((value >> 24) & 0xFF)})
+}
+
+func writeTag(w io.Writer, tag byte) {
+	writeRawByte(w, tag)
+}
+
+func writeRawByte(w io.Writer, value byte) {
+	w.Write([]byte{value})
+}
+
+func readHeaderInfo(r *bytes.Reader) int32 {
+	if readTag(r) != TAG_VERSION {
+		panic(ErrUnExpectBinaryRecordTag)
+	} else {
+		version := readRawDataInt32(r)
+		if version != 0 {
+			panic(ErrUnSupportRecordVersion)
+		}
+	}
+
+	if readTag(r) != TAG_RECORD_COUNT {
+		panic(ErrUnExpectBinaryRecordTag)
+	}
+	return readRawDataInt32(r)
+}
+
+func readRawDataInt32(r *bytes.Reader) int32 {
+	if r.Len() < 4 {
+		panic("read raw data panic")
+	}
+	var v int32
+	binary.Read(r, binary.LittleEndian, &v)
+	return v
+}
+
+func readTag(r *bytes.Reader) int {
+	return int(readRawByte(r))
+}
+
+func readRawByte(r *bytes.Reader) byte {
+	if r.Len() == 0 {
+		panic("read tag panic")
+	}
+	b, _ := r.ReadByte()
+	return b
+}
+
+func readBytes(r *bytes.Reader, size int32) []byte {
+	if int32(r.Len()) < size {
+		panic("size not enough")
+	}
+	v := make([]byte, size)
+	r.Read(v)
+	return v
+}
+
+// SetCredentialsProvider sets funciton for get the user's ak
+func SetCredentialsProvider(provider common.CredentialsProvider) ClientOption {
+	return func(client *TunnelApi) {
+		client.credentialsProvider = provider
 	}
 }

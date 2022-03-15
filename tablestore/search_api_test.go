@@ -7,6 +7,7 @@ import (
 	. "gopkg.in/check.v1"
 	"math"
 	"os"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,207 @@ var searchAPITestIndexName1 = "search_api_test_index1"
 //for group by
 var searchAPITestTableName2 = "search_api_test_table2"
 var searchAPITestIndexName2 = "search_api_test_index2"
+
+func DeleteTable(c *C, client TableStoreApi, tableName string) {
+	req := new(DeleteTableRequest)
+	req.TableName = tableName
+	resp, err := client.DeleteTable(req)
+	c.Log("DeleteTable", resp.RequestId)
+	if err != nil && strings.Contains(err.Error(), "does not exist") {
+		return
+	}
+	c.Check(err, IsNil)
+	c.Log("delete", tableName)
+}
+
+func ListTable(c *C, client TableStoreApi) []string {
+	resp, err := client.ListTable()
+	c.Log("ListTable", resp.RequestId)
+	c.Check(err, IsNil)
+	return resp.TableNames
+}
+
+func DeleteIndex(c *C, client TableStoreApi, tableName string, indexName string) {
+	req := new(DeleteSearchIndexRequest)
+	req.TableName = tableName
+	req.IndexName = indexName
+	resp, err := client.DeleteSearchIndex(req)
+	c.Log("DeleteIndex", resp.ResponseInfo.RequestId)
+	if err != nil && strings.Contains(err.Error(), "OTSObjectNotExist") {
+		return
+	}
+	c.Check(err, IsNil)
+	c.Log("delete table:", tableName, "index:", indexName)
+}
+
+func DescribeSearchIndex(c *C, client TableStoreApi, tableName string, indexName string) *DescribeSearchIndexResponse {
+	req := new(DescribeSearchIndexRequest)
+	req.TableName = tableName
+	req.IndexName = indexName
+	resp, err := client.DescribeSearchIndex(req)
+	c.Log("DescribeSearchIndex", resp.ResponseInfo.RequestId)
+	c.Check(err, IsNil)
+	return resp
+}
+
+func in(target string, strArray []string) bool {
+	sort.Strings(strArray)
+	index := sort.SearchStrings(strArray, target)
+	if index < len(strArray) && strArray[index] == target {
+		return true
+	}
+	return false
+}
+
+func DeleteTableAndAllIndex(c *C, client TableStoreApi, tableName string) {
+	if !in(tableName, ListTable(c, client)) {
+		return
+	}
+	indices := ListSearchIndex(c, client, tableName)
+	for _, index := range indices {
+		DeleteIndex(c, client, tableName, index)
+	}
+	DeleteTable(c, client, tableName)
+}
+
+func getNormalTestIndexSchemaWithNested() *IndexSchema {
+	return &IndexSchema{
+		FieldSchemas: []*FieldSchema{
+			{
+				FieldName:   proto.String("date"),
+				FieldType:   FieldType_DATE,
+				DateFormats: []string{"yyyy-MM-dd'T'HH:mm:ss.SSSSSS", "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS"},
+			},
+			{
+				FieldName: proto.String("nested"),
+				FieldType: FieldType_NESTED,
+				FieldSchemas: []*FieldSchema{
+					{
+						FieldName:   proto.String("nested_date"),
+						FieldType:   FieldType_DATE,
+						DateFormats: []string{"epoch_micros"},
+					},
+				},
+			},
+		},
+	}
+}
+
+func getNormalTestIndexSchema() *IndexSchema {
+	return &IndexSchema{
+		FieldSchemas: []*FieldSchema{
+			{
+				FieldName: proto.String("pk1"),
+				FieldType: FieldType_KEYWORD,
+			},
+			{
+				FieldName: proto.String("col1"),
+				FieldType: FieldType_KEYWORD,
+			},
+		},
+	}
+}
+
+func CreateSearchTable(c *C, client TableStoreApi, tableName string) {
+	createTableRequest := new(CreateTableRequest)
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	resp, err := client.CreateTable(createTableRequest)
+	c.Log("CreateSearchTable", resp.RequestId)
+	c.Check(err, IsNil)
+}
+
+func CreateSearchTableAndDisallowUpdate(c *C, client TableStoreApi, tableName string) {
+	createTableRequest := new(CreateTableRequest)
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	allowUpdate := false
+	tableOption.AllowUpdate = &allowUpdate
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	resp, err := client.CreateTable(createTableRequest)
+	c.Log("CreateSearchTable", resp.RequestId)
+	c.Check(err, IsNil)
+}
+
+func ListSearchIndex(c *C, client TableStoreApi, tableName string) []string {
+	req := new(ListSearchIndexRequest)
+	req.TableName = tableName
+	resp, err := client.ListSearchIndex(req)
+	c.Log("ListSearchIndex", resp.ResponseInfo.RequestId)
+	c.Check(err, IsNil)
+	var indices []string
+	for _, indexInfo := range resp.IndexInfo {
+		indices = append(indices, indexInfo.IndexName)
+	}
+	return indices
+}
+
+func CreateSearchIndex(c *C, client TableStoreApi, tableName string, indexName string, indexSchema *IndexSchema, ttl int32) {
+	req := new(CreateSearchIndexRequest)
+	req.TableName = tableName
+	req.IndexName = indexName
+	req.IndexSchema = indexSchema
+	req.TimeToLive = &ttl
+	resp, err := client.CreateSearchIndex(req)
+	if err != nil {
+		c.Log(fmt.Println(err))
+	}
+	c.Log("CreateSearchIndex", resp.ResponseInfo.RequestId)
+	c.Check(err, IsNil)
+}
+
+func WaitDataSyncByMatchAllQuery(c *C, client TableStoreApi, expectCount int64, tableName string, indexName string, timeInSecond int) {
+	searchRequest := new(SearchRequest)
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+	searchQuery := search.NewSearchQuery()
+	searchQuery.Limit = 0
+	searchQuery.SetQuery(&search.MatchAllQuery{})
+	searchQuery.SetGetTotalCount(true)
+	searchRequest.SetSearchQuery(searchQuery)
+	errTimes := 0
+	for i := 1; i <= timeInSecond; i++ {
+		searchResponse, err := client.Search(searchRequest)
+		if err != nil {
+			errTimes++
+			if errTimes > 10 {
+				c.Fatal(time.Now().Local(), i, "times query", "MatchAllQuery failed!", err)
+				return
+			}
+			c.Log(i, "times query", "MatchAllQuery failed!", err)
+		} else {
+			if i == timeInSecond {
+				c.Log(i, "times query", "MatchAllQuery Hits: ", searchResponse.TotalCount, "  RequestId:", searchResponse.RequestId)
+			}
+			if expectCount == searchResponse.TotalCount {
+				c.Log(i, "times query.", "MatchAllQuery Hits: ", searchResponse.TotalCount, "  RequestId:", searchResponse.RequestId)
+				time.Sleep(time.Duration(2) * time.Second)
+				return
+			}
+		}
+		time.Sleep(time.Duration(1) * time.Second)
+	}
+	c.Fatal("after ", timeInSecond, "seconds, sync date filed", time.Now().Local())
+}
 
 func createTable1(c *C) {
 	fmt.Println("Begin to create table:", searchAPITestTableName1)
@@ -120,14 +322,14 @@ func createSearchIndex1(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field6 := &FieldSchema{
-		FieldName:        proto.String("Col_Text"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field7 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Nested"),
 				FieldType:        FieldType_LONG,
@@ -159,9 +361,9 @@ func createSearchIndex1(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
@@ -199,14 +401,14 @@ func createSearchIndex1(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field16 := &FieldSchema{
-		FieldName:        proto.String("Col_Text_Missing"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text_Missing"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field17 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested_Missing"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested_Missing"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Missing_Nested"),
 				FieldType:        FieldType_LONG,
@@ -238,14 +440,13 @@ func createSearchIndex1(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Missing_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Missing_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
 	schemas = append(schemas, field11, field12, field13, field14, field15, field16, field17)
-
 
 	request.IndexSchema = &IndexSchema{
 		FieldSchemas: schemas,
@@ -296,14 +497,14 @@ func createSearchIndex2(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field6 := &FieldSchema{
-		FieldName:        proto.String("Col_Text"),
-		FieldType:        FieldType_TEXT,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
 	}
 	field7 := &FieldSchema{
-		FieldName:        proto.String("Col_Nested"),
-		FieldType:        FieldType_NESTED,
-		FieldSchemas:     []*FieldSchema {
+		FieldName: proto.String("Col_Nested"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
 			{
 				FieldName:        proto.String("Col_Long_Nested"),
 				FieldType:        FieldType_LONG,
@@ -335,9 +536,9 @@ func createSearchIndex2(c *C) {
 				EnableSortAndAgg: proto.Bool(true),
 			},
 			{
-				FieldName:        proto.String("Col_Text_Nested"),
-				FieldType:        FieldType_TEXT,
-				Index:            proto.Bool(true),
+				FieldName: proto.String("Col_Text_Nested"),
+				FieldType: FieldType_TEXT,
+				Index:     proto.Bool(true),
 			},
 		},
 	}
@@ -362,32 +563,31 @@ func deleteSearchIndex(tableName string, indexName string) {
 }
 
 func writeData1(c *C) {
-	strs := []string {"hangzhou", "tablestore", "ots"}
-	geopoints := []string {
-		"30.137817,120.08681",	//飞天园区
-		"30.135131,120.088355",	//中大银座
-		"30.181877,120.152818",	//中医药地铁站
-		"30.20223,120.13787",	//六和塔
-		"30.216961,120.157633",	//八卦田
-		"30.231566,120.148578",	//太子湾
-		"30.26058,120.170712",	//龙翔桥
-		"30.269501,120.169347",	//凤起路
-		"30.28073,120.168843",	//运河
-		"30.296946,120.21958",	//杭州东站
+	strs := []string{"hangzhou", "tablestore", "ots"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
 	}
 
-	for i := 0; i < 10; i++ {	//0, 1, ..., 9
+	for i := 0; i < 10; i++ { //0, 1, ..., 9
 		putRowRequest := new(PutRowRequest)
 		putRowChange := new(PutRowChange)
 		putRowChange.TableName = searchAPITestTableName1
 		putPk := new(PrimaryKey)
 		putPk.AddPrimaryKeyColumn("pk1", fmt.Sprintf("pk_%d", i))
 
-
 		longValue := int64(i)
 		doubleValue := float64(i) + 0.1
 		boolValue := false
-		if i % 2 == 0 {
+		if i%2 == 0 {
 			boolValue = true
 		}
 		keywordValue := strs[i%len(strs)]
@@ -407,7 +607,7 @@ func writeData1(c *C) {
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
 
-		if i >= 5 {	//leave out the first 5 rows
+		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
 			putRowChange.AddColumn("Col_Double_Missing", doubleValue)
 			putRowChange.AddColumn("Col_Boolean_Missing", boolValue)
@@ -426,24 +626,24 @@ func writeData1(c *C) {
 }
 
 func writeData2(c *C) {
-	longs := []int64 {1, 2, 2, 3, 3, 3, 4, 4, 4, 4}
-	doubles := []float64 {1.1, 2.1, 2.1, 3.1, 3.1, 3.1, 4.1, 4.1, 4.1, 4.1}
-	bools := []bool {false, false, false, false, true, true, true, true, true, true}
-	strs := []string {"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
-	geopoints := []string {
-		"30.137817,120.08681",	//飞天园区
-		"30.135131,120.088355",	//中大银座
-		"30.181877,120.152818",	//中医药地铁站
-		"30.20223,120.13787",	//六和塔
-		"30.216961,120.157633",	//八卦田
-		"30.231566,120.148578",	//太子湾
-		"30.26058,120.170712",	//龙翔桥
-		"30.269501,120.169347",	//凤起路
-		"30.28073,120.168843",	//运河
-		"30.296946,120.21958",	//杭州东站
+	longs := []int64{1, 2, 2, 3, 3, 3, 4, 4, 4, 4}
+	doubles := []float64{1.1, 2.1, 2.1, 3.1, 3.1, 3.1, 4.1, 4.1, 4.1, 4.1}
+	bools := []bool{false, false, false, false, true, true, true, true, true, true}
+	strs := []string{"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
 	}
 
-	for i := 0; i < 10; i++ {	//0, 1, ..., 9
+	for i := 0; i < 10; i++ { //0, 1, ..., 9
 		putRowRequest := new(PutRowRequest)
 		putRowChange := new(PutRowChange)
 		putRowChange.TableName = searchAPITestTableName2
@@ -470,7 +670,7 @@ func writeData2(c *C) {
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
 
-		if i >= 5 {	//leave out the first 5 rows
+		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
 			putRowChange.AddColumn("Col_Double_Missing", doubleValue)
 			putRowChange.AddColumn("Col_Boolean_Missing", boolValue)
@@ -512,9 +712,10 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 
 	writeData1(c)
 	writeData2(c)
-	time.Sleep(time.Duration(30) * time.Second)
-}
 
+	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName1, searchAPITestIndexName1, 40)
+	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName2, searchAPITestIndexName2, 40)
+}
 
 /* avg agg */
 
@@ -531,7 +732,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationEmptyAggName(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationValidType(c *C) {
@@ -632,7 +833,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeKeyword(c *C) {
@@ -648,7 +849,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeGeoPoint(c *C) {
@@ -664,7 +865,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeNested(c *C) {
@@ -680,7 +881,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeText(c *C) {
@@ -696,7 +897,7 @@ func (s *SearchSuite) TestAggregationAvgAggregationInvalidTypeText(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[avg agg\\] field_name:Col_Text type:text is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationAvgAggregationUnknownField(c *C) {
@@ -730,7 +931,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationEmptyAggName(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationValidType(c *C) {
@@ -773,7 +974,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeKeyword(c *C) {
@@ -789,7 +990,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeGeoPoint(c *C) {
@@ -805,7 +1006,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeNested(c *C) {
@@ -821,7 +1022,7 @@ func (s *SearchSuite) TestAggregationMaxAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[max agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMaxAggregationUnknownField(c *C) {
@@ -855,7 +1056,7 @@ func (s *SearchSuite) TestAggregationMinAggregationEmptyAggName(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationValidType(c *C) {
@@ -898,7 +1099,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeBoolean(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Boolean type:boolean is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeKeyword(c *C) {
@@ -914,7 +1115,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeKeyword(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Keyword type:keyword is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeGeoPoint(c *C) {
@@ -930,7 +1131,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeGeoPoint(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_GeoPoint type:geo_point is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeNested(c *C) {
@@ -946,7 +1147,7 @@ func (s *SearchSuite) TestAggregationMinAggregationInvalidTypeNested(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid \\[min agg\\] field_name:Col_Nested type:nested is invalid, allow \\[long, double\\].*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationMinAggregationUnknownField(c *C) {
@@ -980,7 +1181,7 @@ func (s *SearchSuite) TestAggregationSumAggregationEmptyAggName(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationSumAggregationValidType(c *C) {
@@ -1105,7 +1306,7 @@ func (s *SearchSuite) TestAggregationCountAggregationEmptyAggName(c *C) {
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationCountAggregationValidType(c *C) {
@@ -1201,7 +1402,7 @@ func (s *SearchSuite) TestAggregationDistinctCountAggregationEmptyAggName(c *C) 
 			ReturnAll: false,
 		})
 	_, err := client.Search(searchRequest)
-	c.Check(err.Error(), Matches, "OTSParameterInvalid failed to query index.*")
+	c.Check(err.Error(), Matches, "OTSParameterInvalid.*")
 }
 
 func (s *SearchSuite) TestAggregationDistinctCountAggregationValidType(c *C) {
@@ -1335,7 +1536,7 @@ func (s *SearchSuite) TestGroupByGroupByGetResultWrongType(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,
@@ -1358,7 +1559,7 @@ func (s *SearchSuite) TestGroupByGroupByGetResultNotExist(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,
@@ -1436,7 +1637,7 @@ func (s *SearchSuite) TestGroupByGroupByFieldSorters(c *C) {
 			GroupBy(search.NewGroupByField("group_by1", "Col_Keyword").
 				GroupBySorters([]search.GroupBySorter{
 					&search.SubAggGroupBySort{
-						Order: search.SortOrder_ASC.Enum(),
+						Order:      search.SortOrder_ASC.Enum(),
 						SubAggName: "sub_agg1",
 					},
 					&search.GroupKeyGroupBySort{
@@ -1473,7 +1674,7 @@ func (s *SearchSuite) TestGroupByGroupByFilter(c *C) {
 				Query(&search.MatchAllQuery{}).
 				Query(&search.TermQuery{
 					FieldName: "Col_Keyword",
-					Term: "tablestore",
+					Term:      "tablestore",
 				}))).
 		SetColumnsToGet(&ColumnsToGet{
 			ReturnAll: false,
@@ -1757,19 +1958,16 @@ func (s *SearchSuite) TestComputeSplits(c *C) {
 	req := &ComputeSplitsRequest{}
 	req.
 		SetTableName(searchAPITestTableName1).
-		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:searchAPITestIndexName1})
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName: searchAPITestIndexName1})
 	res, err := client.ComputeSplits(req)
 	c.Check(err, Equals, nil)
 	c.Check(int32(1), Equals, res.SplitsSize)
-	//session id: ${uuid}_0
-	//e.g. 7c407215-97d4-40c5-8663-f1d9229e9955_0
-	c.Check(true, Equals, len(res.SessionId) == 38 && strings.HasSuffix(string(res.SessionId), "_0"))
 }
 
 func (s *SearchSuite) TestComputeSplitsInvalidTableName(c *C) {
 	req := &ComputeSplitsRequest{}
 	req.SetTableName("invalid_table_name").
-		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:searchAPITestIndexName1})
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName: searchAPITestIndexName1})
 	_, err := client.ComputeSplits(req)
 	c.Check(err.Error(), Matches, "OTSParameterInvalid table \\[invalid_table_name\\] does not exist.*")
 }
@@ -1778,16 +1976,16 @@ func (s *SearchSuite) TestComputeSplitsInvalidIndexName(c *C) {
 	req := &ComputeSplitsRequest{}
 	req.
 		SetTableName(searchAPITestTableName1).
-		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:"invalid_index_name"})
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName: "invalid_index_name"})
 	_, err := client.ComputeSplits(req)
-	c.Check(err.Error(), Matches, "OTSMetaNotMatch index \\[invalid_index_name\\] does not exist.*")
+	c.Check(err.Error(), Matches, "OTSMetaNotMatch.*")
 }
 
 func computeSplits(tableName string, indexName string) (*ComputeSplitsResponse, error) {
 	req := &ComputeSplitsRequest{}
 	req.
 		SetTableName(tableName).
-		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName:indexName})
+		SetSearchIndexSplitsOptions(SearchIndexSplitsOptions{IndexName: indexName})
 	res, err := client.ComputeSplits(req)
 	if err != nil {
 		return nil, err
@@ -1880,4 +2078,51 @@ func (s *SearchSuite) TestParallelScanMultiThread(c *C) {
 	wg.Wait()
 
 	c.Check(total, Equals, 10)
+}
+
+func (s *SearchSuite) TestCreateSearchIndexWithDateFieldAndDescribeSearchIndex(c *C) {
+	tableName := "go_sdk_test_table"
+	indexName := "go_sdk_test_index"
+	DeleteTableAndAllIndex(c, client, tableName)
+	CreateSearchTable(c, client, tableName)
+	indexSchema := getNormalTestIndexSchemaWithNested()
+	CreateSearchIndex(c, client, tableName, indexName, indexSchema, -1)
+	resp := DescribeSearchIndex(c, client, tableName, indexName)
+	c.Check(resp, NotNil)
+	fieldSchemas := resp.Schema.FieldSchemas
+	c.Check(fieldSchemas, NotNil)
+	// check date field
+	c.Check(len(fieldSchemas), Equals, len(indexSchema.FieldSchemas))
+
+	c.Check(fieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[0].FieldType)
+	c.Check(fmt.Sprintf("%s", fieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexSchema.FieldSchemas[0].DateFormats))
+	c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
+
+	c.Check(fieldSchemas[1].FieldType, Equals, indexSchema.FieldSchemas[1].FieldType)
+	c.Check(*fieldSchemas[1].FieldName, Equals, *indexSchema.FieldSchemas[1].FieldName)
+
+	c.Check(len(fieldSchemas[1].FieldSchemas), Equals, len(indexSchema.FieldSchemas[1].FieldSchemas))
+
+	c.Check(fieldSchemas[1].FieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[1].FieldSchemas[0].FieldType)
+	c.Check(fmt.Sprintf("%s", fieldSchemas[1].FieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexSchema.FieldSchemas[1].FieldSchemas[0].DateFormats))
+	c.Check(*fieldSchemas[1].FieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[1].FieldSchemas[0].FieldName)
+}
+
+func (s *SearchSuite) TestCreateSearchIndexWithTTLAndDescribeSearchIndex(c *C) {
+	tableName := "go_sdk_test_table_ttl"
+	indexName := "go_sdk_test_index"
+	DeleteTableAndAllIndex(c, client, tableName)
+	CreateSearchTableAndDisallowUpdate(c, client, tableName)
+	indexSchema := getNormalTestIndexSchema()
+	ttl := int32(864000)
+	CreateSearchIndex(c, client, tableName, indexName, indexSchema, ttl)
+	resp := DescribeSearchIndex(c, client, tableName, indexName)
+	c.Check(resp.TimeToLive, Equals, ttl)
+	c.Check(resp, NotNil)
+	fieldSchemas := resp.Schema.FieldSchemas
+	c.Check(fieldSchemas, NotNil)
+	// check date field
+	c.Check(len(fieldSchemas), Equals, len(indexSchema.FieldSchemas))
+	c.Check(fieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[0].FieldType)
+	c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
 }
