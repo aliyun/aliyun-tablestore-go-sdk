@@ -22,6 +22,7 @@ type TableStoreApi interface {
 
 	// search related
 	CreateSearchIndex(request *CreateSearchIndexRequest) (*CreateSearchIndexResponse, error)
+	UpdateSearchIndex(request *UpdateSearchIndexRequest) (*UpdateSearchIndexResponse, error)
 	DeleteSearchIndex(request *DeleteSearchIndexRequest) (*DeleteSearchIndexResponse, error)
 	ListSearchIndex(request *ListSearchIndexRequest) (*ListSearchIndexResponse, error)
 	DescribeSearchIndex(request *DescribeSearchIndexRequest) (*DescribeSearchIndexResponse, error)

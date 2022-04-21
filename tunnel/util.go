@@ -6,12 +6,12 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/cenkalti/backoff"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"time"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
 var (
@@ -107,6 +107,15 @@ func ExponentialBackoff(interval, maxInterval, maxElapsed time.Duration, multipl
 	b.MaxElapsedTime = maxElapsed
 	b.Reset()
 	return b
+}
+
+func getBackoffConfForDiffUri(uri string, duration time.Duration) (time.Duration, time.Duration, time.Duration) {
+	switch uri {
+	case readRecordsUri:
+		return initRetryIntervalForDataApi, maxRetryIntervalForDataApi, duration
+	default:
+		return initRetryInterValForMetaApi, maxRetryIntervalForMetaApi, retryMaxElapsedTimeForMetaApi
+	}
 }
 
 func ParseRequestToken(token string) (*protocol.TokenContentV2, error) {

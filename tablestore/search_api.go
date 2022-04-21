@@ -14,6 +14,9 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 	req := new(otsprotocol.CreateSearchIndexRequest)
 	req.TableName = proto.String(request.TableName)
 	req.IndexName = proto.String(request.IndexName)
+	if nil != request.SourceIndexName {
+		req.SourceIndexName = request.SourceIndexName
+	}
 	if request.TimeToLive != nil {
 		req.TimeToLive = proto.Int32(*request.TimeToLive)
 	}
@@ -25,6 +28,21 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 	resp := new(otsprotocol.CreateSearchIndexResponse)
 	response := &CreateSearchIndexResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (tableStoreClient *TableStoreClient) UpdateSearchIndex(request *UpdateSearchIndexRequest) (*UpdateSearchIndexResponse, error) {
+	req := new(otsprotocol.UpdateSearchIndexRequest)
+	req.TableName = proto.String(request.TableName)
+	req.IndexName = proto.String(request.IndexName)
+	req.QueryFlowWeight = convertToPbQueryFlowWeight(request.QueryFlowWeights)
+	req.TimeToLive = request.TimeToLive
+	req.SwitchIndexName = request.SwitchIndexName
+	resp := new(otsprotocol.UpdateSearchIndexResponse)
+	response := new(UpdateSearchIndexResponse)
+	if err := tableStoreClient.doRequestWithRetry(updateSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -122,6 +140,10 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 		response.TimeToLive = *resp.TimeToLive
 	}
 
+	if resp.QueryFlowWeight != nil {
+		response.QueryFlowWeights = parseQueryFlowWeightFromPb(resp.QueryFlowWeight)
+	}
+
 	return response, nil
 }
 
@@ -182,6 +204,20 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 			return nil, err
 		}
 		response.GroupByResults = *groupByResults
+	}
+
+	if resp.Consumed != nil && resp.Consumed.CapacityUnit != nil {
+		response.ConsumedCapacityUnit = &ConsumedCapacityUnit{
+			Read:  resp.Consumed.CapacityUnit.GetRead(),
+			Write: resp.Consumed.CapacityUnit.GetWrite(),
+		}
+	}
+
+	if resp.ReservedConsumed != nil && resp.ReservedConsumed.CapacityUnit != nil {
+		response.ReservedThroughput = &ReservedThroughput{
+			Readcap:  int(resp.ReservedConsumed.CapacityUnit.GetRead()),
+			Writecap: int(resp.ReservedConsumed.CapacityUnit.GetWrite()),
+		}
 	}
 
 	return response, nil

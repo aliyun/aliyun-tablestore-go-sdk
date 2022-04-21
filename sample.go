@@ -61,6 +61,9 @@ func main() {
 	sample.ParallelScanSingleConcurrency(client, "scan_sample_table", "scan_sample_index")
 	sample.ParallelScanMultiConcurrency(client, "scan_sample_table", "scan_sample_index")
 
+	// update searchIndex schema
+	sample.UpdateSearchIndexSchema(client, "go_sdk_test_table", "go_sdk_test_index", "go_sdk_test_index_reindex")
+
 	// SQL sample
 	sample.SQLQuerySample(client)
 }

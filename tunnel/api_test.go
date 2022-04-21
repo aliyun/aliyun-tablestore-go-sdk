@@ -15,17 +15,18 @@ import (
 )
 
 var (
-	alwaysFailUri   = "/tunnel/alwaysFail"
-	badGateWayUri   = "/tunnel/badGateway"
-	fail3timesUri   = "/tunnel/3timesFail"
-	eof4timesUri    = "/tunnel/4timesEOF"
-	successUri      = "/tunnel/success"
-	reflectTokenUri = "/tunnel/reflectToken"
+	alwaysFailUri            = "/tunnel/alwaysFail"
+	badGateWayUri            = "/tunnel/badGateway"
+	fail3timesUri            = "/tunnel/3timesFail"
+	eof4timesUri             = "/tunnel/4timesEOF"
+	successUri               = "/tunnel/success"
+	reflectTokenUri          = "/tunnel/reflectToken"
+	readRecordsAlwaysFailUri = "/tunnel/readrecords"
 
 	requestId = "abcd-123"
 )
 
-func TestDoRequest_RetryBackoffElapsedTime(t *testing.T) {
+func TestDoRequest_RetryBackoffElapsedTimeForMetaApi(t *testing.T) {
 	c := assert.New(t)
 	ts := mockServer()
 	defer ts.Close()
@@ -35,6 +36,25 @@ func TestDoRequest_RetryBackoffElapsedTime(t *testing.T) {
 	s := time.Now()
 
 	traceId, _, err := api.doRequest(alwaysFailUri, nil, nil)
+	c.Equal(traceId, requestId)
+	tunnelErr, ok := err.(*TunnelError)
+	c.True(ok)
+	c.Equal(tunnelErr.Code, ErrCodeServerUnavailable)
+
+	dur := time.Now().Sub(s)
+	c.True(dur > maxRetryIntervalForMetaApi)
+}
+
+func TestDoRequest_RetryBackoffElapsedTimeForDataApi(t *testing.T) {
+	c := assert.New(t)
+	ts := mockServer()
+	defer ts.Close()
+
+	ep := ts.URL
+	api := NewTunnelApi(ep, "testInstance", "testAkId", "testAkSec", nil)
+	s := time.Now()
+
+	traceId, _, err := api.doRequest(readRecordsAlwaysFailUri, nil, nil)
 	c.Equal(traceId, requestId)
 	tunnelErr, ok := err.(*TunnelError)
 	c.True(ok)
@@ -60,7 +80,7 @@ func TestDoRequest_BadGateWayElapsedTime(t *testing.T) {
 	c.Equal(tunnelErr.Code, ErrCodeServerUnavailable)
 
 	dur := time.Now().Sub(s)
-	c.True(dur > api.retryMaxElapsedTime)
+	c.True(dur > retryMaxElapsedTimeForMetaApi)
 }
 
 func TestDoRequest_EOFRetry4Times(t *testing.T) {
@@ -77,9 +97,10 @@ func TestDoRequest_EOFRetry4Times(t *testing.T) {
 	c.Nil(err)
 
 	dur := time.Now().Sub(s)
-	fmt.Println(dur)
-	c.True(dur < 305*time.Millisecond)
-	c.True(dur > 145*time.Millisecond)
+
+	c.True(dur < 2*time.Second)
+	c.True(dur > 1*time.Second)
+
 }
 
 func TestDoRequest_RetryBackoff3Times(t *testing.T) {
@@ -97,8 +118,8 @@ func TestDoRequest_RetryBackoff3Times(t *testing.T) {
 
 	dur := time.Now().Sub(s)
 	fmt.Println(dur)
-	c.True(dur < 150*time.Millisecond)
-	c.True(dur > 74*time.Millisecond)
+	c.True(dur < 1*time.Second)
+	c.True(dur > 400*time.Millisecond)
 }
 
 func TestDoRequest_Succeed(t *testing.T) {
@@ -115,7 +136,7 @@ func TestDoRequest_Succeed(t *testing.T) {
 
 	dur := time.Now().Sub(s)
 	fmt.Println(dur)
-	c.True(dur < initRetryInterval)
+	c.True(dur < initRetryInterValForMetaApi)
 	c.Equal(size, 0)
 }
 
@@ -165,6 +186,18 @@ func TestDoRequest_AddExternalHeader(t *testing.T) {
 
 func mockServer() *httptest.Server {
 	handler := http.NewServeMux()
+	handler.HandleFunc(readRecordsAlwaysFailUri, func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set(xOtsRequestId, requestId)
+		w.WriteHeader(503)
+		errCode := ErrCodeServerUnavailable
+		message := "server busy"
+		pbErr := &protocol.Error{
+			Code:    &errCode,
+			Message: &message,
+		}
+		buf, _ := proto.Marshal(pbErr)
+		w.Write(buf)
+	})
 	handler.HandleFunc(alwaysFailUri, func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set(xOtsRequestId, requestId)
 		w.WriteHeader(503)

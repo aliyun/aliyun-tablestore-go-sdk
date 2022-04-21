@@ -1,9 +1,9 @@
 package tablestore
 
-
 import (
 	"fmt"
 	lruCache "github.com/hashicorp/golang-lru"
+	"reflect"
 
 	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
 	flatbuffers "github.com/google/flatbuffers/go"
@@ -90,10 +90,13 @@ func buildTimeseriesRowToRowGroupOffset(row *TimeseriesRow , fbb *flatbuffers.Bu
 	for i := 0; i < fieldCount; i++ {
 		switch field_values[i].Type {
 		case ColumnType_INTEGER:
-			if val , ok := field_values[i].Value.(int64); ok {
-				longValues[longValueCount] = val
-			} else if valInt , okInt := field_values[i].Value.(int); okInt{
-				longValues[longValueCount] = int64(valInt)
+			switch value := field_values[i].Value.(type) {
+			case int64:
+				longValues[longValueCount] = value
+			case int:
+				longValues[longValueCount] = int64(value)
+			default:
+				return 0, fmt.Errorf("unsupported field type: %v", reflect.TypeOf(field_values[i].Value))
 			}
 			longValueCount++
 			break
@@ -312,4 +315,72 @@ func buildTimeseriesKey(curTimeseriesKey *TimeseriesKey) (*otsprotocol.Timeserie
 	timeseriesKey.Measurement = proto.String(curTimeseriesKey.measurement)
 
 	return timeseriesKey , nil
+}
+
+func buildProtocolBufferRows(rows []*TimeseriesRow, timeseriesTableName string, timeseriesMetaCache *lruCache.Cache) ([]byte, error) {
+	pbRows := new(otsprotocol.TimeseriesPBRows)
+	pbRows.Rows = make([]*otsprotocol.TimeseriesRow, len(rows))
+	for i, row := range rows {
+		// build tag string
+		var err error
+		if row.timeseriesKey.tagsString == nil {
+			row.timeseriesKey.tagsString = new(string)
+			if *row.timeseriesKey.tagsString, err = BuildTagString(row.timeseriesKey.tags); err != nil {
+				return nil, fmt.Errorf("Build tags string failed with error: %s", err)
+			}
+		}
+		// build meta key
+		if row.timeseriesMetaKey == nil {
+			row.timeseriesMetaKey = new(string)
+			if *row.timeseriesMetaKey, err = row.timeseriesKey.buildTimeseriesMetaKey(timeseriesTableName); err != nil {
+				return nil, fmt.Errorf("Build meta key failed with error: %s", err)
+			}
+		}
+		// fetch meta update time
+		updateTimeInSec, ok := timeseriesMetaCache.Get(*row.timeseriesMetaKey)
+		var updateTime uint32
+		if ok {
+			updateTime = updateTimeInSec.(uint32)
+		}
+		// build fields
+		fieldMap := row.GetFieldsMap()
+		fields := make([]*otsprotocol.TimeseriesField, 0, len(fieldMap))
+		for fieldName, fieldValue := range fieldMap {
+			field := &otsprotocol.TimeseriesField{}
+			field.FieldName = proto.String(fieldName)
+			switch fieldValue.Type {
+			case ColumnType_STRING:
+				field.ValueString = proto.String(fieldValue.Value.(string))
+			case ColumnType_INTEGER:
+				switch value := fieldValue.Value.(type) {
+				case int:
+					field.ValueInt = proto.Int64(int64(value))
+				case int64:
+					field.ValueInt = proto.Int64(value)
+				default:
+					return nil, fmt.Errorf("unsupported field type: %v", reflect.TypeOf(fieldValue))
+				}
+			case ColumnType_BOOLEAN:
+				field.ValueBool = proto.Bool(fieldValue.Value.(bool))
+			case ColumnType_DOUBLE:
+				field.ValueDouble = proto.Float64(fieldValue.Value.(float64))
+			case ColumnType_BINARY:
+				field.ValueBinary = fieldValue.Value.([]byte)
+			}
+			fields = append(fields, field)
+		}
+		// build row
+		pbRow := &otsprotocol.TimeseriesRow{
+			TimeseriesKey: &otsprotocol.TimeseriesKey{
+				Measurement: proto.String(row.GetTimeseriesKey().measurement),
+				Source:      proto.String(row.GetTimeseriesKey().GetDataSource()),
+				Tags:        row.timeseriesKey.tagsString,
+			},
+			Time:                proto.Int64(row.timeInUs),
+			Fields:              fields,
+			MetaCacheUpdateTime: proto.Uint32(updateTime),
+		}
+		pbRows.Rows[i] = pbRow
+	}
+	return proto.Marshal(pbRows)
 }

@@ -92,6 +92,8 @@ type SearchResponse struct {
 	AggregationResults search.AggregationResults
 	GroupByResults     search.GroupByResults
 
+	ConsumedCapacityUnit *ConsumedCapacityUnit
+	ReservedThroughput   *ReservedThroughput
 	ResponseInfo
 }
 
@@ -210,6 +212,27 @@ func convertToPbSchema(schema *IndexSchema) (*otsprotocol.IndexSchema, error) {
 	return indexSchema, nil
 }
 
+func convertToPbQueryFlowWeight(queryFlowWeightArray []*QueryFlowWeight) []*otsprotocol.QueryFlowWeight {
+	var queryFlowWeights []*otsprotocol.QueryFlowWeight
+	for _, value := range queryFlowWeightArray {
+		queryFlowWeight := new(otsprotocol.QueryFlowWeight)
+		queryFlowWeight.IndexName = proto.String(value.IndexName)
+		queryFlowWeight.Weight = proto.Int32(value.Weight)
+		queryFlowWeights = append(queryFlowWeights, queryFlowWeight)
+	}
+	return queryFlowWeights
+}
+func parseQueryFlowWeightFromPb(queryFlowWeights []*otsprotocol.QueryFlowWeight) []*QueryFlowWeight {
+	var flowWeights []*QueryFlowWeight
+	for _, value := range queryFlowWeights {
+		queryFlowWeight := new(QueryFlowWeight)
+		queryFlowWeight.IndexName = *value.IndexName
+		queryFlowWeight.Weight = *value.Weight
+
+		flowWeights = append(flowWeights, queryFlowWeight)
+	}
+	return flowWeights
+}
 func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldSchema {
 	var schemas []*FieldSchema
 	for _, value := range pbFieldSchemas {
@@ -500,6 +523,14 @@ func (fs *FieldSchema) String() string {
 	return string(out)
 }
 
+func (queryFlowWeight *QueryFlowWeight) String() string {
+	out, err := json.Marshal(queryFlowWeight)
+	if err != nil {
+		panic(err)
+	}
+	return string(out)
+}
+
 type IndexSetting struct {
 	RoutingFields []string
 }
@@ -508,6 +539,7 @@ type CreateSearchIndexRequest struct {
 	TableName   string
 	IndexName   string
 	IndexSchema *IndexSchema
+	SourceIndexName *string
 	TimeToLive  *int32
 }
 
@@ -543,6 +575,7 @@ type DescribeSearchIndexResponse struct {
 	Schema       *IndexSchema
 	SyncStat     *SyncStat
 	MeteringInfo *MeteringInfo
+	QueryFlowWeights []*QueryFlowWeight
 	CreateTime   int64
 	TimeToLive   int32
 	ResponseInfo ResponseInfo
@@ -568,6 +601,23 @@ type DeleteSearchIndexRequest struct {
 }
 
 type DeleteSearchIndexResponse struct {
+	ResponseInfo ResponseInfo
+}
+
+type QueryFlowWeight struct {
+	IndexName string
+	Weight    int32
+}
+
+type UpdateSearchIndexRequest struct {
+	TableName       string
+	IndexName       string
+	SwitchIndexName *string
+	QueryFlowWeights []*QueryFlowWeight
+	TimeToLive      *int32
+}
+
+type UpdateSearchIndexResponse struct {
 	ResponseInfo ResponseInfo
 }
 

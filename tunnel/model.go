@@ -23,10 +23,12 @@ type ResponseInfo struct {
 }
 
 type CreateTunnelRequest struct {
-	TableName          string
-	TunnelName         string
-	Type               TunnelType
-	StreamTunnelConfig *StreamTunnelConfig
+	TableName                string
+	TunnelName               string
+	Type                     TunnelType
+	StreamTunnelConfig       *StreamTunnelConfig
+	// NeedAllTimeSeriesColumns function is temporarily disabled.
+	NeedAllTimeSeriesColumns bool
 }
 
 type CreateTunnelResponse struct {

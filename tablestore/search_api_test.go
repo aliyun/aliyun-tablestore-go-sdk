@@ -180,10 +180,11 @@ func ListSearchIndex(c *C, client TableStoreApi, tableName string) []string {
 	return indices
 }
 
-func CreateSearchIndex(c *C, client TableStoreApi, tableName string, indexName string, indexSchema *IndexSchema, ttl int32) {
+func CreateSearchIndex(c *C, client TableStoreApi, tableName string, indexName string, sourceIndexName *string, indexSchema *IndexSchema, ttl int32) {
 	req := new(CreateSearchIndexRequest)
 	req.TableName = tableName
 	req.IndexName = indexName
+	req.SourceIndexName = sourceIndexName
 	req.IndexSchema = indexSchema
 	req.TimeToLive = &ttl
 	resp, err := client.CreateSearchIndex(req)
@@ -2086,7 +2087,7 @@ func (s *SearchSuite) TestCreateSearchIndexWithDateFieldAndDescribeSearchIndex(c
 	DeleteTableAndAllIndex(c, client, tableName)
 	CreateSearchTable(c, client, tableName)
 	indexSchema := getNormalTestIndexSchemaWithNested()
-	CreateSearchIndex(c, client, tableName, indexName, indexSchema, -1)
+	CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, -1)
 	resp := DescribeSearchIndex(c, client, tableName, indexName)
 	c.Check(resp, NotNil)
 	fieldSchemas := resp.Schema.FieldSchemas
@@ -2115,7 +2116,7 @@ func (s *SearchSuite) TestCreateSearchIndexWithTTLAndDescribeSearchIndex(c *C) {
 	CreateSearchTableAndDisallowUpdate(c, client, tableName)
 	indexSchema := getNormalTestIndexSchema()
 	ttl := int32(864000)
-	CreateSearchIndex(c, client, tableName, indexName, indexSchema, ttl)
+	CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, ttl)
 	resp := DescribeSearchIndex(c, client, tableName, indexName)
 	c.Check(resp.TimeToLive, Equals, ttl)
 	c.Check(resp, NotNil)
@@ -2125,4 +2126,141 @@ func (s *SearchSuite) TestCreateSearchIndexWithTTLAndDescribeSearchIndex(c *C) {
 	c.Check(len(fieldSchemas), Equals, len(indexSchema.FieldSchemas))
 	c.Check(fieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[0].FieldType)
 	c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
+}
+
+func (s *SearchSuite) TestUpdateSearchIndexTTL(c *C) {
+	tableName := "go_sdk_test_update_search_index"
+	indexName := "go_sdk_test_index"
+	//init
+	{
+		DeleteTableAndAllIndex(c, client, tableName)
+		CreateSearchTableAndDisallowUpdate(c, client, tableName)
+		indexSchema := getNormalTestIndexSchema()
+		ttl := int32(-1)
+		CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, ttl)
+		respD := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(respD.TimeToLive, Equals, ttl)
+		c.Check(respD, NotNil)
+	}
+	//update ttl
+	{
+		updateTTL := int32(3600 * 24 * 7)
+		req := new(UpdateSearchIndexRequest)
+		req.TableName = tableName
+		req.IndexName = indexName
+		req.TimeToLive = proto.Int32(updateTTL)
+		resp, err := client.UpdateSearchIndex(req)
+		if err != nil {
+			c.Log(fmt.Println(err))
+		}
+		c.Log("UpdateSearchIndex", resp.ResponseInfo.RequestId)
+		c.Check(err, IsNil)
+		respD := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(respD.TimeToLive, Equals, updateTTL)
+		c.Check(respD, NotNil)
+	}
+}
+
+func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
+	tableName := "go_sdk_test_table"
+	indexName := "go_sdk_test_index"
+	// 修改schema后的索引, 索引必须以_reindex结尾
+	indexReindexName := "go_sdk_test_index_reindex"
+	indexSchema := getNormalTestIndexSchema()
+	indexReindexSchema := getNormalTestIndexSchemaWithNested()
+
+	{
+		// step 1.创建索引
+		DeleteTableAndAllIndex(c, client, tableName)
+		CreateSearchTable(c, client, tableName)
+		CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, -1)
+		resp := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(resp, NotNil)
+		fieldSchemas := resp.Schema.FieldSchemas
+		c.Check(fieldSchemas, NotNil)
+		c.Check(len(fieldSchemas), Equals, len(indexSchema.FieldSchemas))
+		c.Check(fieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[0].FieldType)
+		c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
+	}
+	{
+		// step 2.创建修改schema后的索引
+		CreateSearchIndex(c, client, tableName, indexReindexName, &indexName, indexReindexSchema, -1)
+		resp := DescribeSearchIndex(c, client, tableName, indexReindexName)
+		c.Check(resp, NotNil)
+		fieldSchemas := resp.Schema.FieldSchemas
+		c.Check(fieldSchemas, NotNil)
+		c.Check(len(fieldSchemas), Equals, len(indexReindexSchema.FieldSchemas))
+		c.Check(fieldSchemas[0].FieldType, Equals, indexReindexSchema.FieldSchemas[0].FieldType)
+		c.Check(fmt.Sprintf("%s", fieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexReindexSchema.FieldSchemas[0].DateFormats))
+		c.Check(*fieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[0].FieldName)
+		c.Check(fieldSchemas[1].FieldType, Equals, indexReindexSchema.FieldSchemas[1].FieldType)
+		c.Check(*fieldSchemas[1].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldName)
+		c.Check(len(fieldSchemas[1].FieldSchemas), Equals, len(indexReindexSchema.FieldSchemas[1].FieldSchemas))
+		c.Check(fieldSchemas[1].FieldSchemas[0].FieldType, Equals, indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldType)
+		c.Check(fmt.Sprintf("%s", fieldSchemas[1].FieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexReindexSchema.FieldSchemas[1].FieldSchemas[0].DateFormats))
+		c.Check(*fieldSchemas[1].FieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldName)
+	}
+	{
+		// step 3.设置AB索引权重，权重在0-100，此处原索引权重为0 新索引权重为100
+		fmt.Println("wait schema reload")
+		time.Sleep(60 * time.Second)
+		req := new(UpdateSearchIndexRequest)
+		req.TableName = tableName
+		req.IndexName = indexName
+		queryFlowWeightArray := make([]*QueryFlowWeight, 0)
+		queryFlowWeightArray = append(queryFlowWeightArray, &QueryFlowWeight{
+			IndexName: indexName,
+			Weight:    0,
+		})
+		queryFlowWeightArray = append(queryFlowWeightArray, &QueryFlowWeight{
+			IndexName: indexReindexName,
+			Weight:    100,
+		})
+		req.QueryFlowWeights = queryFlowWeightArray
+		resp, err := client.UpdateSearchIndex(req)
+		if err != nil {
+			c.Log(fmt.Println(err))
+		}
+		c.Log("UpdateSearchIndex", resp.ResponseInfo.RequestId)
+		c.Check(err, IsNil)
+		respD := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(respD, NotNil)
+		queryFlowWeights := respD.QueryFlowWeights
+		c.Check(queryFlowWeights[0].IndexName, Equals, queryFlowWeightArray[0].IndexName)
+		c.Check(queryFlowWeights[0].Weight, Equals, queryFlowWeightArray[0].Weight)
+		c.Check(queryFlowWeights[1].IndexName, Equals, queryFlowWeightArray[1].IndexName)
+		c.Check(queryFlowWeights[1].Weight, Equals, queryFlowWeightArray[1].Weight)
+	}
+
+	{
+		// step 4.切换索引, 此时索引schema变为新索引的schema
+		switchReq := new(UpdateSearchIndexRequest)
+		switchReq.TableName = tableName
+		switchReq.IndexName = indexName
+		switchReq.SwitchIndexName = &indexReindexName
+		resp, err := client.UpdateSearchIndex(switchReq)
+		if err != nil {
+			c.Log(fmt.Println(err))
+		}
+		c.Log("UpdateSearchIndex", resp.ResponseInfo.RequestId)
+		c.Check(err, IsNil)
+		respD := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(respD, NotNil)
+		fieldSchemas := respD.Schema.FieldSchemas
+		c.Check(fieldSchemas, NotNil)
+		c.Check(len(fieldSchemas), Equals, len(indexReindexSchema.FieldSchemas))
+		c.Check(fieldSchemas[0].FieldType, Equals, indexReindexSchema.FieldSchemas[0].FieldType)
+		c.Check(fmt.Sprintf("%s", fieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexReindexSchema.FieldSchemas[0].DateFormats))
+		c.Check(*fieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[0].FieldName)
+		c.Check(fieldSchemas[1].FieldType, Equals, indexReindexSchema.FieldSchemas[1].FieldType)
+		c.Check(*fieldSchemas[1].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldName)
+		c.Check(len(fieldSchemas[1].FieldSchemas), Equals, len(indexReindexSchema.FieldSchemas[1].FieldSchemas))
+		c.Check(fieldSchemas[1].FieldSchemas[0].FieldType, Equals, indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldType)
+		c.Check(fmt.Sprintf("%s", fieldSchemas[1].FieldSchemas[0].DateFormats), Equals, fmt.Sprintf("%s", indexReindexSchema.FieldSchemas[1].FieldSchemas[0].DateFormats))
+		c.Check(*fieldSchemas[1].FieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldName)
+	}
+	{
+		// step 5.经过一段静默时间后，可以删除修改前的索引
+		DeleteIndex(c, client, tableName, indexReindexName)
+	}
 }

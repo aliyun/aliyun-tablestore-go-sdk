@@ -1482,3 +1482,206 @@ func ParallelScanMultiConcurrency(client *tablestore.TableStoreClient, tableName
 	}
 	wg.Wait()
 }
+
+/**
+ * 动态修改schema
+ * 修改schema的索引必须以_reindex结尾
+ */
+func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName string, indexName string, indexReindexName string) {
+	{
+		// step 1.创建索引
+		fmt.Println("Begin to create table:", tableName)
+		createtableRequest := new(tablestore.CreateTableRequest)
+		tableMeta := new(tablestore.TableMeta)
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+		tableOption := new(tablestore.TableOption)
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 1
+		reservedThroughput := new(tablestore.ReservedThroughput)
+		reservedThroughput.Readcap = 0
+		reservedThroughput.Writecap = 0
+		createtableRequest.TableMeta = tableMeta
+		createtableRequest.TableOption = tableOption
+		createtableRequest.ReservedThroughput = reservedThroughput
+
+		_, err := client.CreateTable(createtableRequest)
+		if err != nil {
+			fmt.Println("Failed to create table with error:", err)
+		} else {
+			fmt.Println("Create table finished")
+		}
+
+		fmt.Println("Begin to create index:", indexName)
+		request := &tablestore.CreateSearchIndexRequest{}
+		request.TableName = tableName // 设置表名
+		request.IndexName = indexName // 设置索引名
+
+		schemas := []*tablestore.FieldSchema{}
+		field1 := &tablestore.FieldSchema{
+			FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
+			FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
+			Index:            proto.Bool(true),             // 设置开启索引
+			EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		}
+		field2 := &tablestore.FieldSchema{
+			FieldName:        proto.String("Col_Long"),
+			FieldType:        tablestore.FieldType_LONG,
+			Index:            proto.Bool(true),
+			EnableSortAndAgg: proto.Bool(true),
+		}
+		schemas = append(schemas, field1, field2)
+
+		request.IndexSchema = &tablestore.IndexSchema{
+			FieldSchemas: schemas, // 设置SearchIndex包含的字段
+		}
+		resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+		if err != nil {
+			fmt.Println("error :", err)
+			return
+		}
+		fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+	}
+	{
+		// step 2.创建修改schema后的索引，将field2删除
+		fmt.Println("Begin to create index:", indexReindexName)
+		request := &tablestore.CreateSearchIndexRequest{}
+		request.TableName = tableName        // 设置表名
+		request.IndexName = indexReindexName // 设置索引名
+		request.SourceIndexName = &indexName // 设置源索引：被修改schema的索引
+
+		schemas := []*tablestore.FieldSchema{}
+		field1 := &tablestore.FieldSchema{
+			FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
+			FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
+			Index:            proto.Bool(true),             // 设置开启索引
+			EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		}
+		schemas = append(schemas, field1)
+
+		request.IndexSchema = &tablestore.IndexSchema{
+			FieldSchemas: schemas, // 设置SearchIndex包含的字段
+		}
+		resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+		if err != nil {
+			fmt.Println("error :", err)
+			return
+		}
+		fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+	}
+	{
+		// step 3.设置AB索引权重，权重在0-100
+		// 做此步前需要等待"重建索引"数据同步。先后经历"全量同步"和"增量同步"两个阶段
+		fmt.Println("wait schema reload")
+		time.Sleep(60 * time.Second)
+		{
+			// 此处原索引权重为50 新索引权重为50
+			req := new(tablestore.UpdateSearchIndexRequest)
+			req.TableName = tableName
+			req.IndexName = indexName
+			var queryFlowWeightArray []*tablestore.QueryFlowWeight
+			queryFlowWeightArray = append(queryFlowWeightArray, &tablestore.QueryFlowWeight{
+				IndexName: indexName,
+				Weight:    50,
+			})
+			queryFlowWeightArray = append(queryFlowWeightArray, &tablestore.QueryFlowWeight{
+				IndexName: indexReindexName,
+				Weight:    50,
+			})
+			req.QueryFlowWeights = queryFlowWeightArray
+			respU, err := client.UpdateSearchIndex(req)
+			if err != nil {
+				fmt.Println("update searchIndex failed with error:", err)
+			}
+			fmt.Println("UpdateSearchIndex finished, requestId:", respU.ResponseInfo.RequestId)
+			// 检查权重设置是否成功
+			requestD := &tablestore.DescribeSearchIndexRequest{}
+			requestD.TableName = tableName
+			requestD.IndexName = indexName
+			respD, err := client.DescribeSearchIndex(requestD)
+			if err != nil {
+				fmt.Println("error: ", err)
+				return
+			}
+			if respD.QueryFlowWeights != nil {
+				fmt.Printf("QueryFlowWeight:\n")
+				for _, queryFlowWeight := range respD.QueryFlowWeights {
+					fmt.Printf("%s\n", queryFlowWeight)
+				}
+			}
+		}
+		{
+			// 此处原索引权重为0 新索引权重为100
+			req := new(tablestore.UpdateSearchIndexRequest)
+			req.TableName = tableName
+			req.IndexName = indexName
+			var queryFlowWeightArray []*tablestore.QueryFlowWeight
+			queryFlowWeightArray = append(queryFlowWeightArray, &tablestore.QueryFlowWeight{
+				IndexName: indexName,
+				Weight:    0,
+			})
+			queryFlowWeightArray = append(queryFlowWeightArray, &tablestore.QueryFlowWeight{
+				IndexName: indexReindexName,
+				Weight:    100,
+			})
+			req.QueryFlowWeights = queryFlowWeightArray
+			respU, err := client.UpdateSearchIndex(req)
+			if err != nil {
+				fmt.Println("update searchIndex failed with error:", err)
+			}
+			fmt.Println("UpdateSearchIndex finished, requestId:", respU.ResponseInfo.RequestId)
+			// 检查权重设置是否成功
+			requestD := &tablestore.DescribeSearchIndexRequest{}
+			requestD.TableName = tableName
+			requestD.IndexName = indexName
+			respD, err := client.DescribeSearchIndex(requestD)
+			if err != nil {
+				fmt.Println("error: ", err)
+				return
+			}
+			if respD.QueryFlowWeights != nil {
+				fmt.Printf("QueryFlowWeight:\n")
+				for _, queryFlowWeight := range respD.QueryFlowWeights {
+					fmt.Printf("%s\n", queryFlowWeight)
+				}
+			}
+		}
+	}
+
+	{
+		// step 4.切换索引, 此时索引schema变为新索引的schema
+		switchReq := new(tablestore.UpdateSearchIndexRequest)
+		switchReq.TableName = tableName
+		switchReq.IndexName = indexName
+		switchReq.SwitchIndexName = &indexReindexName
+		resp, err := client.UpdateSearchIndex(switchReq)
+		if err != nil {
+			fmt.Println("update search index failed with error:", err)
+		}
+		fmt.Println("UpdateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+		// 检查索引切换完后，schema变为新的schema
+		requestD := &tablestore.DescribeSearchIndexRequest{}
+		requestD.TableName = tableName
+		requestD.IndexName = indexName
+		respD, err := client.DescribeSearchIndex(requestD)
+		if err != nil {
+			fmt.Println("error: ", err)
+			return
+		}
+		fmt.Println("FieldSchemas:")
+		for _, schema := range respD.Schema.FieldSchemas {
+			fmt.Printf("%s\n", schema)
+		}
+
+		// 如果发现问题，还有机会切回
+		//switchReq := new(tablestore.UpdateSearchIndexRequest)
+		//switchReq.TableName = tableName
+		//switchReq.IndexName = indexName
+		//switchReq.SwitchIndexName = indexReindexName
+		//resp, err := client.UpdateSearchIndex(switchReq)
+	}
+	{
+		// step 5.经过一段静默时间后，可以删除修改前的索引
+		DeleteSearchIndex(client, tableName, indexReindexName)
+	}
+}

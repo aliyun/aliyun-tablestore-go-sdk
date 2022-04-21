@@ -43,6 +43,7 @@ const (
 	computeSplitPointsBySizeRequestUri = "/ComputeSplitPointsBySize"
 	searchUri                          = "/Search"
 	createSearchIndexUri               = "/CreateSearchIndex"
+	updateSearchIndexUri               = "/UpdateSearchIndex"
 	listSearchIndexUri                 = "/ListSearchIndex"
 	deleteSearchIndexUri               = "/DeleteSearchIndex"
 	describeSearchIndexUri             = "/DescribeSearchIndex"
@@ -77,6 +78,9 @@ const (
 	updateTimeseriesMeta    = "/UpdateTimeseriesMeta"
 	deleteTimeseriesMeta    = "/DeleteTimeseriesMeta"
 )
+
+// RowsSerializeType is used for tests only.
+var RowsSerializeType = otsprotocol.RowsSerializeType_RST_FLAT_BUFFER
 
 // Constructor: to create the client of TableStore service.
 // 构造函数：创建表格存储服务的客户端。
@@ -542,8 +546,15 @@ func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseri
 
 	req.RowsData = new(otsprotocol.TimeseriesRows)
 	req.RowsData.Type = new(otsprotocol.RowsSerializeType)
-	req.RowsData.Type = otsprotocol.RowsSerializeType_RST_FLAT_BUFFER.Enum()
-	req.RowsData.RowsData, err = BuildFlatbufferRows(request.rows, request.timeseriesTableName, timeseriesClient.timeseriesMetaCache)
+	req.RowsData.Type = RowsSerializeType.Enum()
+	switch RowsSerializeType {
+	case otsprotocol.RowsSerializeType_RST_FLAT_BUFFER:
+		req.RowsData.RowsData, err = BuildFlatbufferRows(request.rows, request.timeseriesTableName, timeseriesClient.timeseriesMetaCache)
+	case otsprotocol.RowsSerializeType_RST_PROTO_BUFFER:
+		req.RowsData.RowsData, err = buildProtocolBufferRows(request.rows, request.timeseriesTableName, timeseriesClient.timeseriesMetaCache)
+	default:
+		err = fmt.Errorf("Invalid rows serialize type")
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -1608,7 +1619,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 
 	// do request
 	pbResp := otsprotocol.SQLQueryResponse{}
-	response := &SQLQueryResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
+	response := &SQLQueryResponse{SQLQueryConsumed: &SQLQueryConsumed{}}
 	if err := client.doRequestWithRetry(sqlQueryUri, pbReq, &pbResp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
@@ -1629,6 +1640,35 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 		response.ResultSet = rs
 		response.PayloadVersion = SQLPAYLOAD_FLAT_BUFFERS
 	}
+
+	tableConsumes := make([]*TableConsumedCU, 0, len(pbResp.Consumes))
+	for _, consume := range pbResp.Consumes {
+		tableConsume := new(TableConsumedCU)
+		tableConsume.TableName = consume.GetTableName()
+		if consume.Consumed != nil && consume.Consumed.CapacityUnit != nil {
+			tableConsume.ConsumedCapacityUnit = new(ConsumedCapacityUnit)
+			tableConsume.ConsumedCapacityUnit.Read = consume.Consumed.CapacityUnit.GetRead()
+			tableConsume.ConsumedCapacityUnit.Write = consume.Consumed.CapacityUnit.GetWrite()
+		}
+
+		tableConsumes = append(tableConsumes, tableConsume)
+	}
+	response.SQLQueryConsumed.TableConsumes = tableConsumes
+
+	searchConsumes := make([]*SearchConsumedCU, 0, len(pbResp.SearchConsumes))
+	for _, consume := range pbResp.SearchConsumes {
+		searchConsume := new(SearchConsumedCU)
+		searchConsume.TableName = consume.GetTableName()
+		searchConsume.IndexName = consume.GetIndexName()
+		if consume.Consumed != nil && consume.Consumed.CapacityUnit != nil {
+			searchConsume.ConsumedCapacityUnit = new(ConsumedCapacityUnit)
+			searchConsume.ConsumedCapacityUnit.Read = consume.Consumed.CapacityUnit.GetRead()
+			searchConsume.ConsumedCapacityUnit.Write = consume.Consumed.CapacityUnit.GetWrite()
+		}
+
+		searchConsumes = append(searchConsumes, searchConsume)
+	}
+	response.SQLQueryConsumed.SearchConsumes = searchConsumes
 
 	return response, nil
 }

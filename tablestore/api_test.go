@@ -2,7 +2,9 @@ package tablestore
 
 import (
 	"bytes"
+	"encoding/json"
 	"fmt"
+	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"io"
 	"math/rand"
@@ -30,6 +32,8 @@ var _ = Suite(&TableStoreSuite{})
 var defaultTableName = "defaulttable"
 var rangeQueryTableName = "rangetable"
 var sqlTableName = "test_http_query"
+var sqlTableNameWithSearch = "test_sql_with_search"
+var sqlSearchName = "test_sql_with_search_index"
 
 // Todo: use config
 var client TableStoreApi
@@ -48,7 +52,16 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	rangeQueryTableName = tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
 	PrepareTable2(rangeQueryTableName)
+	// prepare sql tables
+	deleteTable(sqlTableName)
+	deleteSearchIndex(sqlTableNameWithSearch, sqlSearchName)
+	deleteTable(sqlTableNameWithSearch)
+
 	PrepareSQLTable(sqlTableName)
+	PrepareSQLTable(sqlTableNameWithSearch)
+	PrepareSQLSearchIndex(c, sqlTableNameWithSearch, sqlSearchName)
+	WaitDataSyncByMatchAllQuery(c, client, 4, sqlTableNameWithSearch, sqlSearchName, 40)
+
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
 }
 
@@ -90,16 +103,13 @@ func PrepareTable2(tableName string) error {
 }
 
 func PrepareSQLTable(tableName string) {
-	_, _ = client.DeleteTable(&DeleteTableRequest{
-		TableName: tableName,
-	})
 	createtableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("a", PrimaryKeyType_INTEGER)
 	tableOption := new(TableOption)
 	tableOption.TimeToAlive = -1
-	tableOption.MaxVersion = 3
+	tableOption.MaxVersion = 1
 	reservedThroughput := new(ReservedThroughput)
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
@@ -155,6 +165,51 @@ func PrepareSQLTable(tableName string) {
 	_, err := client.BatchWriteRow(batchReq)
 	if err != nil {
 		println("batchwriterow failed", err.Error())
+	}
+}
+
+func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
+	fmt.Println("Begin to create index:", searchAPITestIndexName1)
+	request := &CreateSearchIndexRequest{}
+	request.TableName = tableName
+	request.IndexName = indexName
+
+	var schemas []*FieldSchema
+	field1 := &FieldSchema{
+		FieldName:        proto.String("a"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field2 := &FieldSchema{
+		FieldName:        proto.String("b"),
+		FieldType:        FieldType_DOUBLE,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field3 := &FieldSchema{
+		FieldName:        proto.String("c"),
+		FieldType:        FieldType_KEYWORD,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field4 := &FieldSchema{
+		FieldName:        proto.String("e"),
+		FieldType:        FieldType_BOOLEAN,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	schemas = append(schemas, field1, field2, field3, field4)
+
+	request.IndexSchema = &IndexSchema{
+		FieldSchemas: schemas,
+	}
+	_, err := client.CreateSearchIndex(request)
+	if err != nil {
+		fmt.Println("failed to create search index with error: ", err.Error())
+		c.Fatal("Failed to create search index with error: ", err)
+	} else {
+		fmt.Println("Create search index finished")
 	}
 }
 
@@ -2055,6 +2110,11 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 	resp, err = client.SQLQuery(&SQLQueryRequest{Query: "select * from test_http_query"})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StmtType, Equals, SQL_SELECT)
+	c.Assert(resp.SQLQueryConsumed, NotNil)
+	c.Assert(len(resp.SQLQueryConsumed.SearchConsumes), Equals, 0)
+	c.Assert(len(resp.SQLQueryConsumed.TableConsumes), Equals, 1)
+	c.Assert(resp.SQLQueryConsumed.TableConsumes[0].TableName, Equals, "test_http_query")
+	c.Assert(resp.SQLQueryConsumed.TableConsumes[0].ConsumedCapacityUnit.Read > 0, Equals, true)
 	resultSet := resp.ResultSet
 	c.Assert(len(resultSet.Columns()), Equals, 5)
 	i := 0
@@ -2173,13 +2233,99 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 	}
 }
 
-func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
-	// devops_25w is timeseries table
-	resp, err := client.SQLQuery(&SQLQueryRequest{Query: "select * from devops_25w limit 10"})
+func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
+	resp, err := client.SQLQuery(&SQLQueryRequest{
+		Query: fmt.Sprintf("create table if not exists %s (a bigint not null, b double not null, c mediumtext not null, e bool not null, primary key (`a`));", sqlTableNameWithSearch),
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_CREATE_TABLE)
+	c.Assert(resp.ResultSet, IsNil)
+
+	resp, err = client.SQLQuery(&SQLQueryRequest{
+		Query: "show tables;",
+	})
+	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_SHOW_TABLE)
+	hasTable := false
+	for resp.ResultSet.HasNext() {
+		row := resp.ResultSet.Next()
+		tblName, err := row.GetString(0)
+		c.Assert(err, IsNil)
+		if tblName == sqlTableNameWithSearch {
+			hasTable = true
+		}
+	}
+	c.Assert(hasTable, Equals, true)
+
+	println("sql query via FLAT_BUFFERS")
+	resp, err = client.SQLQuery(&SQLQueryRequest{Query: fmt.Sprintf("select * from %s", sqlTableNameWithSearch)})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StmtType, Equals, SQL_SELECT)
+	c.Assert(resp.SQLQueryConsumed, NotNil)
+	cbytes, _ := json.Marshal(resp.SQLQueryConsumed)
+	println(string(cbytes))
+	c.Assert(len(resp.SQLQueryConsumed.SearchConsumes), Equals, 1)
+	c.Assert(len(resp.SQLQueryConsumed.TableConsumes), Equals, 0)
+	c.Assert(resp.SQLQueryConsumed.SearchConsumes[0].TableName, Equals, sqlTableNameWithSearch)
+	c.Assert(resp.SQLQueryConsumed.SearchConsumes[0].IndexName, Equals, sqlSearchName)
+	c.Assert(resp.SQLQueryConsumed.SearchConsumes[0].ConsumedCapacityUnit.Read > 0, Equals, true)
 	resultSet := resp.ResultSet
-	c.Assert(len(resultSet.Columns()), Equals, 11)
+	c.Assert(len(resultSet.Columns()), Equals, 4)
+	i := 0
+	for resultSet.HasNext() {
+		sqlRow := resultSet.Next()
+		println(sqlRow.DebugString())
+
+		val, err := sqlRow.GetInt64(0)
+		c.Assert(err, IsNil)
+		c.Assert(val, Equals, int64(i))
+		val, err = sqlRow.GetInt64ByName("a")
+		c.Assert(err, IsNil)
+		c.Assert(val, Equals, int64(i))
+
+		val2, err := sqlRow.GetFloat64(1)
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, float64(i))
+		val2, err = sqlRow.GetFloat64ByName("b")
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, float64(i))
+
+		if i == 3 {
+			val, err := sqlRow.IsNull(2)
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, true)
+		} else {
+			val, err := sqlRow.GetString(2)
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, strconv.Itoa(i))
+			val, err = sqlRow.GetStringByName("c")
+			c.Assert(err, IsNil)
+			c.Assert(val, Equals, strconv.Itoa(i))
+		}
+
+		val4, err := sqlRow.GetBool(3)
+		c.Assert(err, IsNil)
+		c.Assert(val4, Equals, i%2 == 1)
+		i++
+	}
+}
+
+func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
+	// devops_25w is timeseries table, prepared in advanced.
+	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
+	if !strings.Contains(instanceName, "test-sql-e2e") {
+		c.Skip("devops_25w is timeseries table, should prepared in advanced.")
+	}
+	resp, err := client.SQLQuery(&SQLQueryRequest{Query: "select * from devops_25w limit 10"})
+	c.Assert(resp.StmtType, Equals, SQL_SELECT)
+	c.Assert(err, IsNil)
+	c.Assert(resp.SQLQueryConsumed, NotNil)
+	c.Assert(len(resp.SQLQueryConsumed.SearchConsumes), Equals, 0)
+	c.Assert(len(resp.SQLQueryConsumed.TableConsumes), Equals, 1)
+	c.Assert(resp.SQLQueryConsumed.TableConsumes[0].TableName, Equals, "devops_25w")
+	c.Assert(resp.SQLQueryConsumed.TableConsumes[0].ConsumedCapacityUnit.Read > 0, Equals, true)
+	resultSet := resp.ResultSet
+	c.Assert(len(resultSet.Columns()), Equals, 12)
 	for resultSet.HasNext() {
 		sqlRow := resultSet.Next()
 		println(sqlRow.DebugString())

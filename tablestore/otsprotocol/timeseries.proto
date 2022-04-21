@@ -138,6 +138,8 @@ message QueryTimeseriesMetaResponse {
 
 enum RowsSerializeType {
   RST_FLAT_BUFFER = 0;
+  RST_PLAIN_BUFFER = 1;
+  RST_PROTO_BUFFER = 2;
 }
 
 message TimeseriesRows {
@@ -204,4 +206,24 @@ message DeleteTimeseriesMetaRequest {
 
 message DeleteTimeseriesMetaResponse {
   repeated FailedRowInfo failed_rows = 1;
+}
+
+message TimeseriesField {
+  optional string field_name = 1;
+  optional int64 value_int = 2;
+  optional string value_string = 3;
+  optional bool value_bool = 4;
+  optional double value_double = 5;
+  optional bytes value_binary = 6;
+}
+
+message TimeseriesRow {
+  optional TimeseriesKey timeseries_key = 1;
+  optional int64 time = 2;
+  repeated TimeseriesField fields = 3;
+  optional uint32 meta_cache_update_time = 4;
+}
+
+message TimeseriesPBRows {
+  repeated TimeseriesRow rows = 1;
 }

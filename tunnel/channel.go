@@ -431,7 +431,7 @@ func (c *channelConn) processRecords(inCh chan *pipeResult) (bool, error) {
 	if ret.recordCount != 0 {
 		c.lg.Info("Metric info", zap.String("tunnelId", c.tunnelId), zap.String("clientId", c.clientId),
 			zap.String("channelId", c.channelId), zap.String("token", ret.nextToken),
-			zap.String("ClientProcessLat]ency", time.Now().Sub(s).String()))
+			zap.String("ClientProcessLatency", time.Now().Sub(s).String()))
 	}
 	//channel switch control by sdk
 	if c.parallelReleaseManager != nil && !c.needManualRelease {

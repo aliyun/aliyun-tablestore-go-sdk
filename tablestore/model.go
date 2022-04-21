@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	lruCache "github.com/hashicorp/golang-lru"
 	"sync"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
 type internalClient struct {
@@ -34,7 +34,7 @@ type internalClient struct {
 	CustomizedRetryFunc CustomizedRetryNotMatterActions
 
 	timeseriesConfiguration *TimeseriesConfiguration
-	credentialsProvider common.CredentialsProvider
+	credentialsProvider     common.CredentialsProvider
 }
 
 const initMapLen int = 8
@@ -246,8 +246,8 @@ const (
 )
 
 const (
-	DefaultRetryInterval      = 10
-	MaxRetryInterval          = 320
+	DefaultRetryInterval = 10
+	MaxRetryInterval     = 320
 )
 
 type PrimaryKeyOption int32
@@ -640,11 +640,27 @@ type SQLQueryRequest struct {
 	Query string
 }
 
-type SQLQueryResponse struct {
-	ResultSet            SQLResultSet
-	StmtType             SQLStatementType
-	PayloadVersion       SQLPayloadVersion
+type SearchConsumedCU struct {
+	TableName            string
+	IndexName            string
 	ConsumedCapacityUnit *ConsumedCapacityUnit
+}
+
+type TableConsumedCU struct {
+	TableName            string
+	ConsumedCapacityUnit *ConsumedCapacityUnit
+}
+
+type SQLQueryConsumed struct {
+	SearchConsumes []*SearchConsumedCU
+	TableConsumes  []*TableConsumedCU
+}
+
+type SQLQueryResponse struct {
+	ResultSet        SQLResultSet
+	StmtType         SQLStatementType
+	PayloadVersion   SQLPayloadVersion
+	SQLQueryConsumed *SQLQueryConsumed
 	ResponseInfo
 }
 
@@ -1220,8 +1236,8 @@ type PutTimeseriesDataResponse struct {
 }
 
 type FailedRowResult struct {
-	Index int32
-	Error error
+	Index     int32
+	Error     error
 	ErrorCode string
 }
 

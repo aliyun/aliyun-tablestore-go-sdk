@@ -42,8 +42,12 @@ const (
 )
 
 var (
-	initRetryInterval = 16 * time.Millisecond
-	maxRetryInterval  = time.Second
+	initRetryIntervalForDataApi = 16 * time.Millisecond
+	maxRetryIntervalForDataApi  = 3 * time.Second
+
+	initRetryInterValForMetaApi   = 100 * time.Millisecond
+	maxRetryIntervalForMetaApi    = 2 * time.Second
+	retryMaxElapsedTimeForMetaApi = 35 * time.Second
 )
 
 type ClientOption func(api *TunnelApi)
@@ -126,7 +130,8 @@ func (api *TunnelApi) doRequest(uri string, req, resp proto.Message) (string, in
 	}
 	var respBody []byte
 	var requestId string
-	bkoff := ExponentialBackoff(initRetryInterval, maxRetryInterval, api.retryMaxElapsedTime, backOffMultiplier, randomizationFactor)
+	initialInterval, maxRetryInterval, retryMaxElapsedTime := getBackoffConfForDiffUri(uri, api.retryMaxElapsedTime)
+	bkoff := ExponentialBackoff(initialInterval, maxRetryInterval, retryMaxElapsedTime, backOffMultiplier, randomizationFactor)
 	for {
 		respBody, err, requestId = api.doRequestInternal(url, uri, body, resp)
 		if err == nil {
@@ -253,6 +258,7 @@ func (api *TunnelApi) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelRespo
 	tunnel.TableName = &req.TableName
 	tunnel.TunnelName = &req.TunnelName
 	tunnel.StreamTunnelConfig = parseTunnelStreamConfig(req.StreamTunnelConfig)
+	tunnel.NeedAllTimeSeriesColumns = &req.NeedAllTimeSeriesColumns
 	switch req.Type {
 	case TunnelTypeBaseData:
 		tunnel.TunnelType = protocol.TunnelType_BaseData.Enum()
