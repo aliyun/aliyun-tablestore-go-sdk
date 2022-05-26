@@ -21,6 +21,7 @@ type SearchRequest struct {
 	SearchQuery   search.SearchQuery
 	ColumnsToGet  *ColumnsToGet
 	RoutingValues []*PrimaryKey
+	TimeoutMs     *int32
 }
 
 func (r *SearchRequest) SetTableName(tableName string) *SearchRequest {
@@ -53,6 +54,11 @@ func (r *SearchRequest) AddRoutingValue(routingValue *PrimaryKey) *SearchRequest
 	return r
 }
 
+func (r *SearchRequest) SetTimeoutMs(timeoutMs int32) *SearchRequest {
+	r.TimeoutMs = proto.Int32(timeoutMs)
+	return r
+}
+
 func (r *SearchRequest) ProtoBuffer() (*otsprotocol.SearchRequest, error) {
 	req := &otsprotocol.SearchRequest{}
 	req.TableName = &r.TableName
@@ -79,6 +85,9 @@ func (r *SearchRequest) ProtoBuffer() (*otsprotocol.SearchRequest, error) {
 		for _, routingValue := range r.RoutingValues {
 			req.RoutingValues = append(req.RoutingValues, routingValue.Build(false))
 		}
+	}
+	if r.TimeoutMs != nil {
+		req.TimeoutMs = r.TimeoutMs
 	}
 	return req, err
 }
@@ -193,7 +202,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 	return schemas
 }
 
-func convertToPbSchema(schema *IndexSchema) (*otsprotocol.IndexSchema, error) {
+func ConvertToPbSchema(schema *IndexSchema) (*otsprotocol.IndexSchema, error) {
 	indexSchema := new(otsprotocol.IndexSchema)
 	indexSchema.FieldSchemas = convertFieldSchemaToPBFieldSchema(schema.FieldSchemas)
 	indexSchema.IndexSetting = new(otsprotocol.IndexSetting)
@@ -536,11 +545,11 @@ type IndexSetting struct {
 }
 
 type CreateSearchIndexRequest struct {
-	TableName   string
-	IndexName   string
-	IndexSchema *IndexSchema
+	TableName       string
+	IndexName       string
+	IndexSchema     *IndexSchema
 	SourceIndexName *string
-	TimeToLive  *int32
+	TimeToLive      *int32
 }
 
 type CreateSearchIndexResponse struct {
@@ -572,13 +581,13 @@ type MeteringInfo struct {
 }
 
 type DescribeSearchIndexResponse struct {
-	Schema       *IndexSchema
-	SyncStat     *SyncStat
-	MeteringInfo *MeteringInfo
+	Schema           *IndexSchema
+	SyncStat         *SyncStat
+	MeteringInfo     *MeteringInfo
 	QueryFlowWeights []*QueryFlowWeight
-	CreateTime   int64
-	TimeToLive   int32
-	ResponseInfo ResponseInfo
+	CreateTime       int64
+	TimeToLive       int32
+	ResponseInfo     ResponseInfo
 }
 
 type ListSearchIndexRequest struct {
@@ -610,11 +619,11 @@ type QueryFlowWeight struct {
 }
 
 type UpdateSearchIndexRequest struct {
-	TableName       string
-	IndexName       string
-	SwitchIndexName *string
+	TableName        string
+	IndexName        string
+	SwitchIndexName  *string
 	QueryFlowWeights []*QueryFlowWeight
-	TimeToLive      *int32
+	TimeToLive       *int32
 }
 
 type UpdateSearchIndexResponse struct {
@@ -629,6 +638,7 @@ type ParallelScanRequest struct {
 	ScanQuery    search.ScanQuery
 	ColumnsToGet *ColumnsToGet
 	SessionId    []byte
+	TimeoutMs    *int32
 }
 
 type ParallelScanResponse struct {
@@ -663,11 +673,19 @@ func (r *ParallelScanRequest) SetSessionId(sessionId []byte) *ParallelScanReques
 	return r
 }
 
+func (r *ParallelScanRequest) SetTimeoutMs(timeoutMs int32) *ParallelScanRequest {
+	r.TimeoutMs = proto.Int32(timeoutMs)
+	return r
+}
+
 func (r *ParallelScanRequest) ProtoBuffer() (*otsprotocol.ParallelScanRequest, error) {
 	req := &otsprotocol.ParallelScanRequest{}
 	req.TableName = proto.String(r.TableName)
 	req.IndexName = proto.String(r.IndexName)
 	req.SessionId = r.SessionId
+	if r.TimeoutMs != nil {
+		req.TimeoutMs = r.TimeoutMs
+	}
 
 	query, err := r.ScanQuery.Serialize()
 	if err != nil {

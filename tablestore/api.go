@@ -1033,7 +1033,9 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 			EnableStream:   *resp.StreamDetails.EnableStream,
 			StreamId:       (*StreamId)(resp.StreamDetails.StreamId),
 			ExpirationTime: *resp.StreamDetails.ExpirationTime,
-			LastEnableTime: *resp.StreamDetails.LastEnableTime}
+			LastEnableTime: *resp.StreamDetails.LastEnableTime,
+			ColumnsToGet:   resp.GetStreamDetails().GetColumnsToGet(),
+		}
 	} else {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: false}
@@ -1077,7 +1079,9 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		if request.StreamSpec.EnableStream == true {
 			req.StreamSpec = &otsprotocol.StreamSpecification{
 				EnableStream:   &request.StreamSpec.EnableStream,
-				ExpirationTime: &request.StreamSpec.ExpirationTime}
+				ExpirationTime: &request.StreamSpec.ExpirationTime,
+				ColumnsToGet:   request.StreamSpec.ColumnsToGet,
+			}
 		} else {
 			req.StreamSpec = &otsprotocol.StreamSpecification{EnableStream: &request.StreamSpec.EnableStream}
 		}
@@ -1103,7 +1107,9 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 			EnableStream:   *resp.StreamDetails.EnableStream,
 			StreamId:       (*StreamId)(resp.StreamDetails.StreamId),
 			ExpirationTime: *resp.StreamDetails.ExpirationTime,
-			LastEnableTime: *resp.StreamDetails.LastEnableTime}
+			LastEnableTime: *resp.StreamDetails.LastEnableTime,
+			ColumnsToGet:   resp.GetStreamDetails().GetColumnsToGet(),
+		}
 	} else {
 		response.StreamDetails = &StreamDetails{
 			EnableStream: false}
@@ -1829,6 +1835,44 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 				break
 			}
 		}
+
+		if pbRecord.GetOriginRecord() != nil {
+			originPlainRows, err := readRowsWithHeader(bytes.NewReader(pbRecord.GetOriginRecord()))
+			if err != nil {
+				return nil, err
+			}
+			Assert(len(originPlainRows) == 1,
+				"There must be exactly one row in a StreamRecord.")
+			originPlainRow := originPlainRows[0]
+
+			record.OriginColumns = make([]*RecordColumn, len(originPlainRow.cells))
+			for i, plainCell := range originPlainRow.cells {
+				cell := RecordColumn{}
+				record.OriginColumns[i] = &cell
+
+				name := string(plainCell.cellName)
+				cell.Name = &name
+				if plainCell.cellValue != nil {
+					cell.Type = RCT_Put
+				} else {
+					if plainCell.cellTimestamp > 0 {
+						cell.Type = RCT_DeleteOneVersion
+					} else {
+						cell.Type = RCT_DeleteAllVersions
+					}
+				}
+				switch cell.Type {
+				case RCT_Put:
+					cell.Value = plainCell.cellValue.Value
+					fallthrough
+				case RCT_DeleteOneVersion:
+					cell.Timestamp = &plainCell.cellTimestamp
+				case RCT_DeleteAllVersions:
+					break
+				}
+			}
+		}
+
 	}
 	resp.Records = records
 	return &resp, nil

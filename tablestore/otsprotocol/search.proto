@@ -222,6 +222,7 @@ message SearchRequest {
     optional ColumnsToGet columns_to_get = 3;
     optional bytes search_query = 4;
     repeated bytes routing_values = 5;
+    optional int32 timeoutMs = 6;
 }
 
 /**
@@ -673,6 +674,7 @@ message ParallelScanRequest {
     optional ColumnsToGet columns_to_get = 3;
     optional bytes session_id = 4;
     optional bytes scan_query = 5;
+    optional int32 timeoutMs = 6;
 }
 
 message ParallelScanResponse {

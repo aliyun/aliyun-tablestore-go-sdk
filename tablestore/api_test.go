@@ -327,12 +327,18 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	updateTableReq.TableOption = new(TableOption)
 	updateTableReq.TableOption.TimeToAlive = -1
 	updateTableReq.TableOption.MaxVersion = 5
+	updateTableReq.StreamSpec = new(StreamSpecification)
+	updateTableReq.StreamSpec.EnableStream = true
+	updateTableReq.StreamSpec.ExpirationTime = 168
+	updateTableReq.StreamSpec.ColumnsToGet = []string{"col1", "col2"}
 
 	updateTableResp, error := client.UpdateTable(updateTableReq)
 	c.Assert(error, Equals, nil)
 	c.Assert(updateTableResp, NotNil)
 	c.Assert(updateTableResp.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
 	c.Assert(updateTableResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
+	c.Assert(updateTableResp.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
+	c.Assert(updateTableResp.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
 
 	describeTableReq := new(DescribeTableRequest)
 	describeTableReq.TableName = defaultTableName
@@ -342,6 +348,12 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	c.Assert(describ, NotNil)
 	c.Assert(describ.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
 	c.Assert(describ.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
+	c.Assert(describ.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
+	c.Assert(describ.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
+	c.Assert(len(describ.StreamDetails.ColumnsToGet), Equals, len(updateTableReq.StreamSpec.ColumnsToGet))
+	for i, s := range describ.StreamDetails.ColumnsToGet {
+		c.Assert(s, Equals, updateTableReq.StreamSpec.ColumnsToGet[i])
+	}
 	fmt.Println("TestUpdateAndDescribeTable finished")
 }
 

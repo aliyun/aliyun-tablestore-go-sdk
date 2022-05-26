@@ -682,6 +682,7 @@ type ListStreamResponse struct {
 type StreamSpecification struct {
 	EnableStream   bool
 	ExpirationTime int32 // must be positive. in hours
+	ColumnsToGet   []string
 }
 
 type StreamDetails struct {
@@ -689,6 +690,7 @@ type StreamDetails struct {
 	StreamId       *StreamId // nil when stream is disabled.
 	ExpirationTime int32     // in hours
 	LastEnableTime int64     // the last time stream is enabled, in usec
+	ColumnsToGet   []string
 }
 
 type DescribeStreamRequest struct {
@@ -773,19 +775,21 @@ type StreamShard struct {
 }
 
 type StreamRecord struct {
-	Type       ActionType
-	Info       *RecordSequenceInfo // required
-	PrimaryKey *PrimaryKey         // required
-	Columns    []*RecordColumn
+	Type          ActionType
+	Info          *RecordSequenceInfo // required
+	PrimaryKey    *PrimaryKey         // required
+	Columns       []*RecordColumn
+	OriginColumns []*RecordColumn
 }
 
 func (this *StreamRecord) String() string {
 	return fmt.Sprintf(
-		"{\"Type\":%s, \"PrimaryKey\":%s, \"Info\":%s, \"Columns\":%s}",
+		"{\"Type\":%s, \"PrimaryKey\":%s, \"Info\":%s, \"Columns\":%s, \"OriginColumns\":%s}",
 		this.Type,
 		*this.PrimaryKey,
 		this.Info,
-		this.Columns)
+		this.Columns,
+		this.OriginColumns)
 }
 
 type ActionType int

@@ -98,6 +98,7 @@ message ConsumedCapacity {
 message StreamSpecification {
     required bool enable_stream = 1;
     optional int32 expiration_time = 2;
+    repeated string columns_to_get = 3;
 }
 
 message StreamDetails {
@@ -105,6 +106,7 @@ message StreamDetails {
     optional string stream_id = 2;
     optional int32 expiration_time = 3;
     optional int64 last_enable_time = 4;
+    repeated string columns_to_get = 5;
 }
 
 /* #############################################  CreateTable  ############################################# */
@@ -499,6 +501,7 @@ message GetStreamRecordResponse {
     message StreamRecord {
         required ActionType action_type = 1;
         required bytes record = 2;
+        optional bytes origin_record = 3;
     }
     repeated StreamRecord stream_records = 1;
     optional string next_shard_iterator = 2;

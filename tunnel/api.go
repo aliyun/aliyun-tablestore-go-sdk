@@ -539,7 +539,7 @@ func (api *TunnelApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, 
 			if err != nil {
 				return nil, err
 			}
-			tunnelRecord, err := DeserializeRecordFromRawBytes(record.Record, typ)
+			tunnelRecord, err := DeserializeRecordFromRawBytes(record.GetRecord(), record.GetOriginRecord(), typ)
 			if err != nil {
 				return nil, err
 			}

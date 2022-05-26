@@ -23,10 +23,10 @@ type ResponseInfo struct {
 }
 
 type CreateTunnelRequest struct {
-	TableName                string
-	TunnelName               string
-	Type                     TunnelType
-	StreamTunnelConfig       *StreamTunnelConfig
+	TableName          string
+	TunnelName         string
+	Type               TunnelType
+	StreamTunnelConfig *StreamTunnelConfig
 	// NeedAllTimeSeriesColumns function is temporarily disabled.
 	NeedAllTimeSeriesColumns bool
 }
@@ -190,6 +190,13 @@ type PrimaryKeyColumn struct {
 	Value      interface{}
 }
 
+func (p *PrimaryKeyColumn) String() string {
+	pkc := make([]string, 0)
+	pkc = append(pkc, fmt.Sprintf("\"Name\":%s", strconv.Quote(p.ColumnName)))
+	pkc = append(pkc, fmt.Sprintf("\"Value\":%s", p.Value))
+	return fmt.Sprintf("{%s}", strings.Join(pkc, ", "))
+}
+
 type SequenceInfo struct {
 	// Epoch of stream log partition
 	Epoch int32
@@ -243,17 +250,23 @@ type Record struct {
 	Timestamp int64
 	// SequenceInfo is nil when it is a base data record,
 	// while SequenceInfo is not nil when it is a stream record.
-	SequenceInfo *SequenceInfo
-	PrimaryKey   *PrimaryKey // required
-	Columns      []*RecordColumn
+	SequenceInfo  *SequenceInfo
+	PrimaryKey    *PrimaryKey // required
+	Columns       []*RecordColumn
+	OriginColumns []*RecordColumn
 }
 
 func (r *Record) String() string {
+	//Prevent panic due to PrimaryKey is nil.
+	if r.PrimaryKey == nil {
+		r.PrimaryKey = &PrimaryKey{}
+	}
 	return fmt.Sprintf(
-		"{\"Type\":%s, \"PrimaryKey\":%v, \"Columns\":%s}",
+		"{\"Type\":%s, \"PrimaryKey\":%s, \"Columns\":%s, \"OriginColumns\":%s}",
 		r.Type,
-		*r.PrimaryKey,
-		r.Columns)
+		r.PrimaryKey.PrimaryKeys,
+		r.Columns,
+		r.OriginColumns)
 }
 
 type ActionType int

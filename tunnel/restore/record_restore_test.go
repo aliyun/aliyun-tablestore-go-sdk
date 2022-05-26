@@ -791,6 +791,479 @@ func (s *BackupRestoreSuite) Test_RecordRestore_WithTwiceBatchWrite(c *C) {
 	compareDiffKeyRestoreRows(want, got, c)
 }
 
+//The server regenerate the value of the autoIncrement pk column. update and delete operations will be ignored.
+func (s *BackupRestoreSuite) Test_AutoIncrementPk_RecordRestore_WithRegenerate(c *C) {
+	tableName := tableNamePrefix + strconv.Itoa(time.Now().Nanosecond())
+	delTableReq := &tablestore.DeleteTableRequest{TableName: tableName}
+	tableMeta, err := prepareAutoIncPkTable(tableName)
+	c.Assert(err, IsNil)
+	c.Assert(GetAutoIncrementPkIndex(tableMeta), Equals, 1)
+	time.Sleep(time.Second * 2)
+	defer client.DeleteTable(delTableReq)
+
+	columnName := "col"
+	recordTimestamp := time.Now().Unix() * 1000
+	tests := []struct {
+		name               string
+		request            *RecordReplayRequest
+		recordRestoreCount int
+		hasTimeoutRecord   bool
+		wantErr            bool
+	}{
+		{
+			name: "",
+			request: &RecordReplayRequest{
+				Record: []*tunnel.Record{
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Delete,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(1),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Update,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+				},
+				Timestamp:                 0,
+				TableName:                 tableName,
+				DiscardDataVersion:        false,
+				AutoIncrementPKIndex:      GetAutoIncrementPkIndex(tableMeta),
+				ReGenerateAutoIncrementPK: true,
+			},
+			recordRestoreCount: 4,
+			hasTimeoutRecord:   false,
+			wantErr:            false,
+		},
+	}
+
+	for _, t := range tests {
+		resp, err := RecordRestore(client, t.request)
+		if t.wantErr {
+			c.Assert(err, NotNil)
+			continue
+		}
+		c.Assert(err, IsNil)
+		want := make([]*tablestore.Row, 0)
+		for _, r := range t.request.Record {
+			if r.Type == tunnel.AT_Put {
+				want = append(want, convertRecordsToRow(r))
+			}
+		}
+		c.Assert(resp.RecordRestoreCount, Equals, t.recordRestoreCount)
+		c.Assert(resp.HasTimeoutRecord, Equals, t.hasTimeoutRecord)
+		got := getRangeRestoreTable(client, tableName, c)
+		c.Assert(len(got), Equals, 2)
+		compareRestoreRowsIncludeAutoInc(want, got, t.request.AutoIncrementPKIndex, c)
+	}
+}
+
+//The server retains the value of the autoIncrement pk column
+func (s *BackupRestoreSuite) Test_AutoIncrementPk_RecordRestore_WithoutRegenerate(c *C) {
+	tableName := tableNamePrefix + strconv.Itoa(time.Now().Nanosecond())
+	delTableReq := &tablestore.DeleteTableRequest{TableName: tableName}
+	err := prepareRecordTable(tableName)
+	c.Assert(err, IsNil)
+	autoIncTableName := tableName + "autoIncrement"
+	_, err = prepareAutoIncPkTable(autoIncTableName)
+	c.Assert(err, IsNil)
+	delAutoIncTableReq := &tablestore.DeleteTableRequest{TableName: autoIncTableName}
+	time.Sleep(time.Second * 2)
+	defer client.DeleteTable(delTableReq)
+	defer client.DeleteTable(delAutoIncTableReq)
+
+	columnName := "col"
+	recordTimestamp := time.Now().Unix() * 1000
+	tests := []struct {
+		name               string
+		request            *RecordReplayRequest
+		recordRestoreCount int
+		hasTimeoutRecord   bool
+		wantErr            bool
+		expectRows         []*tablestore.Row
+		errCode            string
+	}{
+		{
+			name:       "restore to a table without autoIncrementPK, expect success",
+			expectRows: getExpectRowsForAutoIncWithoutRegen(columnName),
+			request: &RecordReplayRequest{
+				Record: []*tunnel.Record{
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(1),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(2),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Delete,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Update,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(1),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal1",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(2),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal1",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+				},
+
+				Timestamp:                 0,
+				TableName:                 tableName,
+				DiscardDataVersion:        false,
+				AutoIncrementPKIndex:      0,
+				ReGenerateAutoIncrementPK: false,
+			},
+			recordRestoreCount: 6,
+			hasTimeoutRecord:   false,
+			wantErr:            false,
+		},
+		{
+			name: "restore to a table with autoIncrementPK, expect failed",
+			request: &RecordReplayRequest{
+				Record: []*tunnel.Record{
+					{
+						Type:         tunnel.AT_Put,
+						Timestamp:    recordTimestamp,
+						SequenceInfo: &tunnel.SequenceInfo{},
+						PrimaryKey: &tunnel.PrimaryKey{
+							PrimaryKeys: []*tunnel.PrimaryKeyColumn{
+								{
+									ColumnName: "PkString",
+									Value:      "pk1",
+								},
+								{
+									ColumnName: "PkInt",
+									Value:      int64(0),
+								},
+								{
+									ColumnName: "PkBinary",
+									Value:      []byte("pkBinary"),
+								},
+							},
+						},
+						Columns: []*tunnel.RecordColumn{
+							{
+								Type:      tunnel.RCT_Put,
+								Name:      &columnName,
+								Value:     "colVal",
+								Timestamp: &recordTimestamp,
+							},
+						},
+					},
+				},
+
+				Timestamp:                 0,
+				TableName:                 autoIncTableName,
+				DiscardDataVersion:        false,
+				AutoIncrementPKIndex:      0,
+				ReGenerateAutoIncrementPK: false,
+			},
+			wantErr: true,
+			errCode: "OTSConditionCheckFail",
+		},
+	}
+
+	for _, t := range tests {
+		resp, err := RecordRestore(client, t.request)
+		if t.wantErr {
+			if otsErr, ok := err.(*tablestore.OtsError); ok {
+				c.Assert(otsErr.Code, Equals, t.errCode)
+			}
+			c.Assert(err, NotNil)
+			continue
+		}
+		c.Assert(err, IsNil)
+		c.Assert(resp.RecordRestoreCount, Equals, t.recordRestoreCount)
+		c.Assert(resp.HasTimeoutRecord, Equals, t.hasTimeoutRecord)
+		got := getRangeRestoreTable(client, tableName, c)
+		c.Assert(len(got), Equals, 2)
+		compareRestoreRowsIncludeAutoInc(t.expectRows, got, t.request.AutoIncrementPKIndex, c)
+	}
+}
+
+func prepareAutoIncPkTable(tableName string) (*tablestore.TableMeta, error) {
+	createTableRequest := new(tablestore.CreateTableRequest)
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("PkString", tablestore.PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumnOption("PkInt", tablestore.PrimaryKeyType_INTEGER, tablestore.AUTO_INCREMENT)
+	tableMeta.AddPrimaryKeyColumn("PkBinary", tablestore.PrimaryKeyType_BINARY)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	_, err := client.CreateTable(createTableRequest)
+	return tableMeta, err
+}
+
 func prepareRecordTable(tableName string) error {
 	createTableRequest := new(tablestore.CreateTableRequest)
 	tableMeta := new(tablestore.TableMeta)
@@ -809,6 +1282,30 @@ func prepareRecordTable(tableName string) error {
 	createTableRequest.ReservedThroughput = reservedThroughput
 	_, err := client.CreateTable(createTableRequest)
 	return err
+}
+
+func convertRecordsToRow(record *tunnel.Record) *tablestore.Row {
+	row := new(tablestore.Row)
+	primaryKey := new(tablestore.PrimaryKey)
+	for _, pk := range record.PrimaryKey.PrimaryKeys {
+		otsPk := &tablestore.PrimaryKeyColumn{
+			ColumnName: pk.ColumnName,
+			Value:      pk.Value,
+		}
+		primaryKey.PrimaryKeys = append(primaryKey.PrimaryKeys, otsPk)
+	}
+	row.PrimaryKey = primaryKey
+
+	attrCol := make([]*tablestore.AttributeColumn, 0)
+	for _, colVal := range record.Columns {
+		otsCol := &tablestore.AttributeColumn{
+			ColumnName: *colVal.Name,
+			Value:      colVal.Value,
+		}
+		attrCol = append(attrCol, otsCol)
+	}
+	row.Columns = attrCol
+	return row
 }
 
 func buildGetRangeReq(tableName string) *tablestore.GetRangeRequest {
@@ -872,5 +1369,76 @@ func compareFuzzyRestoreRows(want []*tablestore.Row, got []*tablestore.Row, c *C
 		equal := reflect.DeepEqual(row.PrimaryKey, want[i].PrimaryKey)
 		c.Assert(equal, Equals, true)
 		c.Assert(row.Columns[0].Value, Equals, int64(2*i))
+	}
+}
+
+func compareRestoreRowsIncludeAutoInc(want []*tablestore.Row, got []*tablestore.Row, autoIncIndex int, c *C) {
+	c.Assert(len(want), Equals, len(got))
+	for i, row := range got {
+		wantPk := want[i].PrimaryKey.PrimaryKeys
+		wantCol := want[i].Columns
+		for j, pk := range row.PrimaryKey.PrimaryKeys {
+			if autoIncIndex == 0 || j != autoIncIndex {
+				equal := reflect.DeepEqual(pk, wantPk[j])
+				c.Assert(equal, Equals, true)
+			}
+		}
+		for j, col := range row.Columns {
+			c.Assert(col.ColumnName, Equals, wantCol[j].ColumnName)
+			c.Assert(col.Value, Equals, wantCol[j].Value.(string))
+		}
+	}
+}
+
+func getExpectRowsForAutoIncWithoutRegen(col string) []*tablestore.Row {
+	return []*tablestore.Row{
+		{
+			PrimaryKey: &tablestore.PrimaryKey{
+				PrimaryKeys: []*tablestore.PrimaryKeyColumn{
+					{
+						ColumnName: "PkString",
+						Value:      "pk1",
+					},
+					{
+						ColumnName: "PkInt",
+						Value:      int64(1),
+					},
+					{
+						ColumnName: "PkBinary",
+						Value:      []byte("pkBinary"),
+					},
+				},
+			},
+			Columns: []*tablestore.AttributeColumn{
+				{
+					ColumnName: col,
+					Value:      "colVal1",
+				},
+			},
+		},
+		{
+			PrimaryKey: &tablestore.PrimaryKey{
+				PrimaryKeys: []*tablestore.PrimaryKeyColumn{
+					{
+						ColumnName: "PkString",
+						Value:      "pk1",
+					},
+					{
+						ColumnName: "PkInt",
+						Value:      int64(2),
+					},
+					{
+						ColumnName: "PkBinary",
+						Value:      []byte("pkBinary"),
+					},
+				},
+			},
+			Columns: []*tablestore.AttributeColumn{
+				{
+					ColumnName: col,
+					Value:      "colVal1",
+				},
+			},
+		},
 	}
 }

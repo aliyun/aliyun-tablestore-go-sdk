@@ -1226,6 +1226,29 @@ func TestParseFieldSchemaFromPb_Date(t *testing.T) {
 	assert.Equal(t, 0, len(fieldSchemas[1].DateFormats))
 }
 
+func TestSearchRequest_ProtoBuffer_TimeoutMs(t *testing.T) {
+	//nil by default
+	query := search.NewSearchQuery().SetQuery(&search.MatchAllQuery{})
+	request := SearchRequest{
+		SearchQuery:    query,
+	}
+	pbSearchRequest, err := request.ProtoBuffer()
+	assert.Nil(t, err)
+
+	assert.Nil(t, pbSearchRequest.TimeoutMs)
+
+	//set timeout_ms explicitly
+	query = search.NewSearchQuery().SetQuery(&search.MatchAllQuery{})
+	request = SearchRequest{
+		SearchQuery:    query,
+		TimeoutMs:      proto.Int32(33),
+	}
+	pbSearchRequest, err = request.ProtoBuffer()
+	assert.Nil(t, err)
+
+	assert.Equal(t, int32(33), *pbSearchRequest.TimeoutMs)
+}
+
 func TestParallelScanRequest_ProtoBuffer(t *testing.T) {
 	query := search.NewScanQuery().SetQuery(&search.MatchAllQuery{})
 	request := ParallelScanRequest{
@@ -1245,6 +1268,7 @@ func TestParallelScanRequest_ProtoBuffer(t *testing.T) {
 
 	assert.Equal(t, "table1", *pbParallelScanRequest.TableName)
 	assert.Equal(t, "index1", *pbParallelScanRequest.IndexName)
+	assert.Nil(t, pbParallelScanRequest.TimeoutMs)
 
 	//assert ScanQuery
 	scanQueryExpected := &otsprotocol.ScanQuery{}
@@ -1263,4 +1287,27 @@ func TestParallelScanRequest_ProtoBuffer(t *testing.T) {
 	assert.Equal(t, columnsToGetExpected, *pbParallelScanRequest.ColumnsToGet)
 
 	assert.Equal(t, []byte("bcd"), pbParallelScanRequest.SessionId)
+}
+
+func TestParallelScanRequest_ProtoBuffer_TimeoutMs(t *testing.T) {
+	//nil by default
+	query := search.NewScanQuery().SetQuery(&search.MatchAllQuery{})
+	request := ParallelScanRequest{
+		ScanQuery:    query,
+	}
+	pbParallelScanRequest, err := request.ProtoBuffer()
+	assert.Nil(t, err)
+
+	assert.Nil(t, pbParallelScanRequest.TimeoutMs)
+
+	//set timeout_ms explicitly
+	query = search.NewScanQuery().SetQuery(&search.MatchAllQuery{})
+	request = ParallelScanRequest{
+		ScanQuery:    query,
+		TimeoutMs:      proto.Int32(33),
+	}
+	pbParallelScanRequest, err = request.ProtoBuffer()
+	assert.Nil(t, err)
+
+	assert.Equal(t, int32(33), *pbParallelScanRequest.TimeoutMs)
 }

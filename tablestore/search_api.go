@@ -21,7 +21,7 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 		req.TimeToLive = proto.Int32(*request.TimeToLive)
 	}
 	var err error
-	req.Schema, err = convertToPbSchema(request.IndexSchema)
+	req.Schema, err = ConvertToPbSchema(request.IndexSchema)
 	if err != nil {
 		return nil, err
 	}

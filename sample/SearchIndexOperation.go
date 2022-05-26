@@ -423,6 +423,7 @@ func MatchAllQuery(client *tablestore.TableStoreClient, tableName string, indexN
 	searchQuery.SetLimit(0)
 	searchQuery.SetGetTotalCount(true) // 设置GetTotalCount为true后才会返回总条数
 	searchRequest.SetSearchQuery(searchQuery)
+	searchRequest.SetTimeoutMs(30000) //可以显示设置请求超时时间
 	searchResponse, err := client.Search(searchRequest)
 	if err != nil {
 		fmt.Printf("%#v", err)

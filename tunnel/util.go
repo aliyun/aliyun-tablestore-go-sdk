@@ -56,7 +56,7 @@ func ParseActionType(pbType *protocol.ActionType) (ActionType, error) {
 	}
 }
 
-func DeserializeRecordFromRawBytes(data []byte, actionType ActionType) (*Record, error) {
+func DeserializeRecordFromRawBytes(data []byte, originData []byte, actionType ActionType) (*Record, error) {
 	rows, err := protocol.ReadRowsWithHeader(bytes.NewReader(data))
 	if err != nil {
 		return nil, err
@@ -95,6 +95,28 @@ func DeserializeRecordFromRawBytes(data []byte, actionType ActionType) (*Record,
 		record.Columns = append(record.Columns, dataColumn)
 	}
 
+	if originData != nil {
+		originRows, err := protocol.ReadRowsWithHeader(bytes.NewReader(originData))
+		if err != nil {
+			return nil, err
+		}
+		for _, originCell := range originRows[0].Cells {
+			cellName := (string)(originCell.CellName)
+			dataColumn := &RecordColumn{Name: &cellName, Timestamp: &originCell.CellTimestamp}
+			if originCell.CellValue != nil {
+				dataColumn.Value = originCell.CellValue.Value
+			}
+			switch originCell.CellType {
+			case protocol.DELETE_ONE_VERSION:
+				dataColumn.Type = RCT_DeleteOneVersion
+			case protocol.DELETE_ALL_VERSION:
+				dataColumn.Type = RCT_DeleteAllVersions
+			default:
+				dataColumn.Type = RCT_Put
+			}
+			record.OriginColumns = append(record.OriginColumns, dataColumn)
+		}
+	}
 	return record, nil
 }
 
@@ -244,7 +266,7 @@ func UnSerializeBinaryRecordFromBytes(r *bytes.Reader) (*Record, error) {
 	if err != nil {
 		return nil, err
 	}
-	rec, err := DeserializeRecordFromRawBytes(b, actionTyp)
+	rec, err := DeserializeRecordFromRawBytes(b, nil, actionTyp)
 	if err != nil {
 		return nil, err
 	}

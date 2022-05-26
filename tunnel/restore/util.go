@@ -13,7 +13,7 @@ import (
 	when a batch of records contains the same primary key record, that record will be moved to
 	the next batch for processing, for example, abacc will be split into abc and ac.
 */
-func recordReplay(client *tablestore.TableStoreClient, records []*tunnel.Record, timestamp int64, tableName string, discardDataVersion bool) (ResponseInfo, bool, int, error) {
+func recordReplay(records []*tunnel.Record, param *recordReplayParam) (ResponseInfo, bool, int, error) {
 	var err error
 	var cnt int
 	var totalLength int
@@ -25,7 +25,7 @@ func recordReplay(client *tablestore.TableStoreClient, records []*tunnel.Record,
 	nextBatch := make([]*tunnel.Record, 0)
 
 	for _, record := range records {
-		if timestamp != 0 && record.SequenceInfo != nil && record.Timestamp > timestamp {
+		if param.timestamp != 0 && record.SequenceInfo != nil && record.Timestamp > param.timestamp {
 			hasTimeoutRecord = true
 			break
 		}
@@ -39,7 +39,7 @@ func recordReplay(client *tablestore.TableStoreClient, records []*tunnel.Record,
 		cnt++
 		recordMap[pkString] = true
 		if cnt == DefaultBatchWriteRowCount {
-			responseInfo, err = executeRecordRestore(client, replayRecords, tableName, discardDataVersion)
+			responseInfo, err = executeRecordRestore(replayRecords, param)
 			if err != nil {
 				return responseInfo, hasTimeoutRecord, 0, err
 			}
@@ -55,7 +55,7 @@ func recordReplay(client *tablestore.TableStoreClient, records []*tunnel.Record,
 	if cnt == 0 {
 		nextBatch = currentBatch
 	}
-	responseInfo, cnt, err = processLastBatch(client, replayRecords, nextBatch, tableName, discardDataVersion, responseInfo)
+	responseInfo, cnt, err = processLastBatch(replayRecords, nextBatch, param, responseInfo)
 	if err != nil {
 		return responseInfo, hasTimeoutRecord, 0, err
 	}
@@ -97,11 +97,11 @@ func processPreviousBatch(cnt int, currentBatch, nextBatch, replayRecords []*tun
 	return cnt
 }
 
-func processLastBatch(client *tablestore.TableStoreClient, replayRecords []*tunnel.Record, currentBatch []*tunnel.Record, tableName string, discardDataVersion bool, info ResponseInfo) (ResponseInfo, int, error) {
+func processLastBatch(replayRecords []*tunnel.Record, currentBatch []*tunnel.Record, param *recordReplayParam, info ResponseInfo) (ResponseInfo, int, error) {
 	var err error
 	var totalLength int
 	if len(replayRecords) != 0 {
-		info, err = executeRecordRestore(client, replayRecords, tableName, discardDataVersion)
+		info, err = executeRecordRestore(replayRecords, param)
 		if err != nil {
 			return info, 0, err
 		}
@@ -125,7 +125,7 @@ func processLastBatch(client *tablestore.TableStoreClient, replayRecords []*tunn
 			}
 		}
 		if len(replayRecords) != 0 {
-			info, err = executeRecordRestore(client, replayRecords, tableName, discardDataVersion)
+			info, err = executeRecordRestore(replayRecords, param)
 			if err != nil {
 				return info, 0, err
 			}
@@ -136,15 +136,21 @@ func processLastBatch(client *tablestore.TableStoreClient, replayRecords []*tunn
 	return info, totalLength, nil
 }
 
-func executeRecordRestore(client *tablestore.TableStoreClient, records []*tunnel.Record, tableName string, discardDataVersion bool) (ResponseInfo, error) {
-	batchWriteReq := genBatchWriteReqForRecordReplay(records, tableName, discardDataVersion)
-	batchWriteResp, err := client.BatchWriteRow(batchWriteReq)
+func executeRecordRestore(records []*tunnel.Record, param *recordReplayParam) (ResponseInfo, error) {
+	batchWriteReq := genBatchWriteReqForRecordReplay(records, param.tableName, param.autoIncrementPKIndex, param.reGenerateAutoIncrementPK, param.discardDataVersion)
+
+	//NOTICE: When the table has autoIncrement pk columns and the server needs to regenerate the autoIncrement column,
+	//the update and delete operations will be ignored, So the rowChange of batchWriteReq may be empty
+	if batchWriteReq.RowChangesGroupByTable == nil && param.reGenerateAutoIncrementPK {
+		return ResponseInfo{}, nil
+	}
+	batchWriteResp, err := param.client.BatchWriteRow(batchWriteReq)
 	if err != nil {
 		return ResponseInfo{}, err
 	}
 	var retErr = &tablestore.OtsError{}
 	var hasFailedRow bool
-	for _, result := range batchWriteResp.TableToRowsResult[tableName] {
+	for _, result := range batchWriteResp.TableToRowsResult[param.tableName] {
 		if !result.IsSucceed {
 			hasFailedRow = true
 			retErr.Code = result.Error.Code
@@ -160,27 +166,32 @@ func executeRecordRestore(client *tablestore.TableStoreClient, records []*tunnel
 	return ResponseInfo{RequestId: batchWriteResp.RequestId}, nil
 }
 
-func genBatchWriteReqForRecordReplay(records []*tunnel.Record, tableName string, discardDataVersion bool) *tablestore.BatchWriteRowRequest {
+func genBatchWriteReqForRecordReplay(records []*tunnel.Record, tableName string, autoIncPkIndex int, regenerateAutoIncrement bool, discardDataVersion bool) *tablestore.BatchWriteRowRequest {
 	batchWriteReq := new(tablestore.BatchWriteRowRequest)
+	//if regenerateAutoIncrement is true, update and delete operations  be ignored.
 	for _, rec := range records {
-		switch rec.Type {
-		case tunnel.AT_Put:
-			batchWriteReq.AddRowChange(getPutRowChange(rec, tableName, discardDataVersion))
-		case tunnel.AT_Delete:
-			batchWriteReq.AddRowChange(getDeleteRowChange(rec, tableName))
-		case tunnel.AT_Update:
+		if rec.Type == tunnel.AT_Put {
+			batchWriteReq.AddRowChange(getPutRowChange(rec, tableName, autoIncPkIndex, regenerateAutoIncrement, discardDataVersion))
+		} else if !regenerateAutoIncrement && rec.Type == tunnel.AT_Update {
 			batchWriteReq.AddRowChange(getUpdateRowChange(rec, tableName, discardDataVersion))
+		} else if !regenerateAutoIncrement && rec.Type == tunnel.AT_Delete {
+			batchWriteReq.AddRowChange(getDeleteRowChange(rec, tableName))
 		}
 	}
 	return batchWriteReq
 }
 
-func getPutRowChange(record *tunnel.Record, tableName string, discardDataVersion bool) *tablestore.PutRowChange {
+func getPutRowChange(record *tunnel.Record, tableName string, autoIncPkIndex int, regenerateAutoInc bool, discardDataVersion bool) *tablestore.PutRowChange {
 	putRowChange := new(tablestore.PutRowChange)
 	putRowChange.TableName = tableName
 	putPk := new(tablestore.PrimaryKey)
-	for _, pk := range record.PrimaryKey.PrimaryKeys {
-		putPk.AddPrimaryKeyColumn(pk.ColumnName, pk.Value)
+	for i, pk := range record.PrimaryKey.PrimaryKeys {
+		//autoIncrement columns exist and need to be automatically generated by the server
+		if i != 0 && i == autoIncPkIndex && regenerateAutoInc {
+			putPk.AddPrimaryKeyColumnWithAutoIncrement(pk.ColumnName)
+		} else {
+			putPk.AddPrimaryKeyColumn(pk.ColumnName, pk.Value)
+		}
 	}
 	putRowChange.PrimaryKey = putPk
 	for _, col := range record.Columns {
@@ -234,6 +245,7 @@ func getUpdateRowChange(record *tunnel.Record, tableName string, discardDataVers
 	return updateRowChange
 }
 
+// ShouldSleep Provided for HBR use
 func ShouldSleep(err error) bool {
 	if err, ok := err.(*tablestore.OtsError); ok && err.Code == tablestore.STORAGE_TIMEOUT {
 		return true
@@ -242,4 +254,16 @@ func ShouldSleep(err error) bool {
 		return true
 	}
 	return false
+}
+
+func GetAutoIncrementPkIndex(meta *tablestore.TableMeta) int {
+	if meta == nil {
+		return 0
+	}
+	for i, pk := range meta.SchemaEntry {
+		if pk != nil && pk.Option != nil && *pk.Option == tablestore.AUTO_INCREMENT {
+			return i
+		}
+	}
+	return 0
 }
