@@ -102,6 +102,7 @@ type CreateTableRequest struct {
 	ReservedThroughput *ReservedThroughput
 	StreamSpec         *StreamSpecification
 	IndexMetas         []*IndexMeta
+	SSESpecification   *SSESpecification
 }
 
 type CreateIndexRequest struct {
@@ -180,6 +181,7 @@ type DescribeTableResponse struct {
 	ReservedThroughput *ReservedThroughput
 	StreamDetails      *StreamDetails
 	IndexMetas         []*IndexMeta
+	SSEDetails         *SSEDetails
 	ResponseInfo
 }
 
@@ -680,17 +682,17 @@ type ListStreamResponse struct {
 }
 
 type StreamSpecification struct {
-	EnableStream   bool
-	ExpirationTime int32 // must be positive. in hours
-	ColumnsToGet   []string
+	EnableStream       bool
+	ExpirationTime     int32    // must be positive. in hours
+	OriginColumnsToGet []string //origin columns to get for stream data
 }
 
 type StreamDetails struct {
-	EnableStream   bool
-	StreamId       *StreamId // nil when stream is disabled.
-	ExpirationTime int32     // in hours
-	LastEnableTime int64     // the last time stream is enabled, in usec
-	ColumnsToGet   []string
+	EnableStream       bool
+	StreamId           *StreamId // nil when stream is disabled.
+	ExpirationTime     int32     // in hours
+	LastEnableTime     int64     // the last time stream is enabled, in usec
+	OriginColumnsToGet []string  //origin columns to get for stream data
 }
 
 type DescribeStreamRequest struct {

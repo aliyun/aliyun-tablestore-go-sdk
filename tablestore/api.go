@@ -490,13 +490,46 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 		if request.StreamSpec.EnableStream {
 			ss = otsprotocol.StreamSpecification{
 				EnableStream:   &request.StreamSpec.EnableStream,
-				ExpirationTime: &request.StreamSpec.ExpirationTime}
+				ExpirationTime: &request.StreamSpec.ExpirationTime,
+				ColumnsToGet:   request.StreamSpec.OriginColumnsToGet,
+			}
 		} else {
 			ss = otsprotocol.StreamSpecification{
 				EnableStream: &request.StreamSpec.EnableStream}
 		}
 
 		req.StreamSpec = &ss
+	}
+
+	if request.SSESpecification != nil {
+		if err := request.SSESpecification.CheckArguments(); err != nil {
+			return nil, err
+		}
+		sse := new(otsprotocol.SSESpecification)
+		sse.Enable = proto.Bool(request.SSESpecification.Enable)
+		if request.SSESpecification.KeyType != nil {
+			sseType := *request.SSESpecification.KeyType
+			switch sseType {
+			case SSE_KMS_SERVICE:
+				keyType := otsprotocol.SSEKeyType_SSE_KMS_SERVICE
+				sse.KeyType = &keyType
+			case SSE_BYOK:
+				keyType := otsprotocol.SSEKeyType_SSE_BYOK
+				sse.KeyType = &keyType
+			default:
+				return nil, errInvalidSSEKeyType(sseType.String())
+			}
+		}
+
+		if request.SSESpecification.KeyId != nil {
+			sse.KeyId = []byte(*request.SSESpecification.KeyId)
+		}
+
+		if request.SSESpecification.RoleArn != nil {
+			sse.RoleArn = []byte(*request.SSESpecification.RoleArn)
+		}
+
+		req.SseSpec = sse
 	}
 
 	resp := new(otsprotocol.CreateTableResponse)
@@ -1030,11 +1063,11 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 
 	if resp.StreamDetails != nil && *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
-			EnableStream:   *resp.StreamDetails.EnableStream,
-			StreamId:       (*StreamId)(resp.StreamDetails.StreamId),
-			ExpirationTime: *resp.StreamDetails.ExpirationTime,
-			LastEnableTime: *resp.StreamDetails.LastEnableTime,
-			ColumnsToGet:   resp.GetStreamDetails().GetColumnsToGet(),
+			EnableStream:       *resp.StreamDetails.EnableStream,
+			StreamId:           (*StreamId)(resp.StreamDetails.StreamId),
+			ExpirationTime:     *resp.StreamDetails.ExpirationTime,
+			LastEnableTime:     *resp.StreamDetails.LastEnableTime,
+			OriginColumnsToGet: resp.GetStreamDetails().GetColumnsToGet(),
 		}
 	} else {
 		response.StreamDetails = &StreamDetails{
@@ -1043,6 +1076,34 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 
 	for _, meta := range resp.IndexMetas {
 		response.IndexMetas = append(response.IndexMetas, ConvertPbIndexMetaToIndexMeta(meta))
+	}
+
+	if resp.GetSseDetails() == nil {
+		response.SSEDetails = &SSEDetails{
+			Enable: false,
+		}
+	} else {
+		respSse := resp.GetSseDetails()
+		sseDetail := new(SSEDetails)
+		sseDetail.Enable = resp.GetSseDetails().GetEnable()
+		switch respSse.GetKeyType() {
+		case otsprotocol.SSEKeyType_SSE_KMS_SERVICE:
+			sseDetail.KeyType = SSE_KMS_SERVICE
+		case otsprotocol.SSEKeyType_SSE_BYOK:
+			sseDetail.KeyType = SSE_BYOK
+		default:
+			return nil, errInvalidSSEKeyType(respSse.GetKeyType().String())
+		}
+
+		if respSse.GetKeyId() != nil {
+			sseDetail.KeyId = string(respSse.GetKeyId())
+		}
+
+		if respSse.GetRoleArn() != nil {
+			sseDetail.RoleArn = string(respSse.GetRoleArn())
+		}
+
+		response.SSEDetails = sseDetail
 	}
 
 	return response, nil
@@ -1080,7 +1141,7 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 			req.StreamSpec = &otsprotocol.StreamSpecification{
 				EnableStream:   &request.StreamSpec.EnableStream,
 				ExpirationTime: &request.StreamSpec.ExpirationTime,
-				ColumnsToGet:   request.StreamSpec.ColumnsToGet,
+				ColumnsToGet:   request.StreamSpec.OriginColumnsToGet,
 			}
 		} else {
 			req.StreamSpec = &otsprotocol.StreamSpecification{EnableStream: &request.StreamSpec.EnableStream}
@@ -1104,11 +1165,11 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 
 	if *resp.StreamDetails.EnableStream {
 		response.StreamDetails = &StreamDetails{
-			EnableStream:   *resp.StreamDetails.EnableStream,
-			StreamId:       (*StreamId)(resp.StreamDetails.StreamId),
-			ExpirationTime: *resp.StreamDetails.ExpirationTime,
-			LastEnableTime: *resp.StreamDetails.LastEnableTime,
-			ColumnsToGet:   resp.GetStreamDetails().GetColumnsToGet(),
+			EnableStream:       *resp.StreamDetails.EnableStream,
+			StreamId:           (*StreamId)(resp.StreamDetails.StreamId),
+			ExpirationTime:     *resp.StreamDetails.ExpirationTime,
+			LastEnableTime:     *resp.StreamDetails.LastEnableTime,
+			OriginColumnsToGet: resp.GetStreamDetails().GetColumnsToGet(),
 		}
 	} else {
 		response.StreamDetails = &StreamDetails{

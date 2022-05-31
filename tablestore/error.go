@@ -13,6 +13,10 @@ var (
 		return errors.New("[tablestore] table name: \"" + name + "\" too long")
 	}
 
+	errInvalidSSEKeyType = func(sseType string) error {
+		return errors.New(fmt.Sprintf("[tablestore] unknown server side encryption key type: %s", sseType))
+	}
+
 	errInvalidPartitionType    = errors.New("[tablestore] invalid partition key")
 	errMissPrimaryKey          = errors.New("[tablestore] missing primary key")
 	errPrimaryKeyTooMuch       = errors.New("[tablestore] primary key too much")

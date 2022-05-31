@@ -109,6 +109,25 @@ message StreamDetails {
     repeated string columns_to_get = 5;
 }
 
+enum SSEKeyType {
+    SSE_KMS_SERVICE = 1;
+    SSE_BYOK = 2;
+}
+
+message SSESpecification {
+    required bool enable = 1;
+    optional SSEKeyType key_type = 2;
+    optional bytes key_id = 3; // only useful when key_type is SSE_BYOK
+    optional bytes role_arn = 4; // only useful when key_type is SSE_BYOK
+}
+
+message SSEDetails {
+    required bool enable = 1;
+    optional SSEKeyType key_type = 2;
+    optional bytes key_id = 3;
+    optional bytes role_arn = 4; // only useful when key_type is SSE_BYOK
+}
+
 /* #############################################  CreateTable  ############################################# */
 /**
  * table_meta用于存储表中不可更改的schema属性，可以更改的ReservedThroughput和TableOptions独立出来，作为UpdateTable的参数。
@@ -127,6 +146,7 @@ message CreateTableRequest {
     optional TableOptions table_options = 3;
     repeated PartitionRange partitions = 4;
     optional StreamSpecification stream_spec = 5;
+    optional SSESpecification sse_spec = 6;
     repeated IndexMeta index_metas = 7;
 }
 
@@ -163,6 +183,7 @@ message DescribeTableResponse {
     required TableStatus table_status = 4;
     optional StreamDetails stream_details = 5;
     repeated bytes shard_splits = 6;
+    optional SSEDetails sse_details = 7;
     repeated IndexMeta index_metas = 8;
 }
 /* ########################################################################################################### */

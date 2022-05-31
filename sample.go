@@ -66,4 +66,7 @@ func main() {
 
 	// SQL sample
 	sample.SQLQuerySample(client)
+
+	// Server side encryption sample
+	sample.ServerSideEncryptionSample(client)
 }

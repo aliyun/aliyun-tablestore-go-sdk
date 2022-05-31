@@ -214,8 +214,6 @@ func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
 }
 
 func (s *TableStoreSuite) TestCreateTable(c *C) {
-	fmt.Println("TestCreateTable finished")
-
 	tableName := tableNamePrefix + "testcreatetable1"
 
 	deleteReq := new(DeleteTableRequest)
@@ -243,8 +241,52 @@ func (s *TableStoreSuite) TestCreateTable(c *C) {
 
 	_, error := client.CreateTable(createtableRequest)
 	c.Check(error, Equals, nil)
-
 	fmt.Println("TestCreateTable finished")
+}
+
+func (s *TableStoreSuite) TestCreateTableWithOriginColumn(c *C) {
+	tableName := tableNamePrefix + "originColumn"
+	defer func() {
+		deleteReq := new(DeleteTableRequest)
+		deleteReq.TableName = tableName
+		client.DeleteTable(deleteReq)
+	}()
+
+	ctReq := new(CreateTableRequest)
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+
+	tableOption := new(TableOption)
+
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+
+	ctReq.TableMeta = tableMeta
+	ctReq.TableOption = tableOption
+	ctReq.ReservedThroughput = reservedThroughput
+
+	ctReq.StreamSpec = &StreamSpecification{
+		EnableStream:       true,
+		ExpirationTime:     168,
+		OriginColumnsToGet: []string{"col1", "col2"},
+	}
+
+	_, err := client.CreateTable(ctReq)
+	c.Check(err, Equals, nil)
+
+	descTableRequest := &DescribeTableRequest{
+		TableName: tableName,
+	}
+	descResp, err := client.DescribeTable(descTableRequest)
+	c.Check(err, Equals, nil)
+	c.Check(2, Equals, len(descResp.StreamDetails.OriginColumnsToGet))
+
+	fmt.Println("TestCreateTableWithOriginColumn finished")
 }
 
 func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
@@ -330,7 +372,7 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	updateTableReq.StreamSpec = new(StreamSpecification)
 	updateTableReq.StreamSpec.EnableStream = true
 	updateTableReq.StreamSpec.ExpirationTime = 168
-	updateTableReq.StreamSpec.ColumnsToGet = []string{"col1", "col2"}
+	updateTableReq.StreamSpec.OriginColumnsToGet = []string{"col1", "col2"}
 
 	updateTableResp, error := client.UpdateTable(updateTableReq)
 	c.Assert(error, Equals, nil)
@@ -350,9 +392,9 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	c.Assert(describ.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
 	c.Assert(describ.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
 	c.Assert(describ.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
-	c.Assert(len(describ.StreamDetails.ColumnsToGet), Equals, len(updateTableReq.StreamSpec.ColumnsToGet))
-	for i, s := range describ.StreamDetails.ColumnsToGet {
-		c.Assert(s, Equals, updateTableReq.StreamSpec.ColumnsToGet[i])
+	c.Assert(len(describ.StreamDetails.OriginColumnsToGet), Equals, len(updateTableReq.StreamSpec.OriginColumnsToGet))
+	for i, s := range describ.StreamDetails.OriginColumnsToGet {
+		c.Assert(s, Equals, updateTableReq.StreamSpec.OriginColumnsToGet[i])
 	}
 	fmt.Println("TestUpdateAndDescribeTable finished")
 }
