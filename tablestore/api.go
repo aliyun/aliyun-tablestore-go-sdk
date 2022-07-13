@@ -1527,6 +1527,27 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 			rowInBatch.RowChange = row.Serialize()
 			rowInBatch.Type = row.getOperationType().Enum()
 			table.Rows = append(table.Rows, rowInBatch)
+
+			if *rowInBatch.Type != otsprotocol.OperationType_DELETE {
+				returnType := ReturnType_RT_NONE
+				switch change := row.(type) {
+				case *PutRowChange:
+					returnType = change.ReturnType
+				case *UpdateRowChange:
+					returnType = change.ReturnType
+				}
+
+				switch returnType {
+				case ReturnType_RT_PK:
+					rowInBatch.ReturnContent = &otsprotocol.ReturnContent{
+						ReturnType: otsprotocol.ReturnType_RT_PK.Enum(),
+					}
+				case ReturnType_RT_AFTER_MODIFY:
+					rowInBatch.ReturnContent = &otsprotocol.ReturnContent{
+						ReturnType: otsprotocol.ReturnType_RT_AFTER_MODIFY.Enum(),
+					}
+				}
+			}
 		}
 
 		tablesInBatch = append(tablesInBatch, table)
@@ -1542,14 +1563,34 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 		return nil, err
 	}
 
-	for _, table := range resp.Tables {
-		index := int32(0)
-		for _, row := range table.Rows {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
-			index++
+	for tableIndex, table := range resp.Tables {
+		for index, row := range table.Rows {
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: int32(index)}
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message}
 			} else {
+				content := req.Tables[tableIndex].Rows[index].ReturnContent
+				if content != nil {
+					rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
+					if err != nil {
+						return nil, err
+					}
+
+					if *content.ReturnType == otsprotocol.ReturnType_RT_PK {
+						for _, pk := range rows[0].primaryKey {
+							pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+							rowResult.PrimaryKey.PrimaryKeys = append(rowResult.PrimaryKey.PrimaryKeys, pkColumn)
+						}
+					}
+
+					if *content.ReturnType == otsprotocol.ReturnType_RT_AFTER_MODIFY {
+						for _, cell := range rows[0].cells {
+							dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
+							rowResult.Columns = append(rowResult.Columns, dataColumn)
+						}
+					}
+				}
+				
 				rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
 				rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			} /*else {
