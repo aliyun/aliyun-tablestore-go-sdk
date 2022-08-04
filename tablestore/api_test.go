@@ -372,7 +372,6 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	updateTableReq.StreamSpec = new(StreamSpecification)
 	updateTableReq.StreamSpec.EnableStream = true
 	updateTableReq.StreamSpec.ExpirationTime = 168
-	updateTableReq.StreamSpec.OriginColumnsToGet = []string{"col1", "col2"}
 
 	updateTableResp, error := client.UpdateTable(updateTableReq)
 	c.Assert(error, Equals, nil)
