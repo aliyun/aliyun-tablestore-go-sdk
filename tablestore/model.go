@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"math/rand"
 	"net/http"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -728,11 +727,14 @@ type GetShardIteratorResponse struct {
 type GetStreamRecordRequest struct {
 	ShardIterator *ShardIterator // required
 	Limit         *int32         // optional. max records which will reside in response
+	TableName     *string
 }
 
 type GetStreamRecordResponse struct {
 	Records           []*StreamRecord
 	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
+	CapacityUnit      *ConsumedCapacityUnit
+	MayMoreRecord     *bool
 	ResponseInfo
 }
 
@@ -967,6 +969,9 @@ type TimeseriesClient struct {
 }
 
 func (timeseriesClient *TimeseriesClient) SetTimeseriesMetaCache(timeseriesMetaCache *lruCache.Cache) {
+	if timeseriesClient.timeseriesMetaCache != nil {
+		timeseriesClient.timeseriesMetaCache.Purge()
+	}
 	timeseriesClient.timeseriesMetaCache = timeseriesMetaCache
 }
 
@@ -1098,37 +1103,6 @@ func (timeseriesRow *TimeseriesRow) GetFieldsMap() map[string]*ColumnValue {
 	return timeseriesRow.fields
 }
 
-func (timeseriesRow *TimeseriesRow) GetFieldsSlice() []string {
-	n := len(timeseriesRow.GetFieldsSlice())
-	key := make([]string, 0, n)
-	for field_key, _ := range timeseriesRow.GetFieldsMap() {
-		key = append(key, field_key)
-	}
-	sort.Strings(key)
-	for i := 0; i < len(key); i++ {
-		field_value := timeseriesRow.GetFieldsMap()[key[i]]
-		switch field_value.Type {
-		case ColumnType_STRING:
-			key[i] = key[i] + "=" + field_value.Value.(string)
-			break
-		case ColumnType_INTEGER:
-			key[i] = key[i] + "=" + strconv.Itoa(int(field_value.Value.(int64)))
-			break
-		case ColumnType_BOOLEAN:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.(bool))
-			break
-		case ColumnType_DOUBLE:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.(float64))
-			break
-		case ColumnType_BINARY:
-			key[i] = key[i] + "=" + fmt.Sprintf("%v", field_value.Value.([]byte))
-		default:
-			panic("Unknow field Value type")
-		}
-	}
-	return key
-}
-
 func (timeseriesRow *TimeseriesRow) AddField(fieldName string, fieldValue *ColumnValue) {
 	if fieldValue == nil {
 		return
@@ -1251,6 +1225,11 @@ func (putTimeseriesDataResponse *PutTimeseriesDataResponse) GetFailedRowResults(
 	return putTimeseriesDataResponse.failedRowResults
 }
 
+type FieldToGet struct {
+	Name string
+	Type ColumnType
+}
+
 type GetTimeseriesDataRequest struct {
 	timeseriesTableName string
 	timeseriesKey       *TimeseriesKey
@@ -1258,6 +1237,8 @@ type GetTimeseriesDataRequest struct {
 	endTimeInUs         int64
 	nextToken           []byte
 	limit               int32
+	backward            bool
+	fieldsToGet         []*FieldToGet
 }
 
 func NewGetTimeseriesDataRequest(timeseriesTableName string) *GetTimeseriesDataRequest {
@@ -1314,6 +1295,26 @@ func (getDataRequest *GetTimeseriesDataRequest) SetLimit(limit int32) {
 
 func (getDataRequest *GetTimeseriesDataRequest) GetLimit() int32 {
 	return getDataRequest.limit
+}
+
+func (getDataRequest *GetTimeseriesDataRequest) SetBackward(backward bool) {
+	getDataRequest.backward = backward
+}
+
+func (getDataRequest *GetTimeseriesDataRequest) GetBackward() bool {
+	return getDataRequest.backward
+}
+
+func (getDataRequest *GetTimeseriesDataRequest) AddFieldToGet(field *FieldToGet) {
+	getDataRequest.fieldsToGet = append(getDataRequest.fieldsToGet, field)
+}
+
+func (getDataRequest *GetTimeseriesDataRequest) SetFieldsToGet(fields []*FieldToGet) {
+	getDataRequest.fieldsToGet = fields
+}
+
+func (getDataRequest *GetTimeseriesDataRequest) GetFieldsToGet() []*FieldToGet {
+	return getDataRequest.fieldsToGet
 }
 
 type GetTimeseriesDataResponse struct {

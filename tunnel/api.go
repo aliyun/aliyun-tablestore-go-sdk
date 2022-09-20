@@ -521,6 +521,7 @@ func (api *TunnelApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, 
 		NextToken:    *readRecordsResponse.NextToken,
 		Size:         size,
 		RecordCount:  len(records),
+		MayMoreRecord: readRecordsResponse.MayMoreRecord,
 		ResponseInfo: ResponseInfo{traceId},
 	}
 

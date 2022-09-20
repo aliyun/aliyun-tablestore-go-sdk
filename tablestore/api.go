@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"crypto/md5"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
 	"github.com/golang/protobuf/proto"
 	"hash/crc32"
 	"io"
@@ -159,9 +161,6 @@ func NewTimeseriesClient(endPoint, instanceName, accessKeyId, accessKeySecret st
 		option(timeseriesClient)
 	}
 
-	timeseriesMetaCache, _ := lruCache.New(timeseriesClient.timeseriesConfiguration.metaCacheMaxDataSize)
-	timeseriesClient.SetTimeseriesMetaCache(timeseriesMetaCache)
-
 	return timeseriesClient
 }
 
@@ -210,6 +209,8 @@ func NewTimeseriesClientWithConfig(endPoint, instanceName, accessKeyId, accessKe
 	timeseriesClient.mu = &sync.Mutex{}
 	timeseriesClient.random = rand.New(rand.NewSource(time.Now().Unix()))
 
+	timeseriesMetaCache, _ := lruCache.New(timeseriesClient.timeseriesConfiguration.metaCacheMaxDataSize)
+	timeseriesClient.SetTimeseriesMetaCache(timeseriesMetaCache)
 	return timeseriesClient
 }
 
@@ -669,6 +670,36 @@ func (timeseriesClient *TimeseriesClient) GetTimeseriesData(request *GetTimeseri
 
 	if request.GetNextToken() != nil && len(request.GetNextToken()) != 0 {
 		req.Token = append([]byte{}, request.GetNextToken()...)
+	}
+
+	if request.backward {
+		req.Backward = proto.Bool(true)
+	}
+
+	if len(request.GetFieldsToGet()) > 0 {
+		fieldsToGet := request.GetFieldsToGet()
+		req.FieldsToGet = make([]*otsprotocol.TimeseriesFieldsToGet, 0, len(fieldsToGet))
+		for i, field := range fieldsToGet {
+			var fieldType int32 = -1
+			switch field.Type {
+			case ColumnType_INTEGER:
+				fieldType = int32(Fieldvalues.DataTypeLONG)
+			case ColumnType_BOOLEAN:
+				fieldType = int32(Fieldvalues.DataTypeBOOLEAN)
+			case ColumnType_DOUBLE:
+				fieldType = int32(Fieldvalues.DataTypeDOUBLE)
+			case ColumnType_STRING:
+				fieldType = int32(Fieldvalues.DataTypeSTRING)
+			case ColumnType_BINARY:
+				fieldType = int32(Fieldvalues.DataTypeBINARY)
+			default:
+				return nil, errors.New(fmt.Sprintf("invalid type: %v", field.Type))
+			}
+			req.FieldsToGet = append(req.FieldsToGet, &otsprotocol.TimeseriesFieldsToGet{
+				Name: &fieldsToGet[i].Name,
+				Type: proto.Int32(fieldType),
+			})
+		}
 	}
 
 	resp := new(otsprotocol.GetTimeseriesDataResponse)
@@ -1526,6 +1557,32 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 			rowInBatch.Condition = row.getCondition()
 			rowInBatch.RowChange = row.Serialize()
 			rowInBatch.Type = row.getOperationType().Enum()
+
+			if *rowInBatch.Type != otsprotocol.OperationType_DELETE {
+				returnType := ReturnType_RT_NONE
+				switch change := row.(type) {
+				case *PutRowChange:
+					returnType = change.ReturnType
+				case *UpdateRowChange:
+					returnType = change.ReturnType
+				}
+				switch returnType {
+				case ReturnType_RT_PK:
+					rowInBatch.ReturnContent = &otsprotocol.ReturnContent{
+						ReturnType: otsprotocol.ReturnType_RT_PK.Enum(),
+					}
+				case ReturnType_RT_AFTER_MODIFY:
+					updateRow, isUpdateRow := row.(*UpdateRowChange)
+					if isUpdateRow {
+						content := otsprotocol.ReturnContent{ReturnType: otsprotocol.ReturnType_RT_AFTER_MODIFY.Enum()}
+						for _, column := range updateRow.ColumnNamesToReturn {
+							content.ReturnColumnNames = append(content.ReturnColumnNames, column)
+						}
+						rowInBatch.ReturnContent = &content
+					}
+				}
+
+			}
 			table.Rows = append(table.Rows, rowInBatch)
 		}
 
@@ -1542,14 +1599,33 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 		return nil, err
 	}
 
-	for _, table := range resp.Tables {
-		index := int32(0)
-		for _, row := range table.Rows {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
-			index++
+	for tableIndex, table := range resp.Tables {
+		for index, row := range table.Rows {
+			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: int32(index)}
 			if *row.IsOk == false {
 				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message}
 			} else {
+				content := req.Tables[tableIndex].Rows[index].ReturnContent
+				if content != nil {
+					rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
+					if err != nil {
+						return nil, err
+					}
+
+					if *content.ReturnType == otsprotocol.ReturnType_RT_PK {
+						for _, pk := range rows[0].primaryKey {
+							pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
+							rowResult.PrimaryKey.PrimaryKeys = append(rowResult.PrimaryKey.PrimaryKeys, pkColumn)
+						}
+					}
+
+					if *content.ReturnType == otsprotocol.ReturnType_RT_AFTER_MODIFY {
+						for _, cell := range rows[0].cells {
+							dataColumn := &AttributeColumn{ColumnName: string(cell.cellName), Value: cell.cellValue.Value, Timestamp: cell.cellTimestamp}
+							rowResult.Columns = append(rowResult.Columns, dataColumn)
+						}
+					}
+				}
 				rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
 				rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
 			} /*else {
@@ -1827,11 +1903,23 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 	if req.Limit != nil {
 		pbReq.Limit = req.Limit
 	}
+	if req.TableName != nil {
+		pbReq.TableName = req.TableName
+	}
 
 	pbResp := otsprotocol.GetStreamRecordResponse{}
 	resp := GetStreamRecordResponse{}
 	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
 		return nil, err
+	}
+
+	resp.MayMoreRecord = pbResp.MayMoreRecord
+	if pbResp.GetConsumed() != nil && pbResp.GetConsumed().GetCapacityUnit() != nil {
+		cu := pbResp.GetConsumed().GetCapacityUnit()
+		resp.CapacityUnit = &ConsumedCapacityUnit{
+			Read:  cu.GetRead(),
+			Write: cu.GetWrite(),
+		}
 	}
 
 	if pbResp.NextShardIterator != nil {

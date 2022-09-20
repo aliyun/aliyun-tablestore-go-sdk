@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/golang/mock/gomock"
+	"github.com/golang/protobuf/proto"
 	. "github.com/smartystreets/goconvey/convey"
+	"github.com/stretchr/testify/assert"
 	"go.uber.org/zap"
 	"sync"
 	"testing"
@@ -316,4 +318,131 @@ func toMap(channels []*protocol.Channel) map[string]*protocol.Channel {
 		m[c.GetChannelId()] = c
 	}
 	return m
+}
+
+func Test_validateChannels(t *testing.T) {
+	tests := []struct {
+		name         string
+		newChannels  []*protocol.Channel
+		oldChannels  []*protocol.Channel
+		wantChannels []*protocol.Channel
+	}{
+		{
+			name: "test new and old channels merge",
+			newChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-1"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-3"),
+					Version:   proto.Int64(2),
+				},
+				{
+					ChannelId: proto.String("cid-4"),
+					Version:   proto.Int64(1),
+				},
+			},
+			oldChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-3"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-4"),
+					Version:   proto.Int64(2),
+				},
+				{
+					ChannelId: proto.String("cid-5"),
+					Version:   proto.Int64(1),
+				},
+			},
+			wantChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-1"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-3"),
+					Version:   proto.Int64(2),
+				},
+				{
+					ChannelId: proto.String("cid-4"),
+					Version:   proto.Int64(2),
+				},
+			},
+		},
+		{
+			name: "old channel is nil",
+			newChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-1"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+			},
+			wantChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-1"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+			},
+		},
+		{
+			name: "new channel is nil",
+			oldChannels: []*protocol.Channel{
+				{
+					ChannelId: proto.String("cid-1"),
+					Version:   proto.Int64(1),
+				},
+				{
+					ChannelId: proto.String("cid-2"),
+					Version:   proto.Int64(1),
+				},
+			},
+			wantChannels: []*protocol.Channel{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			oldSyncMap := convertChannelsToSyncMap(tt.oldChannels)
+			updateSyncMap := validateChannels(tt.newChannels, oldSyncMap)
+			wantSyncMap := convertChannelsToSyncMap(tt.wantChannels)
+			assert.Equal(t, getSyncMapLength(wantSyncMap), getSyncMapLength(updateSyncMap))
+			updateSyncMap.Range(func(cid, channel interface{}) bool {
+				wantChannel, ok := wantSyncMap.Load(cid.(string))
+				assert.True(t, ok)
+				assert.Equal(t, wantChannel.(*protocol.Channel).GetVersion(), channel.(*protocol.Channel).GetVersion())
+				return true
+			})
+		})
+	}
+}
+
+func convertChannelsToSyncMap(chans []*protocol.Channel) *sync.Map {
+	s := new(sync.Map)
+	for _, c := range chans {
+		s.Store(c.GetChannelId(), c)
+	}
+	return s
 }

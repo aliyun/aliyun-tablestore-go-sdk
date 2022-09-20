@@ -175,6 +175,11 @@ message PutTimeseriesDataResponse {
   optional MetaUpdateStatus meta_update_status = 2;
 }
 
+message TimeseriesFieldsToGet {
+  optional string name = 1;
+  optional int32 type = 2;
+}
+
 message GetTimeseriesDataRequest {
   required string table_name = 1;
   required TimeseriesKey time_series_key = 2;
@@ -183,6 +188,8 @@ message GetTimeseriesDataRequest {
   optional int64 specific_time = 5;
   optional bytes token = 6;
   optional int32 limit = 7;
+  optional bool backward = 8;
+  repeated TimeseriesFieldsToGet fields_to_get = 9;
 }
 
 message GetTimeseriesDataResponse {

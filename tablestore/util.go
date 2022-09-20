@@ -10,9 +10,9 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 )
 
 const (
@@ -31,6 +31,26 @@ const (
 	ColumnType_DOUBLE  ColumnType = 4
 	ColumnType_BINARY  ColumnType = 5
 )
+
+func (t *ColumnType) String() string {
+	if t == nil {
+		return "UNKNOWN"
+	}
+	switch *t {
+	case ColumnType_STRING:
+		return "STRING"
+	case ColumnType_INTEGER:
+		return "INTEGER"
+	case ColumnType_BOOLEAN:
+		return "BOOLEAN"
+	case ColumnType_DOUBLE:
+		return "DOUBLE"
+	case ColumnType_BINARY:
+		return "BINARY"
+	default:
+		return "UNKNOWN"
+	}
+}
 
 const (
 	Version          = "1.0"

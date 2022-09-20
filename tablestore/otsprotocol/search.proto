@@ -161,6 +161,8 @@ message FieldSort {
     optional SortOrder order = 2;
     optional SortMode mode = 3;
     optional NestedFilter nested_filter = 4;
+    optional bytes missing_value = 5;
+    optional string missing_field = 6;
 }
 
 enum GeoDistanceType {

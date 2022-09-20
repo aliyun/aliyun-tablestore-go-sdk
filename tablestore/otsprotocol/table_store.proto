@@ -510,6 +510,7 @@ message GetShardIteratorResponse {
 message GetStreamRecordRequest {
     required string shard_iterator = 1;
     optional int32 limit = 2;
+    optional string table_name = 3;
 }
 
 enum ActionType {
@@ -526,6 +527,8 @@ message GetStreamRecordResponse {
     }
     repeated StreamRecord stream_records = 1;
     optional string next_shard_iterator = 2;
+    optional ConsumedCapacity consumed = 3;
+    optional bool may_more_record = 4;
 }
 
 /* +++++ ComputeSplitPointsBySize  +++++ */

@@ -366,7 +366,7 @@ func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struc
 				ret.nextToken = resp.NextToken
 				ret.traceId = resp.RequestId
 				if bkoff != nil {
-					if streamFullData(resp.RecordCount, resp.Size) {
+					if streamFullData(resp.RecordCount, resp.Size, resp.MayMoreRecord) {
 						bkoff.Reset()
 					}
 				}
@@ -440,7 +440,12 @@ func (c *channelConn) processRecords(inCh chan *pipeResult) (bool, error) {
 	return false, nil
 }
 
-func streamFullData(numRec int, size int) bool {
+func streamFullData(numRec int, size int, mayMoreRecord *bool) bool {
+	if mayMoreRecord != nil {
+		// server support tablegroup，using mayMoreRecord to determine backoff
+		return *mayMoreRecord
+	}
+
 	return numRec > rpoBar || size > rpoSizeBar
 }
 

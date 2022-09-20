@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	. "gopkg.in/check.v1"
+	"math"
 	"math/rand"
 	"os"
 	"runtime"
@@ -161,7 +162,10 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
 	timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest(curTimeseriesTableName))
-	PrepareTimeseriesTable(curTimeseriesTableName)
+	err := PrepareTimeseriesTable(curTimeseriesTableName)
+	if err != nil {
+		c.Fatal(err)
+	}
 
 	time.Sleep(30 * time.Second)
 
@@ -224,6 +228,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 	getTimeseriesDataResp, err := timeseriesClient.GetTimeseriesData(getTimeseriesDataReq)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(getTimeseriesDataResp.GetRows()), Equals, 10)
+	lastRowTime := int64(0)
 	for i := 0; i < len(getTimeseriesDataResp.GetRows()); i++ {
 		row := getTimeseriesDataResp.GetRows()[i]
 		c.Assert(row.GetTimeseriesKey().GetMeasurementName(), Equals, "NETWORK")
@@ -231,7 +236,34 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(len(row.GetTimeseriesKey().GetTags()), Equals, 2)
 		c.Assert(row.GetTimeseriesKey().GetTags()["City"], Equals, "Hangzhou")
 		c.Assert(row.GetTimeseriesKey().GetTags()["Region"], Equals, "Xihu")
+		c.Assert(row.GetTimeInus() > lastRowTime, Equals, true)
+		lastRowTime = row.GetTimeInus()
+		c.Assert(string(row.GetFieldsMap()["data"].Value.([]byte)), Equals, "select * from NET")
+		c.Assert(row.GetFieldsMap()["netstatus"].Value.(bool), Equals, true)
+		c.Assert(row.GetFieldsMap()["program"].Value.(string), Equals, "tablestore.d")
+		c.Assert(row.GetFieldsMap()["lossrate"].Value.(float64), Equals, 0.68)
+		c.Assert(row.GetFieldsMap()["datasize"].Value.(int64), Equals, int64(512))
+	}
 
+	// 逆序查询数据
+	getTimeseriesDataReq = NewGetTimeseriesDataRequest(curTimeseriesTableName)
+	getTimeseriesDataReq.SetTimeRange(0, time.Now().UnixNano())
+	getTimeseriesDataReq.SetTimeseriesKey(timeseriesKey)
+	getTimeseriesDataReq.SetBackward(true)
+
+	getTimeseriesDataResp, err = timeseriesClient.GetTimeseriesData(getTimeseriesDataReq)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(getTimeseriesDataResp.GetRows()), Equals, 10)
+	lastRowTime = int64(math.MaxInt64)
+	for i := 0; i < len(getTimeseriesDataResp.GetRows()); i++ {
+		row := getTimeseriesDataResp.GetRows()[i]
+		c.Assert(row.GetTimeseriesKey().GetMeasurementName(), Equals, "NETWORK")
+		c.Assert(row.GetTimeseriesKey().GetDataSource(), Equals, "127.0.0.1")
+		c.Assert(len(row.GetTimeseriesKey().GetTags()), Equals, 2)
+		c.Assert(row.GetTimeseriesKey().GetTags()["City"], Equals, "Hangzhou")
+		c.Assert(row.GetTimeseriesKey().GetTags()["Region"], Equals, "Xihu")
+		c.Assert(row.GetTimeInus() < lastRowTime, Equals, true) // 逆序
+		lastRowTime = row.GetTimeInus()
 		c.Assert(string(row.GetFieldsMap()["data"].Value.([]byte)), Equals, "select * from NET")
 		c.Assert(row.GetFieldsMap()["netstatus"].Value.(bool), Equals, true)
 		c.Assert(row.GetFieldsMap()["program"].Value.(string), Equals, "tablestore.d")
@@ -266,6 +298,46 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(row.GetFieldsMap()["program"].Value.(string), Equals, "tablestore.d")
 		c.Assert(row.GetFieldsMap()["temperature"].Value.(float64), NotNil)
 		c.Assert(row.GetFieldsMap()["runminute"].Value.(int64), NotNil)
+	}
+
+	// 指定列查询数据
+	getTimeseriesDataReq = NewGetTimeseriesDataRequest(curTimeseriesTableName)
+	getTimeseriesDataReq.SetTimeRange(0, time.Now().UnixNano())
+	getTimeseriesDataReq.SetTimeseriesKey(timeseriesKey)
+	getTimeseriesDataReq.AddFieldToGet(&FieldToGet{
+		Name: "memdata",
+		Type: ColumnType_BINARY,
+	})
+	getTimeseriesDataReq.AddFieldToGet(&FieldToGet{
+		Name: "program",
+		Type: ColumnType_STRING,
+	})
+	getTimeseriesDataReq.AddFieldToGet(&FieldToGet{
+		Name: "runminute",
+		Type: ColumnType_INTEGER,
+	})
+	getTimeseriesDataReq.AddFieldToGet(&FieldToGet{
+		Name: "temperature",
+		Type: ColumnType_DOUBLE,
+	})
+
+	getTimeseriesDataResp, err = timeseriesClient.GetTimeseriesData(getTimeseriesDataReq)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(getTimeseriesDataResp.GetRows()), Equals, 10)
+	for i := 0; i < len(getTimeseriesDataResp.GetRows()); i++ {
+		row := getTimeseriesDataResp.GetRows()[i]
+		c.Assert(row.GetTimeseriesKey().GetMeasurementName(), Equals, "CPU")
+		c.Assert(row.GetTimeseriesKey().GetDataSource(), Equals, "127.0.0.1")
+		c.Assert(len(row.GetTimeseriesKey().GetTags()), Equals, 2)
+		c.Assert(row.GetTimeseriesKey().GetTags()["City"], Equals, "Hangzhou")
+		c.Assert(row.GetTimeseriesKey().GetTags()["Region"], Equals, "Xihu")
+		c.Assert(len(row.GetFieldsMap()), Equals, 4)
+		c.Assert(string(row.GetFieldsMap()["memdata"].Value.([]byte)), Equals, "a=123")
+		c.Assert(row.GetFieldsMap()["program"].Value.(string), Equals, "tablestore.d")
+		c.Assert(row.GetFieldsMap()["temperature"].Value.(float64), NotNil)
+		c.Assert(row.GetFieldsMap()["runminute"].Value.(int64), NotNil)
+		_, ok := row.GetFieldsMap()["runstatus"]
+		c.Assert(ok, Equals, false)
 	}
 
 	fmt.Println("[Info]: TestPutAndGetTimeseriesData finished !")

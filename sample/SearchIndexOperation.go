@@ -433,6 +433,41 @@ func MatchAllQuery(client *tablestore.TableStoreClient, tableName string, indexN
 	fmt.Println("TotalCount: ", searchResponse.TotalCount)
 }
 
+func FieldSort_missingField(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+	query := &search.MatchAllQuery{}
+	searchQuery := search.NewSearchQuery()
+	searchQuery.SetQuery(query)
+	searchQuery.SetSort(&search.Sort{
+		Sorters: []search.Sorter{
+			&search.FieldSort{
+				FieldName: "Col_Long",
+				Order:     search.SortOrder_ASC.Enum(),
+				MissingField: proto.String("Col_Long_Sec"), //如果排序字段Col_Long缺失的时候用Col_Long_Sec替换
+				MissingValue: 50, // 如果排序字段及替换字段都缺失情况下用missingValue替换
+				//MissingValue: search.FirstWhenMissing, // 如果missingValue设置为FirstWhenMissing，当排序字段值缺省时候排在最前面
+			},
+		},
+	})
+	searchQuery.SetLimit(10)
+	searchRequest.SetSearchQuery(searchQuery)
+	searchRequest.SetTimeoutMs(30000) //可以显示设置请求超时时间
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}}
+
 /**
  *  查询表中Col_Keyword这一列的值能够匹配"hangzhou"的数据，返回匹配到的总行数和一些匹配成功的行。
  */

@@ -20,6 +20,28 @@ const (
 	SQL_ALTER_TABLE    SQLStatementType = 6
 )
 
+func (t *SQLStatementType) String() string {
+	if t == nil {
+		return "UNKNOWN"
+	}
+	switch *t {
+	case SQL_SELECT:
+		return "SQL_SELECT"
+	case SQL_CREATE_TABLE:
+		return "SQL_CREATE_TABLE"
+	case SQL_SHOW_TABLE:
+		return "SQL_SHOW_TABLE"
+	case SQL_DESCRIBE_TABLE:
+		return "SQL_DESCRIBE_TABLE"
+	case SQL_DROP_TABLE:
+		return "SQL_DROP_TABLE"
+	case SQL_ALTER_TABLE:
+		return "SQL_ALTER_TABLE"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 type SQLPayloadVersion int32
 
 const (
@@ -202,6 +224,10 @@ type SQLColumnInfo struct {
 	dataType dataprotocol.DataType
 }
 
+func (column *SQLColumnInfo) String() string {
+	return fmt.Sprintf("%v:%v", column.Name, column.Type)
+}
+
 // SQLRow represents a row of data, can be used to access values.
 type SQLRow interface {
 	// IsNull returns whether the value with the colIdx is nil.
@@ -294,6 +320,10 @@ func (row *flatBuffersSQLRow) GetString(colIdx int) (string, error) {
 		if colInfo.Type != ColumnType_STRING {
 			return "", errors.New("the type of column is not STRING")
 		}
+		colValues := row.data[colIdx]
+		if colValues.IsNullvalues(row.rowIdx) {
+			return "", nil
+		}
 		if colInfo.dataType == dataprotocol.DataTypeSTRING_RLE {
 			rleStringValues := row.rleData[colIdx]
 			if rleStringValues == nil {
@@ -306,7 +336,6 @@ func (row *flatBuffersSQLRow) GetString(colIdx int) (string, error) {
 				return "", errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", rleStringValues.IndexMappingLength()-1))
 			}
 		} else {
-			colValues := row.data[colIdx]
 			if row.rowIdx < colValues.StringValuesLength() {
 				return string(colValues.StringValues(row.rowIdx)), nil
 			} else {
@@ -332,7 +361,9 @@ func (row *flatBuffersSQLRow) GetInt64(colIdx int) (int64, error) {
 			return 0, errors.New("the type of column is not INTEGER")
 		}
 		colValues := row.data[colIdx]
-		if row.rowIdx < colValues.LongValuesLength() {
+		if colValues.IsNullvalues(row.rowIdx) {
+			return 0, nil
+		} else if row.rowIdx < colValues.LongValuesLength() {
 			return colValues.LongValues(row.rowIdx), nil
 		} else {
 			return 0, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.LongValuesLength()-1))
@@ -356,7 +387,9 @@ func (row *flatBuffersSQLRow) GetBool(colIdx int) (bool, error) {
 			return false, errors.New("the type of column is not BOOLEAN")
 		}
 		colValues := row.data[colIdx]
-		if row.rowIdx < colValues.BoolValuesLength() {
+		if colValues.IsNullvalues(row.rowIdx) {
+			return false, nil
+		} else if row.rowIdx < colValues.BoolValuesLength() {
 			return colValues.BoolValues(row.rowIdx), nil
 		} else {
 			return false, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.BoolValuesLength()-1))
@@ -380,7 +413,9 @@ func (row *flatBuffersSQLRow) GetBytes(colIdx int) ([]byte, error) {
 			return nil, errors.New("the type of column is not BINARY")
 		}
 		colValues := row.data[colIdx]
-		if row.rowIdx < colValues.BinaryValuesLength() {
+		if colValues.IsNullvalues(row.rowIdx) {
+			return nil, nil
+		} else if row.rowIdx < colValues.BinaryValuesLength() {
 			bytesVal := new(dataprotocol.BytesValue)
 			_ = colValues.BinaryValues(bytesVal, row.rowIdx)
 			retBytes := make([]byte, bytesVal.ValueLength())
@@ -410,7 +445,9 @@ func (row *flatBuffersSQLRow) GetFloat64(colIdx int) (float64, error) {
 			return 0, errors.New("the type of column is not DOUBLE")
 		}
 		colValues := row.data[colIdx]
-		if row.rowIdx < colValues.DoubleValuesLength() {
+		if colValues.IsNullvalues(row.rowIdx) {
+			return 0, nil
+		} else if row.rowIdx < colValues.DoubleValuesLength() {
 			return colValues.DoubleValues(row.rowIdx), nil
 		} else {
 			return 0, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.DoubleValuesLength()-1))

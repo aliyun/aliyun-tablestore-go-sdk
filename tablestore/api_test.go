@@ -1118,6 +1118,80 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	fmt.Println("TestBatchWriteRow finished")
 }
 
+func (s *TableStoreSuite) TestBatchWriteRowReturnPK(c *C) {
+	fmt.Println("TestBatchWriteRowReturnPK started")
+
+	PrepareDataInDefaultTable("updateinbatchkey1", "updateinput1")
+	PrepareDataInDefaultTable("deleteinbatchkey1", "deleteinput1")
+	batchWriteReq := &BatchWriteRowRequest{}
+
+	putRowReturnPK := CreatePutRowChange("putinbatchkey1", "datainput1")
+	putRowReturnPK.SetReturnPk()
+	putRowNoReturnPK := CreatePutRowChange("putinbatchkey2", "datainput2")
+
+	deleteRowChange := new(DeleteRowChange)
+	deleteRowChange.TableName = defaultTableName
+	deletePk := new(PrimaryKey)
+	deletePk.AddPrimaryKeyColumn("pk1", "deleteinbatchkey1")
+	deleteRowChange.PrimaryKey = deletePk
+	deleteRowChange.SetCondition(RowExistenceExpectation_EXPECT_EXIST)
+
+	batchWriteReq.AddRowChange(putRowReturnPK)
+	batchWriteReq.AddRowChange(putRowNoReturnPK)
+	batchWriteReq.AddRowChange(deleteRowChange)
+
+	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
+	c.Check(error, Equals, nil)
+	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
+
+	for index, rowToCheck := range batchWriteResponse.TableToRowsResult[defaultTableName] {
+		c.Check(rowToCheck.Index, Equals, int32(index))
+		c.Check(rowToCheck.TableName, Equals, defaultTableName)
+		c.Check(rowToCheck.IsSucceed, Equals, true)
+
+		switch index {
+		case 0:
+			c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 1)
+			c.Check(rowToCheck.PrimaryKey.PrimaryKeys[0].Value, Equals, "putinbatchkey1")
+		case 1:
+			c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 0)
+		case 2:
+			c.Check(len(rowToCheck.PrimaryKey.PrimaryKeys), Equals, 0)
+		}
+	}
+
+	fmt.Println("TestBatchWriteRowReturnPK finished")
+
+}
+
+func (s *TableStoreSuite) TestBatchWriteRowReturnColumn(c *C) {
+	fmt.Println("TestBatchWriteRowReturnColumn started")
+
+	PrepareValueInDefaultTable("updateinbatchkey3", 64)
+
+	updateRowReturnColumn := new(UpdateRowChange)
+	updateRowReturnColumn.TableName = defaultTableName
+	updatePk2 := new(PrimaryKey)
+	updatePk2.AddPrimaryKeyColumn("pk1", "updateinbatchkey3")
+	updateRowReturnColumn.PrimaryKey = updatePk2
+	updateRowReturnColumn.IncrementColumn("col1", int64(40))
+	updateRowReturnColumn.SetCondition(RowExistenceExpectation_IGNORE)
+	updateRowReturnColumn.SetReturnIncrementValue()
+	updateRowReturnColumn.AppendIncrementColumnToReturn("col1")
+
+	batchWriteReq := &BatchWriteRowRequest{}
+	batchWriteReq.AddRowChange(updateRowReturnColumn)
+	batchWriteResponse, error := client.BatchWriteRow(batchWriteReq)
+	c.Check(error, Equals, nil)
+	c.Check(len(batchWriteResponse.TableToRowsResult), Equals, 1)
+
+	for _, rowToCheck := range batchWriteResponse.TableToRowsResult[defaultTableName] {
+		c.Check(rowToCheck.Columns[0].Value, Equals, int64(104))
+	}
+
+	fmt.Println("TestBatchWriteRowReturnColumn finished")
+}
+
 func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
 	fmt.Println("TestAtomicBatchWriteRowWithSamePartitionKey started")
 
@@ -1740,6 +1814,20 @@ func randStringRunes(n int) string {
 }
 
 func PrepareDataInDefaultTable(key string, value string) error {
+	putRowRequest := new(PutRowRequest)
+	putRowChange := new(PutRowChange)
+	putRowChange.TableName = defaultTableName
+	putPk := new(PrimaryKey)
+	putPk.AddPrimaryKeyColumn("pk1", key)
+	putRowChange.AddColumn("col1", value)
+	putRowChange.PrimaryKey = putPk
+	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	putRowRequest.PutRowChange = putRowChange
+	_, error := client.PutRow(putRowRequest)
+	return error
+}
+
+func PrepareValueInDefaultTable(key string, value int64) error {
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
