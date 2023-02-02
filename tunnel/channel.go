@@ -1,13 +1,14 @@
 package tunnel
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/cenkalti/backoff/v4"
+	"go.uber.org/zap"
 )
 
 var (
@@ -460,8 +461,8 @@ type defaultParallelReleaseManager struct {
 }
 
 /*
-	Manually release the quota occupied by this channel, after release, Other channels can preempt this channel.
-	Only the channel that occupies quota can read and process data.
+Manually release the quota occupied by this channel, after release, Other channels can preempt this channel.
+Only the channel that occupies quota can read and process data.
 */
 func (c *defaultParallelReleaseManager) Release() bool {
 	c.mu.Lock()

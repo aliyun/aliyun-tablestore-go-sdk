@@ -48,18 +48,18 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 	h := new(otsHeaders)
 
 	h.headers = []*otsHeader{
-		&otsHeader{name: xOtsDate, must: true},
-		&otsHeader{name: xOtsApiversion, must: true},
-		&otsHeader{name: xOtsAccesskeyid, must: true},
-		&otsHeader{name: xOtsContentmd5, must: true},
-		&otsHeader{name: xOtsInstanceName, must: true},
-		&otsHeader{name: xOtsSignature, must: true},
-		&otsHeader{name: xOtsRequestCompressSize, must: false},
-		&otsHeader{name: xOtsResponseCompressTye, must: false},
-		&otsHeader{name: xOtsRequestCompressType, must: false},
-		&otsHeader{name: xOtsHeaderStsToken, must: false},
-		&otsHeader{name: xOtsHeaderTraceID, must: false},
-		&otsHeader{name: xOtsHeaderTunnelType, must: false},
+		{name: xOtsDate, must: true},
+		{name: xOtsApiversion, must: true},
+		{name: xOtsAccesskeyid, must: true},
+		{name: xOtsContentmd5, must: true},
+		{name: xOtsInstanceName, must: true},
+		{name: xOtsSignature, must: true},
+		{name: xOtsRequestCompressSize, must: false},
+		{name: xOtsResponseCompressTye, must: false},
+		{name: xOtsRequestCompressType, must: false},
+		{name: xOtsHeaderStsToken, must: false},
+		{name: xOtsHeaderTraceID, must: false},
+		{name: xOtsHeaderTunnelType, must: false},
 	}
 
 	sort.Sort(h)

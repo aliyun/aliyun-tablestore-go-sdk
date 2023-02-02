@@ -10,24 +10,6 @@ Table Store tunnel service golang sdk.
 go get github.com/aliyun/aliyun-tablestore-go-sdk/tunnel
 ```
 
-
-* use dep to install dependencies under tunnel directory
-  * install [dep](https://github.com/golang/dep#installation)
-  * dep ensure -v
-* or use `go get` to install dependencies
-
-```bash
-go get -u go.uber.org/zap
-go get github.com/cenkalti/backoff
-go get github.com/golang/protobuf/proto
-go get github.com/satori/go.uuid
-go get github.com/stretchr/testify/assert
-go get github.com/smartystreets/goconvey/convey
-go get github.com/golang/mock/gomock
-go get gopkg.in/natefinch/lumberjack.v2
-```
-
-
 ### Document
 
 * [中文文档](https://help.aliyun.com/document_detail/102520.html?spm=a2c4g.11174283.6.766.379b15c3R8lQsh)

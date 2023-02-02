@@ -7,11 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
-	"github.com/golang/protobuf/proto"
-	"github.com/satori/go.uuid"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +14,12 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/cenkalti/backoff/v4"
+	"github.com/golang/protobuf/proto"
+	uuid "github.com/google/uuid"
 )
 
 const (
@@ -195,9 +196,13 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 	}
-	traceId := uuid.NewV4()
-	hreq.Header.Set(xOtsHeaderTraceID, traceId.String())
-	otshead.set(xOtsHeaderTraceID, traceId.String())
+	traceIdObj, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err, ""
+	}
+	traceId := traceIdObj.String()
+	hreq.Header.Set(xOtsHeaderTraceID, traceId)
+	otshead.set(xOtsHeaderTraceID, traceId)
 
 	otshead.set(xOtsContentmd5, md5Base64)
 	otshead.set(xOtsInstanceName, api.instanceName)
@@ -483,7 +488,7 @@ func (api *TunnelApi) GetCheckpoint(tunnelId, clientId string, channelId string)
 	return *getCheckpointResponse.Checkpoint, *getCheckpointResponse.SequenceNumber, nil
 }
 
-//add for oss data lake sync part
+// add for oss data lake sync part
 func (api *TunnelApi) ReadRows(tunnelId, clientId string, channelId string, token string) ([]*protocol.Record, string, string, int, error) {
 	readRecordsRequest := &protocol.ReadRecordsRequest{
 		TunnelId:  &tunnelId,
@@ -518,11 +523,11 @@ func (api *TunnelApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, 
 	}
 	records := readRecordsResponse.GetRecords()
 	response := &ReadRecordResponse{
-		NextToken:    *readRecordsResponse.NextToken,
-		Size:         size,
-		RecordCount:  len(records),
+		NextToken:     *readRecordsResponse.NextToken,
+		Size:          size,
+		RecordCount:   len(records),
 		MayMoreRecord: readRecordsResponse.MayMoreRecord,
-		ResponseInfo: ResponseInfo{traceId},
+		ResponseInfo:  ResponseInfo{traceId},
 	}
 
 	if req.NeedBinaryRecord {

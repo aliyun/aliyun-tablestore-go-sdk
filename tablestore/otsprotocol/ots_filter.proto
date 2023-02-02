@@ -1,6 +1,8 @@
 syntax = "proto2";
 package otsprotocol;
 
+option go_package = "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol";
+
 enum VariantType {
     VT_INTEGER = 0;
     VT_DOUBLE = 1;

@@ -8,13 +8,13 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
-	lruCache "github.com/hashicorp/golang-lru"
-	"sync"
+	lruCache "github.com/hashicorp/golang-lru/v2"
 )
 
 type internalClient struct {
@@ -587,8 +587,8 @@ type BatchGetRowResponse struct {
 	ResponseInfo
 }
 
-//IsAtomic设置是否为批量原子写
-//如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
+// IsAtomic设置是否为批量原子写
+// 如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
 type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
 	IsAtomic               bool
@@ -965,17 +965,17 @@ func (r *ComputeSplitsRequest) SetSearchIndexSplitsOptions(options SearchIndexSp
 
 type TimeseriesClient struct {
 	*internalClient
-	timeseriesMetaCache *lruCache.Cache
+	timeseriesMetaCache *lruCache.Cache[string, uint32]
 }
 
-func (timeseriesClient *TimeseriesClient) SetTimeseriesMetaCache(timeseriesMetaCache *lruCache.Cache) {
+func (timeseriesClient *TimeseriesClient) SetTimeseriesMetaCache(timeseriesMetaCache *lruCache.Cache[string, uint32]) {
 	if timeseriesClient.timeseriesMetaCache != nil {
 		timeseriesClient.timeseriesMetaCache.Purge()
 	}
 	timeseriesClient.timeseriesMetaCache = timeseriesMetaCache
 }
 
-func (timeseriesClient *TimeseriesClient) GetTimeseriesMetaCache() *lruCache.Cache {
+func (timeseriesClient *TimeseriesClient) GetTimeseriesMetaCache() *lruCache.Cache[string, uint32] {
 	return timeseriesClient.timeseriesMetaCache
 }
 
