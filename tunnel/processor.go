@@ -1,10 +1,11 @@
 package tunnel
 
 import (
-	"go.uber.org/atomic"
-	"go.uber.org/zap"
 	"sync"
+	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -65,7 +66,7 @@ func (s *SimpleProcessFactory) NewProcessor(tunnelId, clientId, channelId string
 		ticker:               time.NewTicker(interval),
 		wg:                   new(sync.WaitGroup),
 		lg:                   lg,
-		finished:             atomic.NewBool(false),
+		finished:             0,
 		needBinaryRecords:    s.NeedBinaryRecord,
 		alwaysCallBack:       s.AlwaysCallBack,
 		recordPipePerChannel: *s.RecordPipePerChannel,
@@ -119,7 +120,7 @@ func (s *AsyncProcessFactory) NewProcessor(tunnelId, clientId, channelId string,
 		ticker:               time.NewTicker(interval),
 		wg:                   new(sync.WaitGroup),
 		lg:                   lg,
-		finished:             atomic.NewBool(false),
+		finished:             0,
 		asyncProcessFlag:     true,
 		needBinaryRecords:    s.NeedBinaryRecord,
 		alwaysCallBack:       s.AlwaysCallBack,
@@ -145,7 +146,7 @@ type defaultProcessor struct {
 	ticker       *time.Ticker
 	wg           *sync.WaitGroup
 
-	finished *atomic.Bool
+	finished uint32
 
 	lg *zap.Logger
 
@@ -183,7 +184,7 @@ func (p *defaultProcessor) Process(records []*Record, binaryRecords []byte, reco
 		}
 	}
 	if nextToken == FinishTag {
-		p.finished.Store(true)
+		atomic.StoreUint32(&p.finished, 1)
 		p.Shutdown()
 	}
 	return nil
@@ -211,7 +212,7 @@ func (p *defaultProcessor) Shutdown() {
 }
 
 func (p *defaultProcessor) Finished() bool {
-	return p.finished.Load()
+	return atomic.LoadUint32(&p.finished) == 1
 }
 
 func (p *defaultProcessor) cpLoop() {

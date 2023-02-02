@@ -3,11 +3,12 @@ package tunnel
 import (
 	"errors"
 	"fmt"
-	"github.com/golang/mock/gomock"
-	"github.com/smartystreets/goconvey/convey"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/golang/mock/gomock"
+	"github.com/smartystreets/goconvey/convey"
 )
 
 func TestTunnelWorkerDaemon_Run(t *testing.T) {

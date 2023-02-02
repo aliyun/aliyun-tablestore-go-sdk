@@ -1,8 +1,9 @@
 package tunnel
 
 import (
-	. "github.com/smartystreets/goconvey/convey"
 	"testing"
+
+	. "github.com/smartystreets/goconvey/convey"
 )
 
 func TestTunnelError_Temporary(t *testing.T) {

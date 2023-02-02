@@ -6,9 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
-	"github.com/golang/protobuf/proto"
 	"hash/crc32"
 	"io"
 	"io/ioutil"
@@ -18,9 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
-	lruCache "github.com/hashicorp/golang-lru"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
+	"github.com/golang/protobuf/proto"
+
 	"sync"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	lruCache "github.com/hashicorp/golang-lru/v2"
 )
 
 const (
@@ -209,7 +211,7 @@ func NewTimeseriesClientWithConfig(endPoint, instanceName, accessKeyId, accessKe
 	timeseriesClient.mu = &sync.Mutex{}
 	timeseriesClient.random = rand.New(rand.NewSource(time.Now().Unix()))
 
-	timeseriesMetaCache, _ := lruCache.New(timeseriesClient.timeseriesConfiguration.metaCacheMaxDataSize)
+	timeseriesMetaCache, _ := lruCache.New[string, uint32](timeseriesClient.timeseriesConfiguration.metaCacheMaxDataSize)
 	timeseriesClient.SetTimeseriesMetaCache(timeseriesMetaCache)
 	return timeseriesClient
 }
@@ -630,7 +632,7 @@ func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseri
 					}
 					metaCacheKey := *curRow.timeseriesMetaKey
 					timeInCache, ok := timeseriesClient.GetTimeseriesMetaCache().Get(metaCacheKey)
-					if !ok || timeInCache.(uint32) < updateTimeInSec {
+					if !ok || timeInCache < updateTimeInSec {
 						timeseriesClient.GetTimeseriesMetaCache().Add(metaCacheKey, updateTimeInSec)
 					}
 				}

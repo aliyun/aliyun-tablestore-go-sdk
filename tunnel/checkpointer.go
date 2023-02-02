@@ -1,6 +1,8 @@
 package tunnel
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type Checkpointer interface {
 	Checkpoint(token string) error

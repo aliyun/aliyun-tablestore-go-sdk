@@ -2,13 +2,14 @@ package tunnel
 
 import (
 	"errors"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/golang/mock/gomock"
 	. "github.com/smartystreets/goconvey/convey"
 	"go.uber.org/zap"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 var (
