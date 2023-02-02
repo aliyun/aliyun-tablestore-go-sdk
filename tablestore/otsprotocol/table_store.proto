@@ -1,5 +1,7 @@
 syntax = "proto2";
 
+option go_package = "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol";
+
 package otsprotocol;
 
 message Error {

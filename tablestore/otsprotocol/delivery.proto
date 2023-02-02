@@ -1,6 +1,8 @@
 syntax = "proto2";
 package otsprotocol;
 
+option go_package = "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol";
+
 enum DeliveryTaskType {
     BASE = 0;
     INC = 1;
