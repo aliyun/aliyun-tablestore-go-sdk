@@ -44,7 +44,6 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
 	accessKeyId := os.Getenv("OTS_TEST_KEYID")
 	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
-
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	tableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
@@ -1512,7 +1511,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 }
 
 func (s *TableStoreSuite) TestFailureCase(c *C) {
-	tableName := randStringRunes(200)
+	tableName := randStringRunes(300)
 	createtableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName

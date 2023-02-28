@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/golang/protobuf/proto"
 	"io"
 	"time"

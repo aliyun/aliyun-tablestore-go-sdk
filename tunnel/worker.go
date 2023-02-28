@@ -56,6 +56,7 @@ func newTunnelWorker(tunnelId string, api *TunnelApi, conf *TunnelWorkerConfig) 
 	initExceptDialerConfig(&cloneConf)
 	lg, err := cloneConf.LogConfig.Build(ReplaceLogCore(cloneConf.LogWriteSyncer, *cloneConf.LogConfig))
 	if err != nil {
+		cancel()
 		return nil, &TunnelError{Code: ErrCodeClientError, Message: err.Error()}
 	}
 	if cloneConf.ChannelDialer == nil {

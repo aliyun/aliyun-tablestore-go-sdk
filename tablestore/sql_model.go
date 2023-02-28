@@ -68,7 +68,7 @@ type TablestoreSQLResultSet struct {
 	rowCursor int
 }
 
-func newSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
+func NewSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
 	rows, err := readRowsWithHeader(bytes.NewReader(rowBytes))
 	if err != nil {
 		return nil, err
@@ -85,7 +85,7 @@ func newSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
 	return rs, nil
 }
 
-func newSQLResultSetFromFlatBuffers(rowBytes []byte) (SQLResultSet, error) {
+func NewSQLResultSetFromFlatBuffers(rowBytes []byte) (SQLResultSet, error) {
 	if len(rowBytes) == 0 {
 		return nil, nil
 	}

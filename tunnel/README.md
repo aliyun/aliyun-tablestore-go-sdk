@@ -18,7 +18,7 @@ go get github.com/aliyun/aliyun-tablestore-go-sdk/tunnel
 
 ```bash
 go get -u go.uber.org/zap
-go get github.com/cenkalti/backoff
+go get github.com/cenkalti/backoff/v4
 go get github.com/golang/protobuf/proto
 go get github.com/satori/go.uuid
 go get github.com/stretchr/testify/assert

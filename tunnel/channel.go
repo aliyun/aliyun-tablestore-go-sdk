@@ -2,7 +2,7 @@ package tunnel
 
 import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"go.uber.org/zap"
 	"strings"
 	"sync"
@@ -419,6 +419,10 @@ func (c *channelConn) processRecords(inCh chan *pipeResult) (bool, error) {
 		return false, ret.error
 	}
 	if ret.finished {
+		c.p.SetFinished(true)
+		c.p.Shutdown()
+		c.lg.Info("channel read finished", zap.String("tunnelId", c.tunnelId), zap.String("clientId", c.clientId),
+			zap.String("channelId", c.channelId))
 		return true, nil
 	}
 	s := time.Now()

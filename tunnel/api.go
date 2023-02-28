@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
+	"github.com/cenkalti/backoff/v4"
 	"github.com/golang/protobuf/proto"
-	"github.com/satori/go.uuid"
+	"github.com/google/uuid"
 	"io"
 	"io/ioutil"
 	"net"
@@ -195,7 +195,10 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 	}
-	traceId := uuid.NewV4()
+	traceId, err := uuid.NewRandom()
+	if err != nil {
+		return nil, err, ""
+	}
 	hreq.Header.Set(xOtsHeaderTraceID, traceId.String())
 	otshead.set(xOtsHeaderTraceID, traceId.String())
 
@@ -518,11 +521,11 @@ func (api *TunnelApi) ReadRecords(req *ReadRecordRequest) (*ReadRecordResponse, 
 	}
 	records := readRecordsResponse.GetRecords()
 	response := &ReadRecordResponse{
-		NextToken:    *readRecordsResponse.NextToken,
-		Size:         size,
-		RecordCount:  len(records),
+		NextToken:     *readRecordsResponse.NextToken,
+		Size:          size,
+		RecordCount:   len(records),
 		MayMoreRecord: readRecordsResponse.MayMoreRecord,
-		ResponseInfo: ResponseInfo{traceId},
+		ResponseInfo:  ResponseInfo{traceId},
 	}
 
 	if req.NeedBinaryRecord {

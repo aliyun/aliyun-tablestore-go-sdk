@@ -463,6 +463,11 @@ func (p *testProcessor) Finished() bool {
 	return p.finished
 }
 
+func (p *testProcessor) SetFinished(isFinished bool) {
+	p.finished = true
+	return
+}
+
 func (p *testProcessor) Error() bool {
 	return false
 }
@@ -481,6 +486,10 @@ func (p *failProcessor) Shutdown() {}
 
 func (p *failProcessor) Finished() bool {
 	return false
+}
+
+func (p *failProcessor) SetFinished(isFinished bool) {
+	return
 }
 
 func (p *failProcessor) Error() bool {

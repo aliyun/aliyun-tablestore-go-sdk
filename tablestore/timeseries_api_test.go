@@ -412,7 +412,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(putTimeseriesDataResp.GetFailedRowResults()), Equals, 0)
 
-	time.Sleep(time.Second * 30) // 数据同步到meta表
+	time.Sleep(time.Second * 50) // 数据同步到meta表
 
 	// 查询timeseriesMeta信息,单条件：measurementQueryMetaCondition
 	measurementMetaQueryCondition := NewMeasurementQueryCondition(OP_GREATER_EQUAL, "")
@@ -510,7 +510,7 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(putTimeseriesDataResponse.GetFailedRowResults()), Equals, 0)
 
-	time.Sleep(10 * time.Second)
+	time.Sleep(40 * time.Second)
 
 	// 查询meta
 	measurementQueryCondition := NewMeasurementQueryCondition(OP_EQUAL, "CPU")
@@ -578,7 +578,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(putTimeseriesDataResponse.GetFailedRowResults()), Equals, 0)
 
-	time.Sleep(20 * time.Second)
+	time.Sleep(60 * time.Second)
 
 	// 查询meta
 	measurementQueryCondition := NewMeasurementQueryCondition(OP_EQUAL, "CPU")

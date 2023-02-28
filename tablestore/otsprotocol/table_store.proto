@@ -148,6 +148,7 @@ message CreateTableRequest {
     optional StreamSpecification stream_spec = 5;
     optional SSESpecification sse_spec = 6;
     repeated IndexMeta index_metas = 7;
+    optional bool enable_local_txn = 8;
 }
 
 message CreateTableResponse {
