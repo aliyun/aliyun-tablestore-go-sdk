@@ -6,9 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
-	"github.com/golang/protobuf/proto"
 	"hash/crc32"
 	"io"
 	"io/ioutil"
@@ -16,11 +13,14 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
+	"github.com/golang/protobuf/proto"
 	lruCache "github.com/hashicorp/golang-lru"
-	"sync"
 )
 
 const (
@@ -69,16 +69,20 @@ const (
 	adddefinedcolumnuri    = "/AddDefinedColumn"
 	deletedefinedcolumnuri = "/DeleteDefinedColumn"
 
-	createTimeseriesTable   = "/CreateTimeseriesTable"
-	putTimeseriesData       = "/PutTimeseriesData"
-	getTimeseriesData       = "/GetTimeseriesData"
-	queryTimeseriesMeta     = "/QueryTimeseriesMeta"
-	listTimeseriesTable     = "/ListTimeseriesTable"
-	deleteTimeseriesTable   = "/DeleteTimeseriesTable"
-	describeTimeseriesTable = "/DescribeTimeseriesTable"
-	updateTimeseriesTable   = "/UpdateTimeseriesTable"
-	updateTimeseriesMeta    = "/UpdateTimeseriesMeta"
-	deleteTimeseriesMeta    = "/DeleteTimeseriesMeta"
+	createTimeseriesTable             = "/CreateTimeseriesTable"
+	putTimeseriesData                 = "/PutTimeseriesData"
+	getTimeseriesData                 = "/GetTimeseriesData"
+	queryTimeseriesMeta               = "/QueryTimeseriesMeta"
+	listTimeseriesTable               = "/ListTimeseriesTable"
+	deleteTimeseriesTable             = "/DeleteTimeseriesTable"
+	describeTimeseriesTable           = "/DescribeTimeseriesTable"
+	updateTimeseriesTable             = "/UpdateTimeseriesTable"
+	updateTimeseriesMeta              = "/UpdateTimeseriesMeta"
+	deleteTimeseriesMeta              = "/DeleteTimeseriesMeta"
+	createTimeseriesAnalyticalStore   = "/CreateTimeseriesAnalyticalStore"
+	deleteTimeseriesAnalyticalStore   = "/DeleteTimeseriesAnalyticalStore"
+	describeTimeseriesAnalyticalStore = "/DescribeTimeseriesAnalyticalStore"
+	updateTimeseriesAnalyticalStore   = "/UpdateTimeseriesAnalyticalStore"
 )
 
 // RowsSerializeType is used for tests only.
@@ -258,7 +262,7 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 		}
 	}
 
-	if respBody == nil || len(respBody) == 0 {
+	if len(respBody) == 0 {
 		return nil
 	}
 
@@ -268,6 +272,241 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 	}
 
 	return nil
+}
+
+func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo) error {
+	end := time.Now().Add(internalClient.config.MaxRetryTime)
+	url := fmt.Sprintf("%s%s", internalClient.endPoint, uri)
+	/* request body */
+	body, err := proto.Marshal(req)
+	if req != nil && err != nil {
+		return err
+	}
+
+	var value int64
+	var respBody []byte
+	var requestId string
+	for i := uint(0); ; i++ {
+
+		respBody, err, requestId = internalClient.doRequest(url, uri, body, resp)
+		responseInfo.RequestId = requestId
+
+		if err != nil {
+			value = internalClient.getNextPause(err, i, end, value, uri)
+
+			// fmt.Println("hit retry", uri, err, *e.Code, Value)
+			if value <= 0 {
+				return err
+			}
+
+			time.Sleep(time.Duration(value) * time.Millisecond)
+		} else {
+			if len(respBody) == 0 {
+				return nil
+			}
+			if err = mergeBatchResponse(resp, respBody, uri); err != nil {
+				return err
+			}
+			var partitionFailedCouldRetry bool
+			body, partitionFailedCouldRetry, err = generateBatchRequest(resp, req, uri)
+			if err != nil || !partitionFailedCouldRetry {
+				return err
+			}
+
+			value = internalClient.getPartitionFailedNextPause(i, end, value)
+			if value <= 0 {
+				return nil
+			}
+			time.Sleep(time.Duration(value) * time.Millisecond)
+		}
+	}
+}
+
+func mergeBatchResponse(previousResp proto.Message, currentRespBody []byte, uri string) error {
+	// merge result of currentRespBody into previousResp
+	var err error
+	switch uri {
+	case batchWriteRowUri:
+		// decode currentRespBody
+		if previousResp == nil ||
+			previousResp.(*otsprotocol.BatchWriteRowResponse).GetTables() == nil { // first response, no need to merge response
+			err = proto.Unmarshal(currentRespBody, previousResp)
+			return err
+		} else { // merge response
+			currentResp := new(otsprotocol.BatchWriteRowResponse)
+			err = proto.Unmarshal(currentRespBody, currentResp)
+			if err != nil {
+				return fmt.Errorf("decode resp failed: %s", err)
+			}
+			// parse currentResp into map
+			rowResultMap := map[string][]*otsprotocol.RowInBatchWriteRowResponse{}
+			for _, currentTable := range currentResp.Tables {
+				rowResultMap[currentTable.GetTableName()] = currentTable.GetRows()
+			}
+			// update failed partition in previousResponse
+			for _, previousTable := range previousResp.(*otsprotocol.BatchWriteRowResponse).Tables {
+				index := 0
+				for _, previousRowResult := range previousTable.GetRows() {
+					if !previousRowResult.GetIsOk() { // previous response failed
+						tmpRowResult := rowResultMap[previousTable.GetTableName()][index]
+						index++
+						if tmpRowResult.GetIsOk() { // new response success
+							*previousRowResult.IsOk = true
+							previousRowResult.Row = tmpRowResult.GetRow()
+							previousRowResult.Consumed = tmpRowResult.GetConsumed()
+						} else {
+							*previousRowResult.IsOk = false // new response failed
+							previousRowResult.Error = tmpRowResult.GetError()
+							previousRowResult.Row = tmpRowResult.GetRow()
+						}
+					}
+				}
+			}
+			return nil
+		}
+	case batchGetRowUri:
+		// decode currentRespBody
+		if previousResp == nil ||
+			previousResp.(*otsprotocol.BatchGetRowResponse).GetTables() == nil { // first response, no need to merge response
+			err = proto.Unmarshal(currentRespBody, previousResp)
+			return err
+		} else { // merge response
+			currentResp := new(otsprotocol.BatchGetRowResponse)
+			err = proto.Unmarshal(currentRespBody, currentResp)
+			if err != nil {
+				return fmt.Errorf("decode resp failed: %s", err)
+			}
+			rowResultMap := map[string][]*otsprotocol.RowInBatchGetRowResponse{}
+			for _, currentTable := range currentResp.Tables {
+				rowResultMap[currentTable.GetTableName()] = currentTable.GetRows()
+			}
+			// update failed partition in previousResponse
+			for _, previousTable := range previousResp.(*otsprotocol.BatchGetRowResponse).Tables {
+				index := 0
+				for _, previousRowResult := range previousTable.GetRows() {
+					if !previousRowResult.GetIsOk() { // previous response failed
+						tmpRowResult := rowResultMap[previousTable.GetTableName()][index]
+						index++
+						if tmpRowResult.GetIsOk() { // new response success
+							*previousRowResult.IsOk = true
+							previousRowResult.Row = tmpRowResult.GetRow()
+							previousRowResult.Consumed = tmpRowResult.GetConsumed()
+						} else {
+							*previousRowResult.IsOk = false // new response failed
+							previousRowResult.Error = tmpRowResult.GetError()
+							previousRowResult.Row = tmpRowResult.GetRow()
+						}
+					}
+				}
+			}
+			return nil
+		}
+	default:
+		return fmt.Errorf("unsupport batch handle function: %s", uri)
+	}
+}
+
+func generateBatchRequest(resp proto.Message, originRequest proto.Message, uri string) ([]byte, bool, error) {
+	// if all success or failure could not retry: return nil, false, nil
+	// if partition failed and could retry: return nextRequest, true, nil
+	respContainsFailedRows := false
+	switch uri {
+	case batchWriteRowUri:
+		tmpReq := new(otsprotocol.BatchWriteRowRequest)
+		var tablesInBatch []*otsprotocol.TableInBatchWriteRowRequest
+		// parse originRequest into map
+		rowRequestMap := map[string][]*otsprotocol.RowInBatchWriteRowRequest{}
+		for _, tableRequest := range originRequest.(*otsprotocol.BatchWriteRowRequest).Tables {
+			rowRequestMap[tableRequest.GetTableName()] = tableRequest.GetRows()
+		}
+
+		for _, table := range resp.(*otsprotocol.BatchWriteRowResponse).Tables {
+			tmpTable := new(otsprotocol.TableInBatchWriteRowRequest)
+			tmpTable.TableName = proto.String(table.GetTableName())
+			index := 0
+			for _, rowResult := range table.GetRows() {
+				if !rowResult.GetIsOk() {
+					// 只有所有失败的行可重试时，批量操作才可以重试
+					if !shouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
+						return nil, false, nil
+					}
+					respContainsFailedRows = true
+					tmpTable.Rows = append(tmpTable.Rows, rowRequestMap[table.GetTableName()][index])
+				}
+				index++
+			}
+			if len(tmpTable.GetRows()) != 0 {
+				tablesInBatch = append(tablesInBatch, tmpTable)
+			}
+		}
+		tmpReq.Tables = tablesInBatch
+		tmpReq.IsAtomic = proto.Bool(originRequest.(*otsprotocol.BatchWriteRowRequest).GetIsAtomic())
+		// TODO: set TransactionId after go sdk support transaction.
+		newRequest, err := proto.Marshal(tmpReq)
+		return newRequest, respContainsFailedRows, err
+	case batchGetRowUri:
+		tmpReq := new(otsprotocol.BatchGetRowRequest)
+		// parse originRequest into map
+		rowRequestMap := map[string]*otsprotocol.TableInBatchGetRowRequest{}
+		for _, rowRequest := range originRequest.(*otsprotocol.BatchGetRowRequest).Tables {
+			rowRequestMap[rowRequest.GetTableName()] = rowRequest
+		}
+
+		for _, table := range resp.(*otsprotocol.BatchGetRowResponse).Tables {
+			tableRequest := new(otsprotocol.TableInBatchGetRowRequest)
+			tableRequest.TableName = rowRequestMap[table.GetTableName()].TableName
+			tableRequest.Token = rowRequestMap[table.GetTableName()].GetToken()
+			tableRequest.ColumnsToGet = rowRequestMap[table.GetTableName()].ColumnsToGet
+			tableRequest.TimeRange = rowRequestMap[table.GetTableName()].TimeRange
+			tableRequest.MaxVersions = rowRequestMap[table.GetTableName()].MaxVersions
+			tableRequest.CacheBlocks = rowRequestMap[table.GetTableName()].CacheBlocks
+			tableRequest.ColumnsToGet = rowRequestMap[table.GetTableName()].ColumnsToGet
+			tableRequest.Filter = rowRequestMap[table.GetTableName()].Filter
+			tableRequest.StartColumn = rowRequestMap[table.GetTableName()].StartColumn
+			tableRequest.EndColumn = rowRequestMap[table.GetTableName()].EndColumn
+
+			index := 0
+			for _, rowResult := range table.GetRows() {
+				if !rowResult.GetIsOk() {
+					// 只有所有失败的行可重试时，批量操作才可以重试
+					if !shouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
+						return nil, false, nil
+					}
+
+					respContainsFailedRows = true
+					primaryKey := rowRequestMap[table.GetTableName()].GetPrimaryKey()[index]
+					if primaryKey == nil {
+						return nil, respContainsFailedRows, fmt.Errorf("can not find table '%s' with index %d", table.GetTableName(), index)
+					}
+					tableRequest.PrimaryKey = append(tableRequest.PrimaryKey, primaryKey)
+				}
+				index++
+			}
+			if len(tableRequest.PrimaryKey) != 0 {
+				tmpReq.Tables = append(tmpReq.Tables, tableRequest)
+			}
+		}
+		newRequest, err := proto.Marshal(tmpReq)
+		return newRequest, respContainsFailedRows, err
+	default:
+		return nil, respContainsFailedRows, fmt.Errorf("unsupport generate batch request handle function: %s", uri)
+	}
+}
+
+func (internalClient *internalClient) getPartitionFailedNextPause(count uint, end time.Time, lastInterval int64) int64 {
+	if internalClient.config.RetryTimes <= count || time.Now().After(end) {
+		return 0
+	}
+
+	// lock/unlock when accessing the rand from a goroutine
+	internalClient.mu.Lock()
+	value := lastInterval*2 + internalClient.random.Int63n(DefaultRetryInterval-1) + 1
+	internalClient.mu.Unlock()
+	if value > MaxRetryInterval {
+		value = MaxRetryInterval
+	}
+
+	return value
 }
 
 func (internalClient *internalClient) getNextPause(err error, count uint, end time.Time, lastInterval int64, action string) int64 {
@@ -335,7 +574,10 @@ func (internalClient *internalClient) shouldRetry(errorCode string, errorMsg str
 			return true
 		}
 	}
+	return shouldRetryViaErrorAndAction(errorCode, errorMsg, action)
+}
 
+func shouldRetryViaErrorAndAction(errorCode string, errorMsg string, action string) bool {
 	if retryNotMatterActions(errorCode, errorMsg) == true {
 		return true
 	}
@@ -360,15 +602,13 @@ func retryNotMatterActions(errorCode string, errorMsg string) bool {
 }
 
 func isIdempotent(action string) bool {
-	if action == batchGetRowUri || action == describeTableUri ||
+	return action == batchGetRowUri || action == describeTableUri ||
 		action == getRangeUri || action == getRowUri ||
 		action == listTableUri || action == listStreamUri ||
 		action == getStreamRecordUri || action == describeStreamUri ||
-		action == computeSplitsUri || action == parallelScanUri {
-		return true
-	} else {
-		return false
-	}
+		action == computeSplitsUri || action == parallelScanUri ||
+		action == searchUri || action == describeSearchIndexUri ||
+		action == listSearchIndexUri
 }
 
 func (internalClient *internalClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, string) {
@@ -533,6 +773,10 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 		req.SseSpec = sse
 	}
 
+	if request.EnableLocalTxn != nil {
+		req.EnableLocalTxn = request.EnableLocalTxn
+	}
+
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
 	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp, &response.ResponseInfo); err != nil {
@@ -555,6 +799,15 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateT
 
 	req.TableMeta.TableOptions = new(otsprotocol.TimeseriesTableOptions)
 	req.TableMeta.TableOptions.TimeToLive = proto.Int32(int32(request.GetTimeseriesTableMeta().GetTimeseriesTableOPtions().GetTimeToLive()))
+
+	for _, analyticalStore := range request.GetAnalyticalStores() {
+		req.AnalyticalStores = append(req.AnalyticalStores, &otsprotocol.TimeseriesAnalyticalStore{
+			StoreName:  proto.String(analyticalStore.StoreName),
+			TimeToLive: analyticalStore.TimeToLive,
+			SyncOption: (*otsprotocol.AnalyticalStoreSyncType)(analyticalStore.SyncOption),
+		})
+	}
+	req.EnableAnalyticalStore = proto.Bool(request.GetEnableAnalyticalStore())
 
 	resp := new(otsprotocol.CreateTimeseriesTableResponse)
 	response := &CreateTimeseriesTableResponse{}
@@ -739,6 +992,13 @@ func (timeseriesClient *TimeseriesClient) DescribeTimeseriesTable(request *Descr
 
 	if resp.GetTableMeta() != nil && resp.GetTableMeta().GetTableName() != "" {
 		response.timeseriesTableMeta = ParseTimeseriesTableMeta(resp.GetTableMeta())
+	}
+	for _, analyticalStore := range resp.GetAnalyticalStores() {
+		response.analyticalStores = append(response.analyticalStores, TimeseriesAnalyticalStore{
+			StoreName:  analyticalStore.GetStoreName(),
+			TimeToLive: analyticalStore.TimeToLive,
+			SyncOption: (*AnalyticalStoreSyncType)(analyticalStore.SyncOption),
+		})
 	}
 	return response, nil
 }
@@ -969,6 +1229,120 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesMeta(request *DeleteTi
 			failedRowResult.ErrorCode = respFailedResult.GetErrorCode()
 			response.failedRowResults = append(response.failedRowResults, failedRowResult)
 		}
+	}
+
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) CreateTimeseriesAnalyticalStore(request *CreateTimeseriesAnalyticalStoreRequest) (*CreateTimeseriesAnalyticalStoreResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.analyticalStore.StoreName == "" {
+		return nil, fmt.Errorf("not set analytical store name")
+	}
+
+	req := new(otsprotocol.CreateTimeseriesAnalyticalStoreRequest)
+	req.TableName = proto.String(request.timeseriesTableName)
+	req.AnalyticalStore = &otsprotocol.TimeseriesAnalyticalStore{
+		StoreName:  proto.String(request.analyticalStore.StoreName),
+		TimeToLive: request.analyticalStore.TimeToLive,
+		SyncOption: (*otsprotocol.AnalyticalStoreSyncType)(request.analyticalStore.SyncOption),
+	}
+
+	resp := new(otsprotocol.CreateTimeseriesAnalyticalStoreResponse)
+	response := new(CreateTimeseriesAnalyticalStoreResponse)
+
+	if err := timeseriesClient.doRequestWithRetry(createTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) DeleteTimeseriesAnalyticalStore(request *DeleteTimeseriesAnalyticalStoreRequest) (*DeleteTimeseriesAnalyticalStoreResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.analyticalStoreName == "" {
+		return nil, fmt.Errorf("not set analytical store name")
+	}
+
+	req := new(otsprotocol.DeleteTimeseriesAnalyticalStoreRequest)
+	req.TableName = proto.String(request.timeseriesTableName)
+	req.StoreName = proto.String(request.analyticalStoreName)
+
+	resp := new(otsprotocol.DeleteTimeseriesAnalyticalStoreResponse)
+	response := new(DeleteTimeseriesAnalyticalStoreResponse)
+
+	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) DescribeTimeseriesAnalyticalStore(request *DescribeTimeseriesAnalyticalStoreRequest) (*DescribeTimeseriesAnalyticalStoreResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.analyticalStoreName == "" {
+		return nil, fmt.Errorf("not set analytical store name")
+	}
+
+	req := new(otsprotocol.DescribeTimeseriesAnalyticalStoreRequest)
+	req.TableName = proto.String(request.timeseriesTableName)
+	req.StoreName = proto.String(request.analyticalStoreName)
+
+	resp := new(otsprotocol.DescribeTimeseriesAnalyticalStoreResponse)
+	response := new(DescribeTimeseriesAnalyticalStoreResponse)
+
+	if err := timeseriesClient.doRequestWithRetry(describeTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
+	}
+
+	response.AnalyticalStore = &TimeseriesAnalyticalStore{
+		StoreName:  resp.GetAnalyticalStore().GetStoreName(),
+		TimeToLive: resp.GetAnalyticalStore().TimeToLive,
+		SyncOption: (*AnalyticalStoreSyncType)(resp.GetAnalyticalStore().SyncOption),
+	}
+	if resp.StorageSize != nil {
+		response.StorageSize = &AnalyticalStoreStorageSize{
+			Size:      resp.GetStorageSize().GetSize(),
+			Timestamp: resp.GetStorageSize().GetTimestamp(),
+		}
+	}
+	if resp.SyncStat != nil {
+		response.SyncStat = &AnalyticalStoreSyncStat{
+			CurrentSyncTimestamp: resp.GetSyncStat().GetCurrentSyncTimestamp(),
+			SyncPhase:            (AnalyticalStoreSyncType)(resp.GetSyncStat().GetSyncPhase()),
+		}
+	}
+
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) UpdateTimeseriesAnalyticalStore(request *UpdateTimeseriesAnalyticalStoreRequest) (*UpdateTimeseriesAnalyticalStoreResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.analyticalStore.StoreName == "" {
+		return nil, fmt.Errorf("not set analytical store name")
+	}
+
+	req := new(otsprotocol.UpdateTimeseriesAnalyticalStoreRequest)
+	req.TableName = proto.String(request.timeseriesTableName)
+	req.AnalyticalStore = &otsprotocol.TimeseriesAnalyticalStore{
+		StoreName:  proto.String(request.analyticalStore.StoreName),
+		TimeToLive: request.analyticalStore.TimeToLive,
+		SyncOption: (*otsprotocol.AnalyticalStoreSyncType)(request.analyticalStore.SyncOption),
+	}
+
+	resp := new(otsprotocol.UpdateTimeseriesAnalyticalStoreResponse)
+	response := new(UpdateTimeseriesAnalyticalStoreResponse)
+
+	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+		return nil, err
 	}
 
 	return response, nil
@@ -1500,7 +1874,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	resp := new(otsprotocol.BatchGetRowResponse)
 
 	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
-	if err := tableStoreClient.doRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doBatchRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
@@ -1595,7 +1969,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	resp := new(otsprotocol.BatchWriteRowResponse)
 	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
-	if err := tableStoreClient.doRequestWithRetry(batchWriteRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doBatchRequestWithRetry(batchWriteRowUri, req, resp, &response.ResponseInfo); err != nil {
 		return nil, err
 	}
 
@@ -1699,6 +2073,12 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		req.EndColumn = request.RangeRowQueryCriteria.EndColumn
 	}
 
+	req.DataBlockTypeHint = toPBDataBlockType(request.RangeRowQueryCriteria.DataBlockType)
+	req.CompressTypeHint = toPBCompressType(request.RangeRowQueryCriteria.CompressType)
+	if request.RangeRowQueryCriteria.ReturnSpecifiedPkOnly {
+		req.ReturnEntirePrimaryKeys = proto.Bool(false)
+	}
+
 	req.InclusiveStartPrimaryKey = request.RangeRowQueryCriteria.StartPrimaryKey.Build(false)
 	req.ExclusiveEndPrimaryKey = request.RangeRowQueryCriteria.EndPrimaryKey.Build(false)
 
@@ -1710,6 +2090,13 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	response.ConsumedCapacityUnit.Read = *resp.Consumed.CapacityUnit.Read
 	response.ConsumedCapacityUnit.Write = *resp.Consumed.CapacityUnit.Write
+
+	compressType, err := parseProtocolCompressType(resp.GetCompressType())
+	if err != nil {
+		return nil, err
+	}
+	response.CompressType = compressType
+
 	if len(resp.NextStartPrimaryKey) != 0 {
 		currentRows, err := readRowsWithHeader(bytes.NewReader(resp.NextStartPrimaryKey))
 		if err != nil {
@@ -1727,13 +2114,58 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 		return response, nil
 	}
 
-	rows, err := readRowsWithHeader(bytes.NewReader(resp.Rows))
+	switch resp.GetDataBlockType() {
+	case otsprotocol.DataBlockType_DBT_PLAIN_BUFFER:
+		rows, err := parsePlainBufferRows(resp.Rows)
+		if err != nil {
+			return nil, err
+		}
+		response.Rows = rows
+		response.DataBlockType = PlainBuffer
+	case otsprotocol.DataBlockType_DBT_SIMPLE_ROW_MATRIX:
+		rows, err := parseMatrixRows(resp.Rows)
+		if err != nil {
+			return nil, err
+		}
+		response.Rows = rows
+		response.DataBlockType = SimpleRowMatrix
+	default:
+		return nil, fmt.Errorf("unknow data block type %d", resp.GetDataBlockType())
+	}
+	return response, nil
+}
+
+func toPBCompressType(compressType CompressType) *otsprotocol.CompressType {
+	switch compressType {
+	case None:
+		return otsprotocol.CompressType_CPT_NONE.Enum()
+	default:
+		// return CompressType_CPT_NONE
+		return otsprotocol.CompressType_CPT_NONE.Enum()
+	}
+}
+
+func toPBDataBlockType(blockType DataBlockType) *otsprotocol.DataBlockType {
+	switch blockType {
+	case PlainBuffer:
+		return otsprotocol.DataBlockType_DBT_PLAIN_BUFFER.Enum()
+	case SimpleRowMatrix:
+		return otsprotocol.DataBlockType_DBT_SIMPLE_ROW_MATRIX.Enum()
+	default:
+		// return DataBlockType_DBT_PLAIN_BUFFER
+		return otsprotocol.DataBlockType_DBT_PLAIN_BUFFER.Enum()
+	}
+}
+
+func parsePlainBufferRows(rowBytes []byte) ([]*Row, error) {
+	pbRows, err := readRowsWithHeader(bytes.NewReader(rowBytes))
 	if err != nil {
-		return response, err
+		return nil, err
 	}
 
-	for _, row := range rows {
-		currentRow := &Row{}
+	rows := make([]*Row, len(pbRows))
+	for i, row := range pbRows {
+		currentRow := new(Row)
 		currentpk := new(PrimaryKey)
 		for _, pk := range row.primaryKey {
 			pkColumn := &PrimaryKeyColumn{ColumnName: string(pk.cellName), Value: pk.cellValue.Value}
@@ -1747,11 +2179,9 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 
-		response.Rows = append(response.Rows, currentRow)
+		rows[i] = currentRow
 	}
-
-	return response, nil
-
+	return rows, nil
 }
 
 func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryResponse, error) {
@@ -1759,6 +2189,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 	pbReq := &otsprotocol.SQLQueryRequest{}
 	pbReq.Query = &req.Query
 	pbReq.Version = otsprotocol.SQLPayloadVersion_SQL_FLAT_BUFFERS.Enum()
+	pbReq.SqlVersion = proto.Int64(1)
 
 	// do request
 	pbResp := otsprotocol.SQLQueryResponse{}
@@ -1769,14 +2200,14 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 
 	response.StmtType = formatSQLStmtTypeFromPB(pbResp.GetType())
 	if pbResp.GetVersion() == otsprotocol.SQLPayloadVersion_SQL_PLAIN_BUFFER {
-		rs, err := newSQLResultSetFromPlainBuffer(pbResp.Rows)
+		rs, err := NewSQLResultSetFromPlainBuffer(pbResp.Rows)
 		if err != nil {
 			return nil, err
 		}
 		response.ResultSet = rs
 		response.PayloadVersion = SQLPAYLOAD_PLAIN_BUFFER
 	} else if pbResp.GetVersion() == otsprotocol.SQLPayloadVersion_SQL_FLAT_BUFFERS {
-		rs, err := newSQLResultSetFromFlatBuffers(pbResp.Rows)
+		rs, err := NewSQLResultSetFromFlatBuffers(pbResp.Rows)
 		if err != nil {
 			return nil, err
 		}

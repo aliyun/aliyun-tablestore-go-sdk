@@ -8,6 +8,7 @@ func SQLQuerySample(client *tablestore.TableStoreClient) {
 	SQLCreateTableSample(client)
 	SQLDescribeTableSample(client)
 	SQLSelectSample(client)
+	SQLSelectTimeTypeSample(client)
 }
 
 func SQLShowTablesSample(client *tablestore.TableStoreClient) {
@@ -126,6 +127,72 @@ func SQLSelectSample(client *tablestore.TableStoreClient) {
 			case tablestore.ColumnType_BOOLEAN:
 				println(row.GetBool(i))
 				println(row.GetBoolByName(name))
+			}
+		}
+	}
+	println("END SQLSelectSample")
+}
+
+func SQLSelectTimeTypeSample(client *tablestore.TableStoreClient) {
+	println("BEGIN SQLSelectSample")
+	request := new(tablestore.SQLQueryRequest)
+	request.Query = "select from_unixtime(1668585138.995),timediff(from_unixtime(1668585138.995),from_unixtime(1668585013.712)),date(from_unixtime(1668585138.995))"
+	response, err := client.SQLQuery(request)
+	if err != nil {
+		println("[Info]: select failed with error: ", err.Error())
+		return
+	}
+
+	resultSet := response.ResultSet
+	columns := resultSet.Columns()
+	for resultSet.HasNext() {
+		row := resultSet.Next()
+		for i := 0; i < len(columns); i++ {
+			name := columns[i].Name
+			println("columnName: ", name)
+			isnull, err := row.IsNull(i)
+			if err != nil {
+				println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				continue
+			}
+			if isnull {
+				println("[INFO]: column is SQL NULL, name: ", name)
+				continue
+			}
+			switch columns[i].Type {
+			case tablestore.ColumnType_DATETIME:
+				time, err := row.GetDateTime(i)
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(time.String())
+				time, err = row.GetDateTimeByName("from_unixtime(1668585138.995)")
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(time.String())
+			case tablestore.ColumnType_TIME:
+				duration, err := row.GetTime(i)
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(duration.String())
+				duration, err = row.GetTimeByName("timediff(from_unixtime(1668585138.995),from_unixtime(1668585013.712))")
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(duration.String())
+			case tablestore.ColumnType_DATE:
+				date, err := row.GetDate(i)
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(date.String())
+				date, err = row.GetDateByName("date(from_unixtime(1668585138.995))")
+				if err != nil {
+					println("[INFO:] get column error, name: ", name, ", error: ", err.Error())
+				}
+				println(date.String())
 			}
 		}
 	}

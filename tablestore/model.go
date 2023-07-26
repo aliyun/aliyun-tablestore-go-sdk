@@ -102,6 +102,7 @@ type CreateTableRequest struct {
 	StreamSpec         *StreamSpecification
 	IndexMetas         []*IndexMeta
 	SSESpecification   *SSESpecification
+	EnableLocalTxn     *bool
 }
 
 type CreateIndexRequest struct {
@@ -587,8 +588,8 @@ type BatchGetRowResponse struct {
 	ResponseInfo
 }
 
-//IsAtomic设置是否为批量原子写
-//如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
+// IsAtomic设置是否为批量原子写
+// 如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
 type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
 	IsAtomic               bool
@@ -606,6 +607,39 @@ const (
 	BACKWARD Direction = 1
 )
 
+type DataBlockType int
+
+const (
+	PlainBuffer DataBlockType = iota
+	SimpleRowMatrix
+)
+
+func parseProtocolDataBlockType(pbType otsprotocol.DataBlockType) (DataBlockType, error) {
+	switch pbType {
+	case otsprotocol.DataBlockType_DBT_PLAIN_BUFFER:
+		return PlainBuffer, nil
+	case otsprotocol.DataBlockType_DBT_SIMPLE_ROW_MATRIX:
+		return SimpleRowMatrix, nil
+	default:
+		return DataBlockType(-1), fmt.Errorf("unknown DataBlockType %d", pbType)
+	}
+}
+
+type CompressType int
+
+const (
+	None CompressType = iota
+)
+
+func parseProtocolCompressType(pbType otsprotocol.CompressType) (CompressType, error) {
+	switch pbType {
+	case otsprotocol.CompressType_CPT_NONE:
+		return None, nil
+	default:
+		return CompressType(-1), fmt.Errorf("unknow CompressType %d", pbType)
+	}
+}
+
 type RangeRowQueryCriteria struct {
 	TableName       string
 	StartPrimaryKey *PrimaryKey
@@ -619,6 +653,16 @@ type RangeRowQueryCriteria struct {
 	StartColumn     *string
 	EndColumn       *string
 	TransactionId   *string
+
+	// DataBlockType指定对服务器端返回的数据编码格式，未设置相当于DataBlockType.PLAIN_BUFFER.
+	DataBlockType DataBlockType
+
+	// 当columnsToGet不为空，且不包含所有主键列时，ReturnSpecifiedPkOnly为false时会返回全部主键列,
+	// 若为true，则只返回columnsToGet中指定的主键列.
+	ReturnSpecifiedPkOnly bool
+
+	// CompressType指定服务端返回的数据的压缩类型，未设置相当于CompressType.NONE.
+	CompressType CompressType
 }
 
 type GetRangeRequest struct {
@@ -634,6 +678,8 @@ type GetRangeResponse struct {
 	Rows                 []*Row
 	ConsumedCapacityUnit *ConsumedCapacityUnit
 	NextStartPrimaryKey  *PrimaryKey
+	DataBlockType        DataBlockType
+	CompressType         CompressType
 	ResponseInfo
 }
 
@@ -1025,11 +1071,15 @@ func (timeseriesTableMeta *TimeseriesTableMeta) GetTimeseriesTableOPtions() *Tim
 }
 
 type CreateTimeseriesTableRequest struct {
-	timeseriesTableMeta *TimeseriesTableMeta
+	timeseriesTableMeta   *TimeseriesTableMeta
+	analyticalStores      []*TimeseriesAnalyticalStore
+	enableAnalyticalStore bool
 }
 
 func NewCreateTimeseriesTableRequest() *CreateTimeseriesTableRequest {
-	return &CreateTimeseriesTableRequest{}
+	return &CreateTimeseriesTableRequest{
+		enableAnalyticalStore: true,
+	}
 }
 
 func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetTimeseriesTableMeta(timeseriesTableMeta *TimeseriesTableMeta) {
@@ -1038,6 +1088,22 @@ func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetTimeseriesT
 
 func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetTimeseriesTableMeta() *TimeseriesTableMeta {
 	return createTimeseriesTableRequest.timeseriesTableMeta
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetAnalyticalStores(analyticalStores []*TimeseriesAnalyticalStore) {
+	createTimeseriesTableRequest.analyticalStores = analyticalStores
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetAnalyticalStores() []*TimeseriesAnalyticalStore {
+	return createTimeseriesTableRequest.analyticalStores
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetEnableAnalyticalStore(enableAnalyticalStore bool) {
+	createTimeseriesTableRequest.enableAnalyticalStore = enableAnalyticalStore
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetEnableAnalyticalStore() bool {
+	return createTimeseriesTableRequest.enableAnalyticalStore
 }
 
 type CreateTimeseriesTableResponse struct {
@@ -1351,11 +1417,16 @@ func (describeTimeseriesReq *DescribeTimeseriesTableRequest) GetTimeseriesTableN
 
 type DescribeTimeseriesTableResponse struct {
 	timeseriesTableMeta *TimeseriesTableMeta
+	analyticalStores    []TimeseriesAnalyticalStore
 	ResponseInfo
 }
 
 func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetTimeseriesTableMeta() *TimeseriesTableMeta {
 	return describeTimeseriesTableResp.timeseriesTableMeta
+}
+
+func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetAnalyticalStores() []TimeseriesAnalyticalStore {
+	return describeTimeseriesTableResp.analyticalStores
 }
 
 type ListTimeseriesTableRequest struct {
@@ -2171,5 +2242,120 @@ func (updateTimeseriesTableReq *UpdateTimeseriesTableRequest) GetTimeseriesTable
 }
 
 type UpdateTimeseriesTableResponse struct {
+	ResponseInfo
+}
+
+type TimeseriesAnalyticalStore struct {
+	StoreName  string
+	TimeToLive *int32
+	SyncOption *AnalyticalStoreSyncType
+}
+
+func NewTimeseriesAnalyticalStore(analyticalStoreName string) *TimeseriesAnalyticalStore {
+	return &TimeseriesAnalyticalStore{
+		StoreName: analyticalStoreName,
+	}
+}
+
+func (analyticalStore *TimeseriesAnalyticalStore) SetTimeToLive(timeToLive int32) {
+	analyticalStore.TimeToLive = &timeToLive
+}
+
+func (analyticalStore *TimeseriesAnalyticalStore) SetSyncOption(syncOption AnalyticalStoreSyncType) {
+	analyticalStore.SyncOption = &syncOption
+}
+
+type AnalyticalStoreSyncType int32
+
+func (analyticalStoreSyncType AnalyticalStoreSyncType) String() string {
+	switch analyticalStoreSyncType {
+	case SYNC_TYPE_FULL:
+		return "SYNC_TYPE_FULL"
+	case SYNC_TYPE_INCR:
+		return "SYNC_TYPE_INCR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+const (
+	SYNC_TYPE_FULL AnalyticalStoreSyncType = 1
+	SYNC_TYPE_INCR AnalyticalStoreSyncType = 2
+)
+
+type AnalyticalStoreSyncStat struct {
+	SyncPhase            AnalyticalStoreSyncType
+	CurrentSyncTimestamp int64
+}
+
+type AnalyticalStoreStorageSize struct {
+	Size      int64
+	Timestamp int64
+}
+
+type CreateTimeseriesAnalyticalStoreRequest struct {
+	timeseriesTableName string
+	analyticalStore     *TimeseriesAnalyticalStore
+}
+
+func NewCreateTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStore *TimeseriesAnalyticalStore) *CreateTimeseriesAnalyticalStoreRequest {
+	return &CreateTimeseriesAnalyticalStoreRequest{
+		timeseriesTableName: timeseriesTableName,
+		analyticalStore:     analyticalStore,
+	}
+}
+
+type CreateTimeseriesAnalyticalStoreResponse struct {
+	ResponseInfo
+}
+
+type DeleteTimeseriesAnalyticalStoreRequest struct {
+	timeseriesTableName string
+	analyticalStoreName string
+}
+
+func NewDeleteTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStoreName string) *DeleteTimeseriesAnalyticalStoreRequest {
+	return &DeleteTimeseriesAnalyticalStoreRequest{
+		timeseriesTableName: timeseriesTableName,
+		analyticalStoreName: analyticalStoreName,
+	}
+}
+
+type DeleteTimeseriesAnalyticalStoreResponse struct {
+	ResponseInfo
+}
+
+type DescribeTimeseriesAnalyticalStoreRequest struct {
+	timeseriesTableName string
+	analyticalStoreName string
+}
+
+func NewDescribeTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStoreName string) *DescribeTimeseriesAnalyticalStoreRequest {
+	return &DescribeTimeseriesAnalyticalStoreRequest{
+		timeseriesTableName: timeseriesTableName,
+		analyticalStoreName: analyticalStoreName,
+	}
+}
+
+type DescribeTimeseriesAnalyticalStoreResponse struct {
+	ResponseInfo
+	AnalyticalStore *TimeseriesAnalyticalStore
+	SyncStat        *AnalyticalStoreSyncStat
+	StorageSize     *AnalyticalStoreStorageSize
+}
+
+type UpdateTimeseriesAnalyticalStoreRequest struct {
+	timeseriesTableName string
+	analyticalStore     *TimeseriesAnalyticalStore
+}
+
+func NewUpdateTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStore *TimeseriesAnalyticalStore) *UpdateTimeseriesAnalyticalStoreRequest {
+	return &UpdateTimeseriesAnalyticalStoreRequest{
+		timeseriesTableName: timeseriesTableName,
+		analyticalStore:     analyticalStore,
+	}
+}
+
+type UpdateTimeseriesAnalyticalStoreResponse struct {
 	ResponseInfo
 }

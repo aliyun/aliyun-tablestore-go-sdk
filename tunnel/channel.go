@@ -419,6 +419,10 @@ func (c *channelConn) processRecords(inCh chan *pipeResult) (bool, error) {
 		return false, ret.error
 	}
 	if ret.finished {
+		c.p.SetFinished(true)
+		c.p.Shutdown()
+		c.lg.Info("channel read finished", zap.String("tunnelId", c.tunnelId), zap.String("clientId", c.clientId),
+			zap.String("channelId", c.channelId))
 		return true, nil
 	}
 	s := time.Now()

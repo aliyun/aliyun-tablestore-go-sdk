@@ -6,9 +6,10 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/golang/protobuf/proto"
 )
 
-/**
+/*
 CreateTimeseriesTableSample 创建一个时序表，其中表名为：timeseriesTableName，TTL为：timetolive。
 */
 func CreateTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string, timetoLive int64) {
@@ -65,7 +66,7 @@ func ListTimeseriesTableSample(client *tablestore.TimeseriesClient) {
 	fmt.Println("[Info]: ListTimeseriesTableSample finished !")
 }
 
-/**
+/*
 DeleteTimeseriesTableSample 删除实例中表名为timeseriesTableName的时序表
 */
 func DeleteTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
@@ -273,4 +274,63 @@ func UpdateTimeseriesMetaSample(tsClient *tablestore.TimeseriesClient, timeserie
 	QueryTimeseriesMetaSample(tsClient, timeseriesTableName)
 
 	fmt.Println("[Info]: UpdateTimeseriesMetaSample finished !")
+}
+
+// CreateTimeseriesTableWithAnalyticalStoreSample 创建时序表，并且创建分析存储
+func CreateTimeseriesTableWithAnalyticalStoreSample(tsClient *tablestore.TimeseriesClient, timeseriesTableName string) {
+	fmt.Println("[Info]: Begin to create timeseries table with analytical store !")
+
+	// 创建时序表
+	meta := tablestore.NewTimeseriesTableMeta(timeseriesTableName)
+	meta.SetTimeseriesTableOptions(tablestore.NewTimeseriesTableOptions(-1))
+	createTimeseriesTableRequest := tablestore.NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetAnalyticalStores([]*tablestore.TimeseriesAnalyticalStore{{
+		StoreName:  "custom_analytical_store", // 分析存储名称
+		TimeToLive: proto.Int32(-1),           // 分析存储数据的过期时间，单位为秒，-1表示永不过期
+	}})
+	_, err := tsClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	if err != nil {
+		fmt.Println("[Error]: Create timeseries table failed with error: ", err)
+		return
+	}
+
+	fmt.Println("[Info]: Create timeseries table with analytical store succeed !")
+}
+
+// DescribeTimeseriesAnalyticalStoresSample 列出时序表下面所有的分析存储，并且打印出分析存储的同步状态和存储大小
+func DescribeTimeseriesAnalyticalStoresSample(tsClient *tablestore.TimeseriesClient, timeseriesTableName string) {
+	fmt.Println("[Info]: Begin to describe timeseries analytical stores !")
+
+	describeTimeseriesTableRequest := tablestore.NewDescribeTimeseriesTableRequset(timeseriesTableName)
+	describeTimeseriesTableResponse, err := tsClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	if err != nil {
+		fmt.Println("[Error]: Describe timeseries table failed with error: ", err)
+		return
+	}
+
+	analyticalStores := describeTimeseriesTableResponse.GetAnalyticalStores()
+	for _, analyticalStore := range analyticalStores {
+		describeAnalyticalStoreRequest := tablestore.NewDescribeTimeseriesAnalyticalStoreRequest(timeseriesTableName, analyticalStore.StoreName)
+		describeAnalyticalStoreResponse, err := tsClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+		if err != nil {
+			fmt.Println("[Error]: Describe analytical store failed with error: ", err)
+			return
+		}
+		fmt.Println("	[Info]: StoreName: ", describeAnalyticalStoreResponse.AnalyticalStore.StoreName)
+		fmt.Println("	[Info]: TimeToLive: ", describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive)
+		fmt.Println("	[Info]: SyncOption: ", describeAnalyticalStoreResponse.AnalyticalStore.SyncOption)
+		syncStat := describeAnalyticalStoreResponse.SyncStat
+		if syncStat != nil {
+			fmt.Println("	[Info]: CurrentSyncTimestamp: ", syncStat.CurrentSyncTimestamp)
+			fmt.Println("	[Info]: SyncPhase: ", syncStat.SyncPhase)
+		}
+		storageSize := describeAnalyticalStoreResponse.StorageSize
+		if storageSize != nil {
+			fmt.Println("	[Info]: Size: ", storageSize.Size)
+			fmt.Println("	[Info]: Timestamp: ", storageSize.Timestamp)
+		}
+	}
+
+	fmt.Println("[Info]: DescribeTimeseriesAnalyticalStoresSample finished !")
 }

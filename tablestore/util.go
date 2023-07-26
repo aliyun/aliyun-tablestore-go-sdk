@@ -9,6 +9,7 @@ import (
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
@@ -25,11 +26,14 @@ const (
 type ColumnType int32
 
 const (
-	ColumnType_STRING  ColumnType = 1
-	ColumnType_INTEGER ColumnType = 2
-	ColumnType_BOOLEAN ColumnType = 3
-	ColumnType_DOUBLE  ColumnType = 4
-	ColumnType_BINARY  ColumnType = 5
+	ColumnType_STRING   ColumnType = 1
+	ColumnType_INTEGER  ColumnType = 2
+	ColumnType_BOOLEAN  ColumnType = 3
+	ColumnType_DOUBLE   ColumnType = 4
+	ColumnType_BINARY   ColumnType = 5
+	ColumnType_DATETIME ColumnType = 6
+	ColumnType_TIME     ColumnType = 7
+	ColumnType_DATE     ColumnType = 8
 )
 
 func (t *ColumnType) String() string {
@@ -75,7 +79,7 @@ func NewColumnValue(columnType ColumnType, value interface{}) *ColumnValue {
 func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	writeTag(w, TAG_CELL_VALUE)
 	if cv == nil {
-		writeRawLittleEndian32(w, 1)
+		WriteRawLittleEndian32(w, 1)
 		writeRawByte(w, VT_AUTO_INCREMENT)
 		return
 	}
@@ -84,40 +88,40 @@ func (cv *ColumnValue) writeCellValue(w io.Writer) {
 	case ColumnType_STRING:
 		v := cv.Value.(string)
 
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
+		WriteRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
 		writeRawByte(w, VT_STRING)
-		writeRawLittleEndian32(w, int32(len(v)))
+		WriteRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, []byte(v))
 
 	case ColumnType_INTEGER:
 		v := cv.Value.(int64)
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_64_SIZE+1))
+		WriteRawLittleEndian32(w, int32(LITTLE_ENDIAN_64_SIZE+1))
 		writeRawByte(w, VT_INTEGER)
 		writeRawLittleEndian64(w, v)
 	case ColumnType_BOOLEAN:
 		v := cv.Value.(bool)
-		writeRawLittleEndian32(w, 2)
+		WriteRawLittleEndian32(w, 2)
 		writeRawByte(w, VT_BOOLEAN)
 		writeBoolean(w, v)
 
 	case ColumnType_DOUBLE:
 		v := cv.Value.(float64)
 
-		writeRawLittleEndian32(w, LITTLE_ENDIAN_64_SIZE+1)
+		WriteRawLittleEndian32(w, LITTLE_ENDIAN_64_SIZE+1)
 		writeRawByte(w, VT_DOUBLE)
 		writeDouble(w, v)
 
 	case ColumnType_BINARY:
 		v := cv.Value.([]byte)
 
-		writeRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
+		WriteRawLittleEndian32(w, int32(LITTLE_ENDIAN_32_SIZE+1+len(v))) // length + type + value
 		writeRawByte(w, VT_BLOB)
-		writeRawLittleEndian32(w, int32(len(v)))
+		WriteRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, v)
 	}
 }
 
-func (cv *ColumnValue) writeCellValueWithoutLengthPrefix() []byte {
+func (cv *ColumnValue) WriteCellValueWithoutLengthPrefix() []byte {
 	var b bytes.Buffer
 	w := &b
 	switch cv.Type {
@@ -125,7 +129,7 @@ func (cv *ColumnValue) writeCellValueWithoutLengthPrefix() []byte {
 		v := cv.Value.(string)
 
 		writeRawByte(w, VT_STRING)
-		writeRawLittleEndian32(w, int32(len(v)))
+		WriteRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, []byte(v))
 
 	case ColumnType_INTEGER:
@@ -147,7 +151,7 @@ func (cv *ColumnValue) writeCellValueWithoutLengthPrefix() []byte {
 		v := cv.Value.([]byte)
 
 		writeRawByte(w, VT_BLOB)
-		writeRawLittleEndian32(w, int32(len(v)))
+		WriteRawLittleEndian32(w, int32(len(v)))
 		writeBytes(w, v)
 	}
 
@@ -382,19 +386,19 @@ func (pkc *PrimaryKeyColumnInner) writePrimaryKeyColumn(w io.Writer) {
 	writeCellName(w, []byte(pkc.Name))
 	if pkc.isInfMin() {
 		writeTag(w, TAG_CELL_VALUE)
-		writeRawLittleEndian32(w, 1)
+		WriteRawLittleEndian32(w, 1)
 		writeRawByte(w, VT_INF_MIN)
 		return
 	}
 	if pkc.isInfMax() {
 		writeTag(w, TAG_CELL_VALUE)
-		writeRawLittleEndian32(w, 1)
+		WriteRawLittleEndian32(w, 1)
 		writeRawByte(w, VT_INF_MAX)
 		return
 	}
 	if pkc.isAutoInc() {
 		writeTag(w, TAG_CELL_VALUE)
-		writeRawLittleEndian32(w, 1)
+		WriteRawLittleEndian32(w, 1)
 		writeRawByte(w, VT_AUTO_INCREMENT)
 		return
 	}
@@ -579,7 +583,7 @@ func NewSingleColumnValueFilter(condition *SingleColumnCondition) *otsprotocol.S
 	filter.Comparator = &comparatorType
 	filter.ColumnName = condition.ColumnName
 	col := NewColumn([]byte(*condition.ColumnName), condition.ColumnValue)
-	filter.ColumnValue = col.toPlainBufferCell(false).cellValue.writeCellValueWithoutLengthPrefix()
+	filter.ColumnValue = col.toPlainBufferCell(false).cellValue.WriteCellValueWithoutLengthPrefix()
 	filter.FilterIfMissing = proto.Bool(condition.FilterIfMissing)
 	filter.LatestVersionOnly = proto.Bool(condition.LatestVersionOnly)
 	if condition.TransferRule != nil {
@@ -1125,4 +1129,8 @@ func SetCredentialsProvider(provider common.CredentialsProvider) ClientOption {
 	return func(client *TableStoreClient) {
 		client.credentialsProvider = provider
 	}
+}
+
+func fromUnixMicrosTimestamp(timestamp int64) time.Time {
+	return time.Unix(timestamp/1e6, (timestamp%1e6)*1e3)
 }

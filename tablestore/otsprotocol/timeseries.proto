@@ -14,6 +14,8 @@ message TimeseriesTableMeta {
 
 message CreateTimeseriesTableRequest {
   required TimeseriesTableMeta table_meta = 1;
+  repeated TimeseriesAnalyticalStore analytical_stores = 3;
+  optional bool enable_analytical_store = 4;
 }
 
 message CreateTimeseriesTableResponse {
@@ -47,6 +49,7 @@ message DescribeTimeseriesTableRequest {
 
 message DescribeTimeseriesTableResponse {
   required TimeseriesTableMeta table_meta = 1;
+  repeated TimeseriesAnalyticalStore analytical_stores = 2;
 }
 
 enum MetaQueryConditionType {
@@ -234,3 +237,56 @@ message TimeseriesRow {
 message TimeseriesPBRows {
   repeated TimeseriesRow rows = 1;
 }
+
+enum AnalyticalStoreSyncType {
+  SYNC_TYPE_FULL = 1;	// 全量构建
+  SYNC_TYPE_INCR = 2;	// 增量构建
+}
+
+message TimeseriesAnalyticalStore {
+  optional string store_name = 1;	      // 存储名称
+  optional int32 time_to_live = 2;    // 存储数据TTL
+  optional AnalyticalStoreSyncType sync_option = 3;	// 全量或者增量构建
+}
+
+message AnalyticalStoreSyncStat {
+  optional AnalyticalStoreSyncType sync_phase = 1;				// 构建状态
+  optional int64 current_sync_timestamp = 2;// 最新同步时间
+}
+
+message AnalyticalStoreStorageSize {
+  optional int64 size = 1;			// 分析存储占用存储大小
+  optional int64 timestamp = 2;	// 统计时间
+}
+
+message CreateTimeseriesAnalyticalStoreRequest {
+  required string table_name = 1;
+  optional TimeseriesAnalyticalStore analytical_store = 2;	// 需要创建的时序分析存储
+}
+
+message CreateTimeseriesAnalyticalStoreResponse {}
+
+message DeleteTimeseriesAnalyticalStoreRequest {
+  required string table_name = 1;
+  required string store_name = 2;
+}
+
+message DeleteTimeseriesAnalyticalStoreResponse {}
+
+message DescribeTimeseriesAnalyticalStoreRequest {
+  required string table_name = 1;
+  required string store_name = 2;
+}
+
+message DescribeTimeseriesAnalyticalStoreResponse {
+  optional TimeseriesAnalyticalStore analytical_store = 1;
+  optional AnalyticalStoreSyncStat sync_stat = 2;
+  optional AnalyticalStoreStorageSize storage_size = 3;
+}
+
+message UpdateTimeseriesAnalyticalStoreRequest {
+  required string table_name = 1;
+  required TimeseriesAnalyticalStore analytical_store = 2;
+}
+
+message UpdateTimeseriesAnalyticalStoreResponse {}
