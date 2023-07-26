@@ -3,6 +3,7 @@ package tablestore
 import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"math"
 	"math/rand"
@@ -610,4 +611,78 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 	queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 0)
+}
+
+func (s *TimeseriesSuite) TestAnalyticalStore(c *C) {
+	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store1"))
+	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store2"))
+	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store3"))
+
+	// create table with default analytical store
+	meta := NewTimeseriesTableMeta("test_analytical_store1")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	// describe table
+	describeTimeseriesTableRequest := NewDescribeTimeseriesTableRequset("test_analytical_store1")
+	describeTimeseriesTableResponse, err := timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	analyticalStores := describeTimeseriesTableResponse.GetAnalyticalStores()
+	c.Assert(len(analyticalStores), Equals, 1)
+	c.Assert(analyticalStores[0].StoreName, Equals, "default_analytical_store")
+	c.Assert(analyticalStores[0].TimeToLive, DeepEquals, proto.Int32(-1))
+	c.Assert(*analyticalStores[0].SyncOption, Equals, SYNC_TYPE_FULL)
+	// describe analytical store
+	describeAnalyticalStoreRequest := NewDescribeTimeseriesAnalyticalStoreRequest("test_analytical_store1", "default_analytical_store")
+	describeAnalyticalStoreResponse, err := timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	analyticalStore := describeAnalyticalStoreResponse.AnalyticalStore
+	c.Assert(analyticalStore.StoreName, Equals, "default_analytical_store")
+	c.Assert(analyticalStore.TimeToLive, DeepEquals, proto.Int32(-1))
+	c.Assert(*analyticalStore.SyncOption, Equals, SYNC_TYPE_FULL)
+	syncStat := describeAnalyticalStoreResponse.SyncStat
+	c.Assert(syncStat.SyncPhase, Equals, SYNC_TYPE_FULL)
+	c.Assert(syncStat.CurrentSyncTimestamp, Equals, int64(0))
+	storageSize := describeAnalyticalStoreResponse.StorageSize
+	c.Assert(storageSize, IsNil)
+
+	// create table without analytical store
+	meta = NewTimeseriesTableMeta("test_analytical_store2")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest = NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(false)
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err = timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	// describe table
+	describeTimeseriesTableRequest = NewDescribeTimeseriesTableRequset("test_analytical_store2")
+	describeTimeseriesTableResponse, err = timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	analyticalStores = describeTimeseriesTableResponse.GetAnalyticalStores()
+	c.Assert(len(analyticalStores), Equals, 0)
+
+	// create table with custom analytical store
+	syncType := SYNC_TYPE_FULL
+	meta = NewTimeseriesTableMeta("test_analytical_store3")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest = NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetAnalyticalStores([]*TimeseriesAnalyticalStore{{
+		StoreName:  "custom_analytical_store",
+		TimeToLive: proto.Int32(888888),
+		SyncOption: &syncType,
+	}})
+	_, err = timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	// describe table
+	describeTimeseriesTableRequest = NewDescribeTimeseriesTableRequset("test_analytical_store3")
+	describeTimeseriesTableResponse, err = timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	analyticalStores = describeTimeseriesTableResponse.GetAnalyticalStores()
+	c.Assert(len(analyticalStores), Equals, 1)
+	c.Assert(analyticalStores[0].StoreName, Equals, "custom_analytical_store")
+	c.Assert(analyticalStores[0].TimeToLive, DeepEquals, proto.Int32(888888))
+	c.Assert(*analyticalStores[0].SyncOption, Equals, SYNC_TYPE_FULL)
 }

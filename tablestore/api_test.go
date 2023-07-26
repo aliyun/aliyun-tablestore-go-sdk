@@ -2,11 +2,13 @@ package tablestore
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"io"
+	"log"
 	"math/rand"
 	"net/http"
 	"os"
@@ -29,11 +31,19 @@ var tableNamePrefix string
 
 var _ = Suite(&TableStoreSuite{})
 
-var defaultTableName = "defaulttable"
-var rangeQueryTableName = "rangetable"
-var sqlTableName = "test_http_query"
-var sqlTableNameWithSearch = "test_sql_with_search"
-var sqlSearchName = "test_sql_with_search_index"
+var (
+	defaultTableName       = "defaulttable"
+	rangeQueryTableName    = "rangetable"
+	sqlTableName           = "test_http_query"
+	sqlTableNameWithSearch = "test_sql_with_search"
+	sqlSearchName          = "test_sql_with_search_index"
+
+	fuzzyTableName = "fuzzytable"
+	fuzzyMetaPk1   = "pkStr"
+	fuzzyMetaPk2   = "pkBlob"
+	fuzzyMetaPk3   = "pkInt"
+	fuzzyMetaAttr  = []string{"string", "integer", "boolean", "double", "blob"}
+)
 
 // Todo: use config
 var client TableStoreApi
@@ -52,6 +62,8 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	rangeQueryTableName = tableNamePrefix + rangeQueryTableName
 	PrepareTable(defaultTableName)
 	PrepareTable2(rangeQueryTableName)
+	err := PrepareFuzzyTable(fuzzyTableName)
+	c.Assert(err, IsNil)
 	// prepare sql tables
 	deleteTable(sqlTableName)
 	deleteSearchIndex(sqlTableNameWithSearch, sqlSearchName)
@@ -63,6 +75,36 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	WaitDataSyncByMatchAllQuery(c, client, 4, sqlTableNameWithSearch, sqlSearchName, 40)
 
 	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
+}
+
+func (s *TableStoreSuite) SetUpTest(c *C) {
+
+}
+
+func (s *TableStoreSuite) TearDownTest(c *C) {
+
+}
+
+func PrepareFuzzyTable(tableName string) error {
+	client.DeleteTable(&DeleteTableRequest{TableName: tableName})
+	time.Sleep(time.Second)
+	meta := &TableMeta{
+		TableName: tableName,
+	}
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk1, PrimaryKeyType_STRING)
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk2, PrimaryKeyType_BINARY)
+	meta.AddPrimaryKeyColumn(fuzzyMetaPk3, PrimaryKeyType_INTEGER)
+	req := &CreateTableRequest{
+		TableMeta: meta,
+		TableOption: &TableOption{
+			TimeToAlive: -1,
+			MaxVersion:  1,
+		},
+		ReservedThroughput: &ReservedThroughput{0, 0},
+	}
+	_, err := client.CreateTable(req)
+	time.Sleep(time.Second)
+	return err
 }
 
 func PrepareTable(tableName string) error {
@@ -164,12 +206,12 @@ func PrepareSQLTable(tableName string) {
 
 	_, err := client.BatchWriteRow(batchReq)
 	if err != nil {
-		println("batchwriterow failed", err.Error())
+		log.Println("batchwriterow failed", err.Error())
 	}
 }
 
 func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
-	fmt.Println("Begin to create index:", searchAPITestIndexName1)
+	log.Println("Begin to create index:", searchAPITestIndexName1)
 	request := &CreateSearchIndexRequest{}
 	request.TableName = tableName
 	request.IndexName = indexName
@@ -206,10 +248,10 @@ func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
 	}
 	_, err := client.CreateSearchIndex(request)
 	if err != nil {
-		fmt.Println("failed to create search index with error: ", err.Error())
+		log.Println("failed to create search index with error: ", err.Error())
 		c.Fatal("Failed to create search index with error: ", err)
 	} else {
-		fmt.Println("Create search index finished")
+		log.Println("Create search index finished")
 	}
 }
 
@@ -241,7 +283,7 @@ func (s *TableStoreSuite) TestCreateTable(c *C) {
 
 	_, error := client.CreateTable(createtableRequest)
 	c.Check(error, Equals, nil)
-	fmt.Println("TestCreateTable finished")
+	log.Println("TestCreateTable finished")
 }
 
 func (s *TableStoreSuite) TestCreateTableWithOriginColumn(c *C) {
@@ -286,11 +328,11 @@ func (s *TableStoreSuite) TestCreateTableWithOriginColumn(c *C) {
 	c.Check(err, Equals, nil)
 	c.Check(2, Equals, len(descResp.StreamDetails.OriginColumnsToGet))
 
-	fmt.Println("TestCreateTableWithOriginColumn finished")
+	log.Println("TestCreateTableWithOriginColumn finished")
 }
 
 func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
-	fmt.Println("TestReCreateTableAndPutRow started")
+	log.Println("TestReCreateTableAndPutRow started")
 
 	tableName := tableNamePrefix + "testrecreatetable1"
 
@@ -344,7 +386,7 @@ func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
 	_, error = client.PutRow(putRowRequest)
 	c.Check(error, Equals, nil)
 
-	fmt.Println("TestReCreateTableAndPutRow finished")
+	log.Println("TestReCreateTableAndPutRow finished")
 }
 
 func (s *TableStoreSuite) TestListTable(c *C) {
@@ -352,7 +394,7 @@ func (s *TableStoreSuite) TestListTable(c *C) {
 	c.Check(error, Equals, nil)
 	defaultTableExist := false
 	for _, table := range listtables.TableNames {
-		fmt.Println(table)
+		log.Println(table)
 		if table == defaultTableName {
 			defaultTableExist = true
 			break
@@ -363,7 +405,7 @@ func (s *TableStoreSuite) TestListTable(c *C) {
 }
 
 func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
-	fmt.Println("TestUpdateAndDescribeTable started")
+	log.Println("TestUpdateAndDescribeTable started")
 	updateTableReq := new(UpdateTableRequest)
 	updateTableReq.TableName = defaultTableName
 	updateTableReq.TableOption = new(TableOption)
@@ -396,7 +438,7 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	for i, s := range describ.StreamDetails.OriginColumnsToGet {
 		c.Assert(s, Equals, updateTableReq.StreamSpec.OriginColumnsToGet[i])
 	}
-	fmt.Println("TestUpdateAndDescribeTable finished")
+	log.Println("TestUpdateAndDescribeTable finished")
 }
 
 func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
@@ -443,7 +485,7 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		c.Check(response.PrimaryKey.PrimaryKeys[1].ColumnName, Equals, "pk2")
 		c.Check(response.PrimaryKey.PrimaryKeys[1].Value.(int64) > 0, Equals, true)
 
-		fmt.Println(response.PrimaryKey.PrimaryKeys[1].Value)
+		log.Println(response.PrimaryKey.PrimaryKeys[1].Value)
 	}
 
 	describeTableReq := new(DescribeTableRequest)
@@ -453,7 +495,7 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 }
 
 func (s *TableStoreSuite) TestPutGetRow(c *C) {
-	fmt.Println("TestPutGetRow started")
+	log.Println("TestPutGetRow started")
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -562,11 +604,11 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	colmap := getResp.GetColumnMap()
 	c.Check(colmap, NotNil)
 
-	fmt.Println("TestPutGetRow finished")
+	log.Println("TestPutGetRow finished")
 }
 
 func (s *TableStoreSuite) TestCreateTableAndPutRow(c *C) {
-	fmt.Println("TestCreateTableAndPutRow finished")
+	log.Println("TestCreateTableAndPutRow finished")
 
 	tableName := tableNamePrefix + "testpkschema"
 	deleteReq := new(DeleteTableRequest)
@@ -615,11 +657,11 @@ func (s *TableStoreSuite) TestCreateTableAndPutRow(c *C) {
 	_, error = client.PutRow(putRowRequest)
 	c.Check(error, Equals, nil)
 
-	fmt.Println("TestCreateTableAndPutRow finished")
+	log.Println("TestCreateTableAndPutRow finished")
 }
 
 func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
-	fmt.Println("TestPutGetRowWithTimestamp started")
+	log.Println("TestPutGetRowWithTimestamp started")
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -667,7 +709,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(getResp.Columns[5].Value, Equals, int64(60))
 
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
-	fmt.Println("timerange", timeNow)
+	log.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
 	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 1}
 	getResp2, error := client.GetRow(getRowRequest)
@@ -676,7 +718,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 0)
 
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
-	fmt.Println("timerange", timeNow)
+	log.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
 	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 1, End: timeNow + 2}
 	getResp2, error = client.GetRow(getRowRequest)
@@ -684,7 +726,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(getResp2, NotNil)
 
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 0
-	fmt.Println("timerange", timeNow)
+	log.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
 	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 1}
 	getResp2, error = client.GetRow(getRowRequest)
@@ -692,7 +734,7 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(getResp2, NotNil)
 	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 0)
 
-	fmt.Println("timerange", timeNow)
+	log.Println("timerange", timeNow)
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
 	getRowRequest.SingleRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow - 1, End: timeNow + 2}
 	getResp2, error = client.GetRow(getRowRequest)
@@ -700,11 +742,11 @@ func (s *TableStoreSuite) TestPutGetRowWithTimestamp(c *C) {
 	c.Check(getResp2, NotNil)
 	c.Check(len(getResp2.PrimaryKey.PrimaryKeys), Equals, 1)
 
-	fmt.Println("TestPutGetRowWithTimestamp finished")
+	log.Println("TestPutGetRowWithTimestamp finished")
 }
 
 func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
-	fmt.Println("TestPutGetRowWithFilter started")
+	log.Println("TestPutGetRowWithFilter started")
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -811,11 +853,11 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 	c.Check(error, Equals, nil)
 	c.Check(getResp, NotNil)
 	c.Check(getResp.Columns[0].ColumnName, Equals, "col4")
-	fmt.Println("TestPutGetRowWithFilter finished")
+	log.Println("TestPutGetRowWithFilter finished")
 }
 
 func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
-	fmt.Println("TestPutUpdateDeleteRow started")
+	log.Println("TestPutUpdateDeleteRow started")
 	keyToUpdate := "pk1toupdate"
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
@@ -876,8 +918,8 @@ func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	deleteRowReq.DeleteRowChange.SetColumnCondition(clCondition1)
 	resp, error := client.DeleteRow(deleteRowReq)
 	c.Check(error, Equals, nil)
-	fmt.Println(resp.ConsumedCapacityUnit.Write)
-	fmt.Println(resp.ConsumedCapacityUnit.Read)
+	log.Println(resp.ConsumedCapacityUnit.Write)
+	log.Println(resp.ConsumedCapacityUnit.Read)
 
 	_, error = invalidClient.UpdateRow(updateRowRequest)
 	c.Check(error, NotNil)
@@ -885,11 +927,11 @@ func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	_, error = invalidClient.DeleteRow(deleteRowReq)
 	c.Check(error, NotNil)
 
-	fmt.Println("TestPutUpdateDeleteRow finished")
+	log.Println("TestPutUpdateDeleteRow finished")
 }
 
 func (s *TableStoreSuite) TestBatchGetRow(c *C) {
-	fmt.Println("TestBatchGetRow started")
+	log.Println("TestBatchGetRow started")
 	rowCount := 100
 	for i := 0; i < rowCount; i++ {
 		key := "batchkey" + strconv.Itoa(i)
@@ -979,11 +1021,11 @@ func (s *TableStoreSuite) TestBatchGetRow(c *C) {
 	_, error = invalidClient.BatchGetRow(batchGetReq)
 	c.Check(error, NotNil)
 
-	fmt.Println("TestBatchGetRow started")
+	log.Println("TestBatchGetRow started")
 }
 
 func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
-	fmt.Println("TestBatchGetRowWithFilter started")
+	log.Println("TestBatchGetRowWithFilter started")
 	rowCount := 100
 	for i := 0; i < rowCount; i++ {
 		key := "filterbatchkey" + strconv.Itoa(i)
@@ -1067,11 +1109,11 @@ func (s *TableStoreSuite) TestBatchGetRowWithFilter(c *C) {
 	}
 	c.Check(count, Equals, 1)
 
-	fmt.Println("TestBatchGetRowWithFilter finished")
+	log.Println("TestBatchGetRowWithFilter finished")
 }
 
 func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
-	fmt.Println("TestBatchWriteRow started")
+	log.Println("TestBatchWriteRow started")
 
 	PrepareDataInDefaultTable("updateinbatchkey1", "updateinput1")
 	PrepareDataInDefaultTable("deleteinbatchkey1", "deleteinput1")
@@ -1115,11 +1157,11 @@ func (s *TableStoreSuite) TestBatchWriteRow(c *C) {
 	_, error = invalidClient.BatchWriteRow(batchWriteReq)
 	c.Check(error, NotNil)
 
-	fmt.Println("TestBatchWriteRow finished")
+	log.Println("TestBatchWriteRow finished")
 }
 
 func (s *TableStoreSuite) TestBatchWriteRowReturnPK(c *C) {
-	fmt.Println("TestBatchWriteRowReturnPK started")
+	log.Println("TestBatchWriteRowReturnPK started")
 
 	PrepareDataInDefaultTable("updateinbatchkey1", "updateinput1")
 	PrepareDataInDefaultTable("deleteinbatchkey1", "deleteinput1")
@@ -1160,12 +1202,12 @@ func (s *TableStoreSuite) TestBatchWriteRowReturnPK(c *C) {
 		}
 	}
 
-	fmt.Println("TestBatchWriteRowReturnPK finished")
+	log.Println("TestBatchWriteRowReturnPK finished")
 
 }
 
 func (s *TableStoreSuite) TestBatchWriteRowReturnColumn(c *C) {
-	fmt.Println("TestBatchWriteRowReturnColumn started")
+	log.Println("TestBatchWriteRowReturnColumn started")
 
 	PrepareValueInDefaultTable("updateinbatchkey3", 64)
 
@@ -1189,11 +1231,11 @@ func (s *TableStoreSuite) TestBatchWriteRowReturnColumn(c *C) {
 		c.Check(rowToCheck.Columns[0].Value, Equals, int64(104))
 	}
 
-	fmt.Println("TestBatchWriteRowReturnColumn finished")
+	log.Println("TestBatchWriteRowReturnColumn finished")
 }
 
 func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
-	fmt.Println("TestAtomicBatchWriteRowWithSamePartitionKey started")
+	log.Println("TestAtomicBatchWriteRowWithSamePartitionKey started")
 
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
@@ -1238,11 +1280,11 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithSamePartitionKey(c *C) {
 	_, error = invalidClient.BatchWriteRow(batchWriteReq)
 	c.Check(error, NotNil)
 
-	fmt.Println("TestAtomicBatchWriteRowWithSamePartitionKey finished")
+	log.Println("TestAtomicBatchWriteRowWithSamePartitionKey finished")
 }
 
 func (s *TableStoreSuite) TestAtomicBatchWriteRowWithDiffPartitionKey(c *C) {
-	fmt.Println("TestAtomicBatchWriteRowWithDiffPartitionKey started")
+	log.Println("TestAtomicBatchWriteRowWithDiffPartitionKey started")
 
 	batchWriteReq := &BatchWriteRowRequest{}
 	batchWriteReq.IsAtomic = true
@@ -1267,11 +1309,122 @@ func (s *TableStoreSuite) TestAtomicBatchWriteRowWithDiffPartitionKey(c *C) {
 	_, error = invalidClient.BatchWriteRow(batchWriteReq)
 	c.Check(error, NotNil)
 
-	fmt.Println("TestAtomicBatchWriteRowWithDiffPartitionKey finished")
+	log.Println("TestAtomicBatchWriteRowWithDiffPartitionKey finished")
+}
+
+func (s *TableStoreSuite) TestFuzzyGetRangeMatrix(c *C) {
+	log.Println("TestFuzzyGetRangeMatrix started")
+	expect, err := PrepareFuzzyTableData(fuzzyTableName, 1024, 10240, 10000)
+	c.Assert(err, IsNil)
+	startPk := new(PrimaryKey)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk1)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk2)
+	startPk.AddPrimaryKeyColumnWithMinValue(fuzzyMetaPk3)
+	endPk := new(PrimaryKey)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk1)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk2)
+	endPk.AddPrimaryKeyColumnWithMaxValue(fuzzyMetaPk3)
+	criteria := &RangeRowQueryCriteria{
+		TableName:       fuzzyTableName,
+		StartPrimaryKey: startPk,
+		EndPrimaryKey:   endPk,
+		ColumnsToGet:    fuzzyMetaAttr,
+		MaxVersion:      1,
+		Limit:           2000,
+		DataBlockType:   SimpleRowMatrix,
+	}
+	for {
+		resp, err := client.GetRange(&GetRangeRequest{criteria})
+		c.Assert(err, IsNil)
+		c.Assert(resp.DataBlockType, Equals, SimpleRowMatrix)
+		for _, row := range resp.Rows {
+			pks := row.PrimaryKey.PrimaryKeys
+			cpKey := pks[0].Value.(string) + "-" + base64.StdEncoding.EncodeToString(pks[1].Value.([]byte)) +
+				"-" + fmt.Sprintf("%d", pks[2].Value.(int64))
+			attrs, ok := expect[cpKey]
+			if !ok {
+				c.Errorf("got %s", cpKey)
+			}
+			for _, column := range row.Columns {
+				//log.Printf("%s %v\n", column.ColumnName, column.Value)
+				switch column.ColumnName {
+				case "string":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "blob":
+					c.Assert(column.Value.([]byte), DeepEquals, attrs[column.ColumnName].([]byte))
+				case "boolean":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "integer":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				case "double":
+					c.Assert(column.Value, DeepEquals, attrs[column.ColumnName])
+				}
+			}
+			c.Assert(len(row.Columns), Equals, len(attrs))
+			delete(expect, cpKey)
+		}
+		if resp.NextStartPrimaryKey != nil {
+			criteria.StartPrimaryKey = resp.NextStartPrimaryKey
+		} else {
+			break
+		}
+	}
+	c.Assert(len(expect), Equals, 0)
+	log.Println("TestFuzzyGetRangeMatrix finished")
+}
+
+func PrepareFuzzyTableData(tableName string, maxStringLen, maxBlobLen int, rowCount int) (map[string]map[string]interface{}, error) {
+	retMap := make(map[string]map[string]interface{})
+	for i := 0; i < rowCount; i++ {
+		pk := new(PrimaryKey)
+		pkStr := randStringRunes(128)
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk1, pkStr)
+		buf := make([]byte, rand.Intn(512))
+		rand.Read(buf)
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk2, buf)
+		pkInt := rand.Int63()
+		pk.AddPrimaryKeyColumn(fuzzyMetaPk3, pkInt)
+		encodeKey := pkStr + "-" + base64.StdEncoding.EncodeToString(buf) + "-" + fmt.Sprintf("%d", pkInt)
+		change := &PutRowChange{
+			TableName:  tableName,
+			PrimaryKey: pk,
+			Condition:  &RowCondition{RowExistenceExpectation: RowExistenceExpectation_IGNORE},
+		}
+		attrs := make(map[string]interface{}, len(fuzzyMetaAttr))
+		for _, nameType := range fuzzyMetaAttr {
+			var v interface{}
+			switch nameType {
+			case "string":
+				v = randStringRunes(maxStringLen)
+			case "integer":
+				v = rand.Int63n(101)
+				if v.(int64)%10 == 0 {
+					v = nil
+				}
+			case "boolean":
+				v = rand.Int()%2 == 0
+			case "double":
+				v = rand.Float64()
+			case "blob":
+				v = make([]byte, rand.Intn(maxBlobLen)+1)
+				rand.Read(v.([]byte))
+			}
+			if v != nil {
+				change.AddColumn(nameType, v)
+				attrs[nameType] = v
+			}
+		}
+		_, err := client.PutRow(&PutRowRequest{change})
+		if err != nil {
+			return nil, err
+		}
+		retMap[encodeKey] = attrs
+	}
+	return retMap, nil
 }
 
 func (s *TableStoreSuite) TestGetRange(c *C) {
-	fmt.Println("TestGetRange started")
+	log.Println("TestGetRange started")
 	rowCount := 9
 	timeNow := time.Now().Unix() * 1000
 	for i := 0; i < rowCount; i++ {
@@ -1296,8 +1449,8 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	rangeRowQueryCriteria.ColumnsToGet = []string{"col1"}
 	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
 
-	fmt.Println("check", rangeRowQueryCriteria.ColumnsToGet)
-	fmt.Println("check2", getRangeRequest.RangeRowQueryCriteria.ColumnsToGet)
+	log.Println("check", rangeRowQueryCriteria.ColumnsToGet)
+	log.Println("check2", getRangeRequest.RangeRowQueryCriteria.ColumnsToGet)
 	getRangeResp, error := client.GetRange(getRangeRequest)
 	c.Check(error, Equals, nil)
 	c.Check(getRangeResp.Rows, NotNil)
@@ -1319,14 +1472,14 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 	c.Check(error, Equals, nil)
 	c.Check(getRangeResp.Rows, NotNil)
 
-	fmt.Println("use time range to query rows")
+	log.Println("use time range to query rows")
 
 	rangeRowQueryCriteria.TimeRange = &TimeRange{Specific: timeNow - 100001}
 	getRangeResp, error = client.GetRange(getRangeRequest)
 	c.Check(error, NotNil)
-	fmt.Println(error)
+	log.Println(error)
 
-	fmt.Println("use time range to query rows 2")
+	log.Println("use time range to query rows 2")
 	rangeRowQueryCriteria.TimeRange = &TimeRange{Start: timeNow + 1, End: timeNow + 2}
 	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
 	getRangeResp2, error := client.GetRange(getRangeRequest)
@@ -1338,11 +1491,11 @@ func (s *TableStoreSuite) TestGetRange(c *C) {
 
 	_, error = invalidClient.GetRange(getRangeRequest)
 	c.Check(error, NotNil)
-	fmt.Println("TestGetRange finished")
+	log.Println("TestGetRange finished")
 }
 
 func (s *TableStoreSuite) TestGetRangeWithPagination(c *C) {
-	fmt.Println("TestGetRangeWithPagination started")
+	log.Println("TestGetRangeWithPagination started")
 	rowCount := 9
 	for i := 0; i < rowCount; i++ {
 		key := "testrangequery" + strconv.Itoa(i)
@@ -1374,11 +1527,11 @@ func (s *TableStoreSuite) TestGetRangeWithPagination(c *C) {
 
 	c.Check(len(getRangeResp.Rows), Equals, int(limit))
 	c.Check(getRangeResp.NextStartPrimaryKey, NotNil)
-	fmt.Println("TestGetRangeWithPagination finished")
+	log.Println("TestGetRangeWithPagination finished")
 }
 
 func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
-	fmt.Println("TestGetRange started")
+	log.Println("TestGetRange started")
 	rowCount := 20
 	timeNow := time.Now().Unix() * 1000
 	for i := 0; i < rowCount; i++ {
@@ -1423,17 +1576,17 @@ func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
 
 	getRangeResp, error := client.GetRange(getRangeRequest)
 	c.Check(error, Equals, nil)
-	fmt.Println(getRangeResp)
-	fmt.Println(getRangeResp.NextStartPrimaryKey)
-	fmt.Println(getRangeResp.Rows)
-	//fmt.Println(getRangeResp.NextStartPrimaryKey)
+	log.Println(getRangeResp)
+	log.Println(getRangeResp.NextStartPrimaryKey)
+	log.Println(getRangeResp.Rows)
+	//log.Println(getRangeResp.NextStartPrimaryKey)
 	//c.Check(getRangeResp.Rows, NotNil)
 
-	fmt.Println("TestGetRange with filter finished")
+	log.Println("TestGetRange with filter finished")
 }
 
 func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
-	fmt.Println("TestGetRangeWithMinMaxValue started")
+	log.Println("TestGetRangeWithMinMaxValue started")
 
 	getRangeRequest := &GetRangeRequest{}
 	rangeRowQueryCriteria := &RangeRowQueryCriteria{}
@@ -1458,11 +1611,11 @@ func (s *TableStoreSuite) TestGetRangeWithMinMaxValue(c *C) {
 
 	c.Check(len(getRangeResp.Rows), Equals, int(limit))
 	c.Check(getRangeResp.NextStartPrimaryKey, NotNil)
-	fmt.Println("TestGetRangeWithMinMaxValue finished")
+	log.Println("TestGetRangeWithMinMaxValue finished")
 }
 
 func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
-	fmt.Println("TestPutRowsWorkload started")
+	log.Println("TestPutRowsWorkload started")
 
 	start := time.Now().UnixNano()
 
@@ -1478,7 +1631,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 				putRowRequest.PutRowChange = rowToPut1
 				_, error := client.PutRow(putRowRequest)
 				if error != nil {
-					fmt.Println("put row error", error)
+					log.Println("put row error", error)
 				}
 				c.Check(error, IsNil)
 			}
@@ -1495,7 +1648,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	count := 0
 	for _ = range isFinished {
 		count++
-		fmt.Println("catched count is:", count)
+		log.Println("catched count is:", count)
 		if count >= totalCount {
 			close(isFinished)
 		}
@@ -1504,11 +1657,11 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	end := time.Now().UnixNano()
 
 	totalCost := (end - start) / 1000000
-	fmt.Println("total cost:", totalCost)
+	log.Println("total cost:", totalCost)
 	c.Check(totalCost < 30*1000, Equals, true)
 
 	time.Sleep(time.Millisecond * 20)
-	fmt.Println("TestPutRowsWorkload finished")
+	log.Println("TestPutRowsWorkload finished")
 }
 
 func (s *TableStoreSuite) TestFailureCase(c *C) {
@@ -1600,7 +1753,7 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 }
 
 func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
-	fmt.Println("TestMockHttpClientCase started")
+	log.Println("TestMockHttpClientCase started")
 	currentGetHttpClientFunc = func() IHttpClient {
 		return &mockHttpClient{}
 	}
@@ -1635,7 +1788,7 @@ func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
 		return &TableStoreHttpClient{}
 	}
 
-	fmt.Println("TestMockHttpClientCase finished")
+	log.Println("TestMockHttpClientCase finished")
 }
 
 func (s *TableStoreSuite) TestUnit(c *C) {
@@ -1760,7 +1913,7 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 func SetSth() ClientOption {
 	return func(client *TableStoreClient) {
-		fmt.Println(client.accessKeyId)
+		log.Println(client.accessKeyId)
 	}
 }
 
@@ -1890,7 +2043,7 @@ func PrepareDataInRangeTableWithTimestamp(key1 string, key2 string, value string
 
 func (s *TableStoreSuite) TestListStream(c *C) {
 	tableName := defaultTableName + "_ListStream"
-	fmt.Printf("TestListStream starts on table %s\n", tableName)
+	log.Printf("TestListStream starts on table %s\n", tableName)
 	{
 		err := PrepareTable(tableName)
 		c.Assert(err, IsNil)
@@ -1908,7 +2061,7 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
 		c.Assert(err, IsNil)
-		fmt.Printf("%v\n", resp)
+		log.Printf("%v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 0)
 	}
 	{
@@ -1921,25 +2074,25 @@ func (s *TableStoreSuite) TestListStream(c *C) {
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
 		c.Assert(err, IsNil)
-		fmt.Printf("%#v\n", resp)
+		log.Printf("%#v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 1)
 	}
 	{
 		resp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
 		c.Assert(err, IsNil)
 		c.Assert(resp.StreamDetails, NotNil)
-		fmt.Printf("%#v\n", resp)
+		log.Printf("%#v\n", resp)
 		c.Assert(resp.StreamDetails.EnableStream, Equals, true)
 		c.Assert(resp.StreamDetails.StreamId, NotNil)
 		c.Assert(resp.StreamDetails.ExpirationTime, Equals, int32(24))
 		c.Assert(resp.StreamDetails.LastEnableTime > 0, Equals, true)
 	}
-	fmt.Println("TestListStream finish")
+	log.Println("TestListStream finish")
 }
 
 func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
 	tableName := defaultTableName + "_CreateTableWithStream"
-	fmt.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
+	log.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
 	{
 		req := CreateTableRequest{}
 		tableMeta := TableMeta{}
@@ -1963,15 +2116,15 @@ func (s *TableStoreSuite) TestCreateTableWithStream(c *C) {
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
 		c.Assert(err, IsNil)
-		fmt.Printf("%#v\n", resp)
+		log.Printf("%#v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 1)
 	}
-	fmt.Println("TestCreateTableWithStream finish")
+	log.Println("TestCreateTableWithStream finish")
 }
 
 func (s *TableStoreSuite) TestStream(c *C) {
 	tableName := defaultTableName + "_Stream"
-	fmt.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
+	log.Printf("TestCreateTableWithStream starts on table %s\n", tableName)
 	{
 		req := CreateTableRequest{}
 		tableMeta := TableMeta{}
@@ -1996,7 +2149,7 @@ func (s *TableStoreSuite) TestStream(c *C) {
 	{
 		resp, err := client.ListStream(&ListStreamRequest{TableName: &tableName})
 		c.Assert(err, IsNil)
-		fmt.Printf("%#v\n", resp)
+		log.Printf("%#v\n", resp)
 		c.Assert(len(resp.Streams), Equals, 1)
 		streamId = resp.Streams[0].Id
 	}
@@ -2005,12 +2158,12 @@ func (s *TableStoreSuite) TestStream(c *C) {
 	for {
 		resp, err := client.DescribeStream(&DescribeStreamRequest{StreamId: streamId})
 		c.Assert(err, IsNil)
-		fmt.Printf("DescribeStreamResponse: %#v\n", resp)
+		log.Printf("DescribeStreamResponse: %#v\n", resp)
 		c.Assert(*resp.StreamId, Equals, *streamId)
 		c.Assert(resp.ExpirationTime, Equals, int32(24))
 		c.Assert(*resp.TableName, Equals, tableName)
 		c.Assert(len(resp.Shards), Equals, 1)
-		fmt.Printf("StreamShard: %#v\n", resp.Shards[0])
+		log.Printf("StreamShard: %#v\n", resp.Shards[0])
 		shardId = resp.Shards[0].SelfShard
 		if resp.Status == SS_Active {
 			break
@@ -2027,9 +2180,9 @@ func (s *TableStoreSuite) TestStream(c *C) {
 		c.Assert(resp.ShardIterator, NotNil)
 		iter = resp.ShardIterator
 	}
-	fmt.Printf("init iterator: %#v\n", *iter)
+	log.Printf("init iterator: %#v\n", *iter)
 	iter, _ = exhaustStreamRecords(c, iter)
-	fmt.Printf("put row:\n")
+	log.Printf("put row:\n")
 	{
 		req := PutRowRequest{}
 		rowChange := PutRowChange{}
@@ -2157,7 +2310,7 @@ func (s *TableStoreSuite) TestStream(c *C) {
 
 		c.Assert(len(r.Columns), Equals, 0)
 	}
-	fmt.Println("TestCreateTableWithStream finish")
+	log.Println("TestCreateTableWithStream finish")
 }
 
 func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamRecord) {
@@ -2166,19 +2319,19 @@ func exhaustStreamRecords(c *C, iter *ShardIterator) (*ShardIterator, []*StreamR
 		resp, err := client.GetStreamRecord(&GetStreamRecordRequest{
 			ShardIterator: iter})
 		c.Assert(err, IsNil)
-		fmt.Printf("#records: %d\n", len(resp.Records))
+		log.Printf("#records: %d\n", len(resp.Records))
 		for i, rec := range resp.Records {
-			fmt.Printf("record %d: %s\n", i, rec)
+			log.Printf("record %d: %s\n", i, rec)
 		}
 		for _, rec := range resp.Records {
 			records = append(records, rec)
 		}
 		nextIter := resp.NextShardIterator
 		if nextIter == nil {
-			fmt.Printf("next iterator: %#v\n", nextIter)
+			log.Printf("next iterator: %#v\n", nextIter)
 			break
 		} else {
-			fmt.Printf("next iterator: %#v\n", *nextIter)
+			log.Printf("next iterator: %#v\n", *nextIter)
 		}
 		if *iter == *nextIter {
 			break
@@ -2245,10 +2398,10 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 	c.Assert(resp.StmtType, Equals, SQL_DESCRIBE_TABLE)
 	c.Assert(len(resp.ResultSet.Columns()), Equals, 6)
 	for resp.ResultSet.HasNext() {
-		println(resp.ResultSet.Next().DebugString())
+		log.Println(resp.ResultSet.Next().DebugString())
 	}
 
-	println("sql query via FLAT_BUFFERS")
+	log.Println("sql query via FLAT_BUFFERS")
 	resp, err = client.SQLQuery(&SQLQueryRequest{Query: "select * from test_http_query"})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StmtType, Equals, SQL_SELECT)
@@ -2262,7 +2415,7 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 	i := 0
 	for resultSet.HasNext() {
 		sqlRow := resultSet.Next()
-		println(sqlRow.DebugString())
+		log.Println(sqlRow.DebugString())
 
 		val, err := sqlRow.GetInt64(0)
 		c.Assert(err, IsNil)
@@ -2373,6 +2526,50 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 
 		i++
 	}
+	resp, err = client.SQLQuery(&SQLQueryRequest{Query: "select from_unixtime(1668585138.995),timediff(from_unixtime(1668585138.995),from_unixtime(1668585013.712)),date(from_unixtime(1668585138.995))"})
+	c.Assert(err, IsNil)
+	timeTpResSet := resp.ResultSet
+	for timeTpResSet.HasNext() {
+		sqlRow := timeTpResSet.Next()
+		val1, err := sqlRow.GetDateTime(0)
+		c.Assert(err, IsNil)
+		c.Assert(val1, Equals, time.Unix(1668585138, 995000000).UTC())
+		val1, err = sqlRow.GetDateTimeByName("from_unixtime(1668585138.995)")
+		c.Assert(err, IsNil)
+		c.Assert(val1, Equals, time.Unix(1668585138, 995000000).UTC())
+		val1, err = sqlRow.GetDateTimeByName("from_unixtime(16685138.995)")
+		c.Assert(err.Error(), Equals, "SQLRow doesn't contains Name: from_unixtime(16685138.995)")
+		_, err = sqlRow.GetTime(0)
+		c.Assert(err.Error(), Equals, "the type of column is not TIME")
+		_, err = sqlRow.GetDateTime(5)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 2))
+
+		val2, err := sqlRow.GetTime(1)
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, time.Duration(125283000000))
+		val2, err = sqlRow.GetTimeByName("timediff(from_unixtime(1668585138.995),from_unixtime(1668585013.712))")
+		c.Assert(err, IsNil)
+		c.Assert(val2, Equals, time.Duration(125283000000))
+		val2, err = sqlRow.GetTimeByName("a")
+		c.Assert(err.Error(), Equals, "SQLRow doesn't contains Name: a")
+		_, err = sqlRow.GetDateTime(1)
+		c.Assert(err.Error(), Equals, "the type of column is not DATETIME")
+		_, err = sqlRow.GetDate(1)
+		c.Assert(err.Error(), Equals, "the type of column is not DATE")
+		_, err = sqlRow.GetTime(5)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 2))
+
+		val3, err := sqlRow.GetDate(2)
+		c.Assert(err, IsNil)
+		c.Assert(val3, Equals, time.Unix(1668556800, 0).UTC())
+		val3, err = sqlRow.GetDateByName("date(from_unixtime(1668585138.995))")
+		c.Assert(err, IsNil)
+		c.Assert(val3, Equals, time.Unix(1668556800, 0).UTC())
+		val3, err = sqlRow.GetDateByName("b")
+		c.Assert(err.Error(), Equals, "SQLRow doesn't contains Name: b")
+		_, err = sqlRow.GetDate(5)
+		c.Assert(err.Error(), Equals, fmt.Sprintf("colIdx out of bound, max: %d", 2))
+	}
 }
 
 func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
@@ -2399,13 +2596,13 @@ func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
 	}
 	c.Assert(hasTable, Equals, true)
 
-	println("sql query via FLAT_BUFFERS")
+	log.Println("sql query via FLAT_BUFFERS")
 	resp, err = client.SQLQuery(&SQLQueryRequest{Query: fmt.Sprintf("select * from %s", sqlTableNameWithSearch)})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StmtType, Equals, SQL_SELECT)
 	c.Assert(resp.SQLQueryConsumed, NotNil)
 	cbytes, _ := json.Marshal(resp.SQLQueryConsumed)
-	println(string(cbytes))
+	log.Println(string(cbytes))
 	c.Assert(len(resp.SQLQueryConsumed.SearchConsumes), Equals, 1)
 	c.Assert(len(resp.SQLQueryConsumed.TableConsumes), Equals, 0)
 	c.Assert(resp.SQLQueryConsumed.SearchConsumes[0].TableName, Equals, sqlTableNameWithSearch)
@@ -2416,7 +2613,7 @@ func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
 	i := 0
 	for resultSet.HasNext() {
 		sqlRow := resultSet.Next()
-		println(sqlRow.DebugString())
+		log.Println(sqlRow.DebugString())
 
 		val, err := sqlRow.GetInt64(0)
 		c.Assert(err, IsNil)
@@ -2459,8 +2656,8 @@ func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
 		c.Skip("devops_25w is timeseries table, should prepared in advanced.")
 	}
 	resp, err := client.SQLQuery(&SQLQueryRequest{Query: "select * from devops_25w limit 10"})
-	c.Assert(resp.StmtType, Equals, SQL_SELECT)
 	c.Assert(err, IsNil)
+	c.Assert(resp.StmtType, Equals, SQL_SELECT)
 	c.Assert(resp.SQLQueryConsumed, NotNil)
 	c.Assert(len(resp.SQLQueryConsumed.SearchConsumes), Equals, 0)
 	c.Assert(len(resp.SQLQueryConsumed.TableConsumes), Equals, 1)
@@ -2470,7 +2667,7 @@ func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
 	c.Assert(len(resultSet.Columns()), Equals, 12)
 	for resultSet.HasNext() {
 		sqlRow := resultSet.Next()
-		println(sqlRow.DebugString())
+		log.Println(sqlRow.DebugString())
 		isnull, err := sqlRow.IsNullByName("_m_name")
 		c.Assert(err, IsNil)
 		c.Assert(isnull, Equals, false)

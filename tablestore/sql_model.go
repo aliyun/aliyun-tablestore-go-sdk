@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/sql/dataprotocol"
+	"time"
 )
 
 type SQLStatementType int32
@@ -68,7 +69,7 @@ type TablestoreSQLResultSet struct {
 	rowCursor int
 }
 
-func newSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
+func NewSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
 	rows, err := readRowsWithHeader(bytes.NewReader(rowBytes))
 	if err != nil {
 		return nil, err
@@ -85,7 +86,7 @@ func newSQLResultSetFromPlainBuffer(rowBytes []byte) (SQLResultSet, error) {
 	return rs, nil
 }
 
-func newSQLResultSetFromFlatBuffers(rowBytes []byte) (SQLResultSet, error) {
+func NewSQLResultSetFromFlatBuffers(rowBytes []byte) (SQLResultSet, error) {
 	if len(rowBytes) == 0 {
 		return nil, nil
 	}
@@ -162,7 +163,7 @@ func formatSQLTableMetaFromPlainBufferRow(row *PlainBufferRow) *SQLTableMeta {
 	return meta
 }
 
-func formatColumnTypeFromFlatBuffers(typ dataprotocol.DataType) ColumnType {
+func formatColumnTypeFromFlatBuffers(typ dataprotocol.DataType, logicTyp dataprotocol.LogicType) ColumnType {
 	switch typ {
 	case dataprotocol.DataTypeLONG:
 		return ColumnType_INTEGER
@@ -176,6 +177,17 @@ func formatColumnTypeFromFlatBuffers(typ dataprotocol.DataType) ColumnType {
 		return ColumnType_BINARY
 	case dataprotocol.DataTypeSTRING_RLE:
 		return ColumnType_STRING
+	case dataprotocol.DataTypeCOMPLEX:
+		switch logicTyp {
+		case dataprotocol.LogicTypeDATETIME:
+			return ColumnType_DATETIME
+		case dataprotocol.LogicTypeTIME:
+			return ColumnType_TIME
+		case dataprotocol.LogicTypeDATE:
+			return ColumnType_DATE
+		default:
+			return ColumnType(-1)
+		}
 	default:
 		return ColumnType(-1)
 	}
@@ -186,10 +198,17 @@ func formatSQLTableMetaFromFlatBufferColumns(columns *dataprotocol.SQLResponseCo
 	for i := 0; i < columns.ColumnsLength(); i++ {
 		column := new(dataprotocol.SQLResponseColumn)
 		columns.Columns(column, i)
+		tp := column.ColumnType()
+
+		complexTypeInfo := column.ColumnComplexTypeInfo(new(dataprotocol.ComplexColumnTypeInfo))
+		if complexTypeInfo == nil {
+			panic("your SDK version is not compatible with the server. Please rollback the SDK version")
+		}
 		columnInfo := &SQLColumnInfo{
-			Name:     string(column.ColumnName()),
-			Type:     formatColumnTypeFromFlatBuffers(column.ColumnType()),
-			dataType: column.ColumnType(),
+			Name:                  string(column.ColumnName()),
+			Type:                  formatColumnTypeFromFlatBuffers(tp, complexTypeInfo.ColumnLogicType()),
+			complexColumnTypeInfo: *complexTypeInfo,
+			dataType:              column.ColumnType(),
 		}
 		meta.columns = append(meta.columns, columnInfo)
 		meta.colOffset[columnInfo.Name] = i
@@ -221,7 +240,8 @@ type SQLColumnInfo struct {
 	Name string
 	Type ColumnType
 
-	dataType dataprotocol.DataType
+	dataType              dataprotocol.DataType
+	complexColumnTypeInfo dataprotocol.ComplexColumnTypeInfo
 }
 
 func (column *SQLColumnInfo) String() string {
@@ -272,6 +292,24 @@ type SQLRow interface {
 
 	// GetFloat64ByName returns the float64 value with the column Name.
 	GetFloat64ByName(colName string) (float64, error)
+
+	// GetTime returns the time.Duration with the colIdx.
+	GetTime(colIdx int) (time.Duration, error)
+
+	// GetTimeByName returns the time.Duration with the column Name.
+	GetTimeByName(colName string) (time.Duration, error)
+
+	// GetDateTime returns the time.Time with the colIdx.
+	GetDateTime(colIdx int) (time.Time, error)
+
+	// GetDateTimeByName returns the time.Time with the column Name.
+	GetDateTimeByName(colName string) (time.Time, error)
+
+	// GetDate returns the time.Time with the colIdx.
+	GetDate(colIdx int) (time.Time, error)
+
+	// GetDateByName returns the time.Time with the column Name.
+	GetDateByName(colName string) (time.Time, error)
 
 	// DebugString for debug/test/print use
 	DebugString() string
@@ -465,6 +503,108 @@ func (row *flatBuffersSQLRow) GetFloat64ByName(colName string) (float64, error) 
 	}
 }
 
+func (row *flatBuffersSQLRow) GetDateTime(colIdx int) (time.Time, error) {
+	if colIdx < len(row.data) {
+		if row.columnInfos[colIdx].Type != ColumnType_DATETIME {
+			return time.Time{}, errors.New("the type of column is not DATETIME")
+		}
+		complexInfo := row.columnInfos[colIdx].complexColumnTypeInfo
+		if complexInfo.ColumnEncodeType() != dataprotocol.DataTypeLONG {
+			return time.Time{}, errors.New("encoding type mismatch")
+		}
+		colValues := row.data[colIdx]
+		if colValues.IsNullvalues(row.rowIdx) {
+			return time.Time{}, nil
+		} else if row.rowIdx < colValues.LongValuesLength() {
+			return fromUnixMicrosTimestamp(colValues.LongValues(row.rowIdx)), nil
+		} else {
+			return time.Time{}, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.LongValuesLength()-1))
+		}
+	} else {
+		return time.Time{}, errors.New(fmt.Sprintf("colIdx out of bound, max: %d", len(row.data)-1))
+	}
+}
+
+func (row *flatBuffersSQLRow) GetDateTimeByName(colName string) (time.Time, error) {
+	if colIdx, ok := row.colOffset[colName]; ok {
+		val, err := row.GetDateTime(colIdx)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return val, nil
+	} else {
+		return time.Time{}, errors.New("SQLRow doesn't contains Name: " + colName)
+	}
+}
+
+func (row *flatBuffersSQLRow) GetTime(colIdx int) (time.Duration, error) {
+	if colIdx < len(row.data) {
+		if row.columnInfos[colIdx].Type != ColumnType_TIME {
+			return 0, errors.New("the type of column is not TIME")
+		}
+		complexInfo := row.columnInfos[colIdx].complexColumnTypeInfo
+		if complexInfo.ColumnEncodeType() != dataprotocol.DataTypeLONG {
+			return 0, errors.New("encoding type mismatch")
+		}
+		colValues := row.data[colIdx]
+		if colValues.IsNullvalues(row.rowIdx) {
+			return 0, nil
+		} else if row.rowIdx < colValues.LongValuesLength() {
+			return time.Duration(colValues.LongValues(row.rowIdx)), nil
+		} else {
+			return 0, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.LongValuesLength()-1))
+		}
+	} else {
+		return 0, errors.New(fmt.Sprintf("colIdx out of bound, max: %d", len(row.data)-1))
+	}
+}
+
+func (row *flatBuffersSQLRow) GetTimeByName(colName string) (time.Duration, error) {
+	if colIdx, ok := row.colOffset[colName]; ok {
+		val, err := row.GetTime(colIdx)
+		if err != nil {
+			return 0, err
+		}
+		return val, nil
+	} else {
+		return 0, errors.New("SQLRow doesn't contains Name: " + colName)
+	}
+}
+
+func (row *flatBuffersSQLRow) GetDate(colIdx int) (time.Time, error) {
+	if colIdx < len(row.data) {
+		if row.columnInfos[colIdx].Type != ColumnType_DATE {
+			return time.Time{}, errors.New("the type of column is not DATE")
+		}
+		complexInfo := row.columnInfos[colIdx].complexColumnTypeInfo
+		if complexInfo.ColumnEncodeType() != dataprotocol.DataTypeLONG {
+			return time.Time{}, errors.New("encoding type mismatch")
+		}
+		colValues := row.data[colIdx]
+		if colValues.IsNullvalues(row.rowIdx) {
+			return time.Time{}, nil
+		} else if row.rowIdx < colValues.LongValuesLength() {
+			return time.Unix(colValues.LongValues(row.rowIdx), 0).UTC(), nil
+		} else {
+			return time.Time{}, errors.New(fmt.Sprintf("rowIdx out of bound, max: %d", colValues.LongValuesLength()-1))
+		}
+	} else {
+		return time.Time{}, errors.New(fmt.Sprintf("colIdx out of bound, max: %d", len(row.data)-1))
+	}
+}
+
+func (row *flatBuffersSQLRow) GetDateByName(colName string) (time.Time, error) {
+	if colIdx, ok := row.colOffset[colName]; ok {
+		val, err := row.GetDate(colIdx)
+		if err != nil {
+			return time.Time{}, err
+		}
+		return val, nil
+	} else {
+		return time.Time{}, errors.New("SQLRow doesn't contains Name: " + colName)
+	}
+}
+
 func (row *flatBuffersSQLRow) DebugString() string {
 	rowValues := make([]interface{}, len(row.colOffset))
 	for i := 0; i < len(row.colOffset); i++ {
@@ -652,6 +792,36 @@ func (row *plainBufferSQLRow) GetFloat64ByName(colName string) (float64, error) 
 	} else {
 		return 0, errors.New("SQLRow doesn't contains Name: " + colName)
 	}
+}
+
+func (row *plainBufferSQLRow) GetTime(colIdx int) (time.Duration, error) {
+	//TODO: support date in plainbuffer
+	return 0, errors.New("plainbuffer not support time type")
+}
+
+func (row *plainBufferSQLRow) GetTimeByName(colName string) (time.Duration, error) {
+	//TODO: support date in plainbuffer
+	return 0, errors.New("plainbuffer not support time type")
+}
+
+func (row *plainBufferSQLRow) GetDateTime(colIdx int) (time.Time, error) {
+	//TODO: support date in plainbuffer
+	return time.Time{}, errors.New("plainbuffer not support datetime type")
+}
+
+func (row *plainBufferSQLRow) GetDateTimeByName(colName string) (time.Time, error) {
+	//TODO: support date in plainbuffer
+	return time.Time{}, errors.New("plainbuffer not support datetime type")
+}
+
+func (row *plainBufferSQLRow) GetDate(colIdx int) (time.Time, error) {
+	//TODO: support date in plainbuffer
+	return time.Time{}, errors.New("plainbuffer not support date type")
+}
+
+func (row *plainBufferSQLRow) GetDateByName(colName string) (time.Time, error) {
+	//TODO: support date in plainbuffer
+	return time.Time{}, errors.New("plainbuffer not support date type")
 }
 
 func (row *plainBufferSQLRow) DebugString() string {
