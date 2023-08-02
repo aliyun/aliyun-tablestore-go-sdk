@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-
+	"log"
+	
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
@@ -158,7 +159,7 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 		return nil, err
 	}
 	response.TotalCount = *resp.TotalHits
-
+	
 	rows := make([]*PlainBufferRow, 0)
 	for _, buf := range resp.Rows {
 		row, err := readRowsWithHeader(bytes.NewReader(buf))
@@ -181,6 +182,32 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 			currentRow.Columns = append(currentRow.Columns, dataColumn)
 		}
 		response.Rows = append(response.Rows, currentRow)
+	}
+	
+	if len(resp.SearchHits) != 0 && len(resp.Rows) != len(resp.SearchHits) {
+		log.Fatal("the row count is not equal to search extra result item count in server response body, ignore the search extra result items.")
+	} else {
+		for idx, pbSearchHit := range resp.GetSearchHits() {
+			searchHit := &SearchHit{}
+			searchHit.Row = response.Rows[idx]
+			
+			if pbSearchHit.HighlightResult == nil {
+				response.SearchHits = append(response.SearchHits, searchHit)
+				continue
+			}
+			
+			highlightResultItem := &HighlightResultItem{
+				HighlightFields: make(map[string]*HighlightField, initMapLen),
+			}
+			for _, pbHighlightField := range pbSearchHit.HighlightResult.HighlightFields {
+				highlightField := new(HighlightField)
+				highlightField.Fragments = append([]string{}, pbHighlightField.FieldFragments...)
+				highlightResultItem.HighlightFields[pbHighlightField.GetFieldName()] = highlightField
+			}
+			searchHit.HighlightResultItem = highlightResultItem
+			
+			response.SearchHits = append(response.SearchHits, searchHit)
+		}
 	}
 
 	response.IsAllSuccess = *resp.IsAllSucceeded

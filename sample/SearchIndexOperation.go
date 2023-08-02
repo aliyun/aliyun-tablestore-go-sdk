@@ -6,6 +6,7 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
+	"strconv"
 	"sync"
 	"time"
 )
@@ -179,39 +180,24 @@ func CreateSearchIndexWithIndexSort(client *tablestore.TableStoreClient, tableNa
 	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
 }
 
+// 创建一个SearchIndex，为查询高亮Demo做正准备
+func CreateSearchIndexForQueryHighlighting(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	var schemas []*tablestore.FieldSchema
+	field1 := &tablestore.FieldSchema{
+		FieldName:          proto.String("Col_Text"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:          tablestore.FieldType_TEXT, // 设置字段类型
+		Index:              proto.Bool(true),          // 设置开启索引
+		EnableHighlighting: proto.Bool(true),          // 设置开启字段高亮
+	}
+	schemas = append(schemas, field1)
+	
+	createSearchIndex(client, tableName, indexName, schemas)
+}
+
 /**
  *创建一个SearchIndex，为Aggregation和GroupBy的demo做准备
  */
 func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClient, tableName string, indexName string) {
-	fmt.Println("Begin to create table:", tableName)
-	createTableRequest := new(tablestore.CreateTableRequest)
-
-	tableMeta := new(tablestore.TableMeta)
-	tableMeta.TableName = tableName
-	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
-	tableOption := new(tablestore.TableOption)
-	tableOption.TimeToAlive = -1
-	tableOption.MaxVersion = 1
-	reservedThroughput := new(tablestore.ReservedThroughput)
-	reservedThroughput.Readcap = 0
-	reservedThroughput.Writecap = 0
-	createTableRequest.TableMeta = tableMeta
-	createTableRequest.TableOption = tableOption
-	createTableRequest.ReservedThroughput = reservedThroughput
-
-	_, err := client.CreateTable(createTableRequest)
-	if err != nil {
-		fmt.Println("Failed to create table with error:", err)
-	} else {
-		fmt.Println("Create table finished")
-	}
-
-	// create search index
-	fmt.Println("Begin to create index:", indexName)
-	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
-
 	var schemas []*tablestore.FieldSchema
 	field1 := &tablestore.FieldSchema{
 		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
@@ -238,10 +224,43 @@ func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClie
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	schemas = append(schemas, field1, field2, field3, field4)
+	
+	createSearchIndex(client, tableName, indexName, schemas)
+}
 
-	request.IndexSchema = &tablestore.IndexSchema{
-		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+func createSearchIndex(client *tablestore.TableStoreClient, tableName string, indexName string, fieldSchemas []*tablestore.FieldSchema) {
+	fmt.Println("Begin to create table:", tableName)
+	createTableRequest := new(tablestore.CreateTableRequest)
+	
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	
+	_, err := client.CreateTable(createTableRequest)
+	if err != nil {
+		fmt.Println("Failed to create table with error:", err)
+	} else {
+		fmt.Println("Create table finished")
 	}
+	
+	// create search index
+	fmt.Println("Begin to create index:", indexName)
+	request := &tablestore.CreateSearchIndexRequest{}
+	request.TableName = tableName // 设置表名
+	request.IndexName = indexName // 设置索引名
+	request.IndexSchema = &tablestore.IndexSchema{
+		FieldSchemas: fieldSchemas,
+	}
+	
 	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
@@ -318,6 +337,75 @@ func WriteData(client *tablestore.TableStoreClient, tableName string) {
 			fmt.Println("putrow failed with error:", err)
 		}
 	}
+}
+
+// WriteDataForQueryHighlighting 为高亮查询测试插入数据
+func WriteDataForQueryHighlighting(client *tablestore.TableStoreClient, tableName string) {
+	fmt.Println("Begin to write data")
+	texts := []string{"When the world is dark and dreary", "And the night is long and weary,", "Look up to the stars above,", "And find the light of hope and love."}
+	
+	for idx, text := range texts {
+		putPK := new(tablestore.PrimaryKey)
+		putPK.AddPrimaryKeyColumn("pk1", strconv.Itoa(idx))
+		putRowChange := new(tablestore.PutRowChange)
+		putRowChange.TableName = tableName
+		putRowChange.PrimaryKey = putPK
+		putRowChange.AddColumn("Col_Text", text)
+		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+		putRowRequest := new(tablestore.PutRowRequest)
+		putRowRequest.PutRowChange = putRowChange
+		if _, err := client.PutRow(putRowRequest); err != nil {
+			fmt.Println("Put test data failed with err: ", err)
+		}
+	}
+	time.Sleep(30 * time.Second)
+	
+	fmt.Println("Write data finished.")
+}
+
+// QueryHighlightingSample 查询高亮示例
+func QueryHighlightingSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to run highlight query")
+	searchRequest := &tablestore.SearchRequest{}
+	searchRequest.
+		SetTableName(tableName).
+		SetIndexName(indexName).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchQuery{
+				FieldName: "Col_Text",
+				Text:      "stars dark light",
+			}).
+			SetHighlight(search.NewHighlight().
+				SetHighlightEncoder(search.PlainMode).
+				AddFieldHighlightParameter("Col_Text", search.NewHighlightParameter().
+					SetPreTag("<em>").
+					SetPostTag("</em>"))).
+			SetGetTotalCount(false)).
+		SetColumnsToGet(&tablestore.ColumnsToGet{ReturnAllFromIndex: true})
+	if resp, err := client.Search(searchRequest); err != nil {
+		fmt.Println("Highlighting query failed with err: ", err)
+	} else {
+		fmt.Println("RequestId: " + resp.RequestId)
+		for _, searchHit := range resp.SearchHits {
+			if rowBytes, err := json.Marshal(searchHit.Row); err != nil {
+				fmt.Println("marshal response row failed with err: ", err)
+				return
+			} else {
+				fmt.Println("Row: ")
+				fmt.Println(string(rowBytes))
+			}
+			
+			// json序列化将"<"、">"转义
+			if highlightResultItemByte, err := json.Marshal(searchHit.HighlightResultItem); err != nil {
+				fmt.Println("marshal response highlight result item failed with err: ", err)
+				return
+			} else {
+				fmt.Println("Highlight: ")
+				fmt.Println(string(highlightResultItemByte))
+			}
+		}
+	}
+	fmt.Println("highlight query finished")
 }
 
 /**

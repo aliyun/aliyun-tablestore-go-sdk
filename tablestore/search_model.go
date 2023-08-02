@@ -95,6 +95,7 @@ func (r *SearchRequest) ProtoBuffer() (*otsprotocol.SearchRequest, error) {
 type SearchResponse struct {
 	TotalCount   int64
 	Rows         []*Row
+	SearchHits   []*SearchHit
 	IsAllSuccess bool
 	NextToken    []byte
 
@@ -162,6 +163,9 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		}
 		if value.EnableSortAndAgg != nil {
 			field.SortAndAgg = proto.Bool(*value.EnableSortAndAgg)
+		}
+		if value.EnableHighlighting != nil {
+			field.EnableHighlighting = proto.Bool(*value.EnableHighlighting)
 		}
 		if value.Store != nil {
 			field.Store = proto.Bool(*value.Store)
@@ -289,6 +293,7 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 			}
 		}
 		field.EnableSortAndAgg = value.SortAndAgg
+		field.EnableHighlighting = value.EnableHighlighting
 		field.Store = value.Store
 		field.IsArray = value.IsArray
 		field.IsVirtualField = value.IsVirtualField
@@ -462,19 +467,20 @@ type FuzzyAnalyzerParameter struct {
 }
 
 type FieldSchema struct {
-	FieldName         *string
-	FieldType         FieldType
-	Index             *bool
-	IndexOptions      *IndexOptions
-	Analyzer          *Analyzer
-	AnalyzerParameter interface{}
-	EnableSortAndAgg  *bool
-	Store             *bool
-	IsArray           *bool
-	FieldSchemas      []*FieldSchema
-	IsVirtualField    *bool
-	SourceFieldNames  []string
-	DateFormats       []string
+	FieldName          *string
+	FieldType          FieldType
+	Index              *bool
+	IndexOptions       *IndexOptions
+	Analyzer           *Analyzer
+	AnalyzerParameter  interface{}
+	EnableSortAndAgg   *bool
+	EnableHighlighting *bool
+	Store              *bool
+	IsArray            *bool
+	FieldSchemas       []*FieldSchema
+	IsVirtualField     *bool
+	SourceFieldNames   []string
+	DateFormats        []string
 }
 
 func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
@@ -492,6 +498,7 @@ func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
 	r.Analyzer = copyFS.Analyzer
 	r.AnalyzerParameter = copyFS.AnalyzerParameter
 	r.EnableSortAndAgg = copyFS.EnableSortAndAgg
+	r.EnableHighlighting = copyFS.EnableHighlighting
 	r.Store = copyFS.Store
 	r.IsArray = copyFS.IsArray
 	r.FieldSchemas = copyFS.FieldSchemas
