@@ -25,6 +25,7 @@ type searchQuery struct {
 	Offset        int32
 	Limit         int32
 	Query         Query `json:"-"`
+    Highlight     *Highlight
 	Collapse      *Collapse
 	Sort          *Sort
 	GetTotalCount bool
@@ -183,6 +184,11 @@ func (s *searchQuery) SetQuery(query Query) *searchQuery {
 	return s
 }
 
+func (s *searchQuery) SetHighlight(highlight *Highlight) *searchQuery {
+    s.Highlight = highlight
+    return s
+}
+
 func NewAvgAggregation(name string, fieldName string) *AvgAggregation {
 	return &AvgAggregation {
 		AggName: name,
@@ -324,6 +330,13 @@ func (s *searchQuery) Serialize() ([]byte, error) {
 		}
 		searchQuery.Query = pbQuery
 	}
+    if s.Highlight != nil {
+        if pbHighlight, err := s.Highlight.ProtoBuffer(); err != nil {
+			return nil, err
+		} else {
+			searchQuery.Highlight = pbHighlight
+		}
+    }
 	if s.Collapse != nil {
 		pbCollapse, err := s.Collapse.ProtoBuffer()
 		if err != nil {

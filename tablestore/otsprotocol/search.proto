@@ -204,6 +204,31 @@ message SearchQuery {
     optional bytes token = 9;
     optional Aggregations aggs = 10;
     optional GroupBys group_bys = 11;
+    optional Highlight highlight = 12;
+}
+
+message Highlight {
+    repeated HighlightParameter highlight_parameters = 1;
+    optional HighlightEncoder highlight_encoder = 2 [default=PLAIN_MODE];
+}
+
+message HighlightParameter {
+    optional string  field_name = 1;
+    optional int32   number_of_fragments = 2;
+    optional int32   fragment_size = 3;
+    optional string  pre_tag = 4;
+    optional string  post_tag = 5;
+    optional HighlightFragmentOrder fragments_order = 6 [default=TEXT_SEQUENCE];
+}
+
+enum HighlightFragmentOrder {
+    TEXT_SEQUENCE = 1;
+    SCORE = 2;
+}
+
+enum HighlightEncoder {
+    PLAIN_MODE = 1;
+    HTML_MODE = 2;
 }
 
 enum ColumnReturnType {
@@ -235,12 +260,27 @@ message SearchResponse {
     optional int64 total_hits = 1;
     repeated bytes rows = 2;
     optional bool is_all_succeeded = 3;
+    repeated SearchHit search_hits = 5;
     optional bytes next_token = 6;
     optional bytes aggs = 7;
     optional bytes group_bys = 8;
     optional ConsumedCapacity consumed = 9;
     optional ConsumedCapacity reserved_consumed = 10;
 }
+
+message SearchHit {
+    optional HighlightResult highlight_result = 4;
+}
+
+message HighlightResult {
+    repeated HighlightField highlight_fields = 1;
+}
+
+message HighlightField {
+    optional string field_name = 1;
+    repeated string field_fragments = 2;
+}
+
 
 /* Create Search Index */
 
@@ -290,6 +330,7 @@ message FieldSchema {
     optional bool is_virtual_field = 11;
     repeated string source_field_names = 12;
     repeated string date_formats = 13;
+    optional bool enable_highlighting = 14;
 }
 
 message IndexSchema {

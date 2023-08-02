@@ -123,6 +123,11 @@ func getNormalTestIndexSchema() *IndexSchema {
 				FieldName: proto.String("col1"),
 				FieldType: FieldType_KEYWORD,
 			},
+			{
+				FieldName: proto.String("col2"),
+				FieldType: FieldType_TEXT,
+				EnableHighlighting: proto.Bool(true),
+			},
 		},
 	}
 }
@@ -326,6 +331,7 @@ func createSearchIndex1(c *C) {
 		FieldName: proto.String("Col_Text"),
 		FieldType: FieldType_TEXT,
 		Index:     proto.Bool(true),
+		EnableHighlighting: proto.Bool(true),
 	}
 	field7 := &FieldSchema{
 		FieldName: proto.String("Col_Nested"),
@@ -448,6 +454,15 @@ func createSearchIndex1(c *C) {
 		},
 	}
 	schemas = append(schemas, field11, field12, field13, field14, field15, field16, field17)
+	
+	// highlight column
+	field18 := &FieldSchema{
+		FieldName: proto.String("Col_Highlight_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
+		EnableHighlighting: proto.Bool(true),
+	}
+	schemas = append(schemas, field18)
 
 	request.IndexSchema = &IndexSchema{
 		FieldSchemas: schemas,
@@ -565,6 +580,7 @@ func deleteSearchIndex(tableName string, indexName string) {
 
 func writeData1(c *C) {
 	strs := []string{"hangzhou", "tablestore", "ots"}
+	highlightText := []string{"dengcai <em>street</em>, xihu district, hangzhou city"}
 	geopoints := []string{
 		"30.137817,120.08681",  //飞天园区
 		"30.135131,120.088355", //中大银座
@@ -594,6 +610,7 @@ func writeData1(c *C) {
 		keywordValue := strs[i%len(strs)]
 		geoPointValue := geopoints[i]
 		textValue := strs[i%len(strs)]
+		highlightTextValue := highlightText[i % len(highlightText)]
 		nestedValue := fmt.Sprintf("[{\"Col_Long_Nested\": %v, \"Col_Double_Nested\": %v, \"Col_Boolean_Nested\": %v, \"Col_Keyword_Nested\": \"%v\", \"Col_GeoPoint_Nested\": \"%v\", \"Col_Text_Nested\": \"%v\"}]",
 			longValue, doubleValue, boolValue, keywordValue, geoPointValue, textValue)
 		nestedMissingValue := fmt.Sprintf("[{\"Col_Long_Missing_Nested\": %v, \"Col_Double_Missing_Nested\": %v, \"Col_Boolean_Missing_Nested\": %v, \"Col_Keyword_Missing_Nested\": \"%v\", \"Col_GeoPoint_Missing_Nested\": \"%v\", \"Col_Text_Missing_Nested\": \"%v\"}]",
@@ -607,6 +624,7 @@ func writeData1(c *C) {
 		putRowChange.AddColumn("Col_GeoPoint", geoPointValue)
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
+		putRowChange.AddColumn("Col_Highlight_Text", highlightTextValue)
 
 		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
@@ -1954,6 +1972,35 @@ func (s *SearchSuite) TestGroupByNestedFieldUnderGroupBy(c *C) {
 	}
 }
 
+func (s *SearchSuite) TestSearchQueryWithHighlight(c *C) {
+	searchRequest := &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName1).
+		SetIndexName(searchAPITestIndexName1).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchQuery{
+				FieldName: "Col_Highlight_Text",
+				Text:      "xihu dengcai",
+			}).
+			SetHighlight(search.NewHighlight().
+				SetHighlightEncoder(search.HtmlMode).
+				AddFieldHighlightParameter("Col_Highlight_Text", search.NewHighlightParameter().
+					SetPreTag("<em>").
+					SetPostTag("</em>").
+					SetFragmentSize(100).
+					SetHighlightFragmentOrder(search.TextSequence).
+					SetNumberOfFragments(5)))).
+		SetColumnsToGet(&ColumnsToGet{
+			ReturnAll: true,
+		})
+	resp, err := client.Search(searchRequest)
+	c.Check(err, IsNil)
+	c.Check(resp.SearchHits, NotNil)
+	c.Check(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"], NotNil)
+	c.Check(strings.Contains(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"].Fragments[0], "<em>xihu</em>"), Equals, true)
+	c.Check(strings.Contains(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"].Fragments[0], "&lt;em&gt;street&lt;&#x2F;em&gt;"), Equals, true)
+}
+
 /* compute splits */
 func (s *SearchSuite) TestComputeSplits(c *C) {
 	req := &ComputeSplitsRequest{}
@@ -2126,6 +2173,21 @@ func (s *SearchSuite) TestCreateSearchIndexWithTTLAndDescribeSearchIndex(c *C) {
 	c.Check(len(fieldSchemas), Equals, len(indexSchema.FieldSchemas))
 	c.Check(fieldSchemas[0].FieldType, Equals, indexSchema.FieldSchemas[0].FieldType)
 	c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
+}
+
+func (s *SearchSuite) TestCreateSearchIndexWithHighlightingField(c *C) {
+	tableName := "go_sdk_test_highlighting_table"
+	indexName := "go_sdk_test_highlighting_index"
+	DeleteTableAndAllIndex(c, client, tableName)
+	CreateSearchTable(c, client, tableName)
+	indexSchema := getNormalTestIndexSchema()
+	CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, -1)
+	resp := DescribeSearchIndex(c, client, tableName, indexName)
+	c.Check(resp, NotNil)
+	fieldSchemas := resp.Schema.FieldSchemas
+	c.Check(fieldSchemas, NotNil)
+	c.Check(fieldSchemas[2].FieldType.String(), Equals, indexSchema.FieldSchemas[2].FieldType.String())
+	c.Check(*fieldSchemas[2].EnableHighlighting, Equals, *indexSchema.FieldSchemas[2].EnableHighlighting)
 }
 
 func (s *SearchSuite) TestUpdateSearchIndexTTL(c *C) {

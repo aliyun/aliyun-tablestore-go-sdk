@@ -674,6 +674,19 @@ type Row struct {
 	Columns    []*AttributeColumn
 }
 
+type HighlightResultItem struct {
+	HighlightFields map[string]*HighlightField
+}
+
+type HighlightField struct {
+	Fragments      []string
+}
+
+type SearchHit struct {
+	Row                 *Row
+	HighlightResultItem *HighlightResultItem
+}
+
 type GetRangeResponse struct {
 	Rows                 []*Row
 	ConsumedCapacityUnit *ConsumedCapacityUnit
