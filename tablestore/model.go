@@ -80,6 +80,7 @@ type TableStoreConfig struct {
 	MaxRetryTime       time.Duration
 	HTTPTimeout        HTTPTimeout
 	MaxIdleConnections int
+	IdleConnTimeout    time.Duration
 	Transport          http.RoundTripper
 }
 
@@ -91,7 +92,8 @@ func NewDefaultTableStoreConfig() *TableStoreConfig {
 		RetryTimes:         10,
 		HTTPTimeout:        *httpTimeout,
 		MaxRetryTime:       time.Second * 5,
-		MaxIdleConnections: 2000}
+		MaxIdleConnections: 2000,
+		IdleConnTimeout:    time.Second * 25}
 	return config
 }
 
@@ -679,7 +681,7 @@ type HighlightResultItem struct {
 }
 
 type HighlightField struct {
-	Fragments      []string
+	Fragments []string
 }
 
 type SearchHit struct {

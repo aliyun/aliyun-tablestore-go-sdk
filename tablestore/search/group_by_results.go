@@ -32,7 +32,7 @@ func (g *GroupByResults) Put(name string, result GroupByResult) {
 	g.resultMap[name] = result
 }
 
-func (g GroupByResults) GroupByField(name string) (*GroupByFieldResult, error){
+func (g GroupByResults) GroupByField(name string) (*GroupByFieldResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByFieldType {
 			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByFieldType.String()))
@@ -42,7 +42,7 @@ func (g GroupByResults) GroupByField(name string) (*GroupByFieldResult, error){
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
-func (g GroupByResults) GroupByRange(name string) (*GroupByRangeResult, error){
+func (g GroupByResults) GroupByRange(name string) (*GroupByRangeResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByRangeType {
 			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByRangeType.String()))
@@ -52,7 +52,7 @@ func (g GroupByResults) GroupByRange(name string) (*GroupByRangeResult, error){
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
-func (g GroupByResults) GroupByFilter(name string) (*GroupByFilterResult, error){
+func (g GroupByResults) GroupByFilter(name string) (*GroupByFilterResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByFilterType {
 			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByFilterType.String()))
@@ -62,7 +62,7 @@ func (g GroupByResults) GroupByFilter(name string) (*GroupByFilterResult, error)
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
-func (g GroupByResults) GroupByGeoDistance(name string) (*GroupByGeoDistanceResult, error){
+func (g GroupByResults) GroupByGeoDistance(name string) (*GroupByGeoDistanceResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByGeoDistanceType {
 			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByGeoDistanceType.String()))
@@ -72,7 +72,7 @@ func (g GroupByResults) GroupByGeoDistance(name string) (*GroupByGeoDistanceResu
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
-func (g GroupByResults) GroupByHistogram(name string) (*GroupByHistogramResult, error){
+func (g GroupByResults) GroupByHistogram(name string) (*GroupByHistogramResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByHistogramType {
 			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByHistogramType.String()))
@@ -82,10 +82,19 @@ func (g GroupByResults) GroupByHistogram(name string) (*GroupByHistogramResult, 
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
+func (g GroupByResults) GroupByDateHistogram(name string) (*GroupByDateHistogramResult, error) {
+	if result, ok := g.resultMap[name]; ok {
+		if result.GetType() != GroupByDateHistogramType {
+			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByDateHistogramType.String()))
+		}
+		return result.(*GroupByDateHistogramResult), nil
+	}
+	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
+}
+
 func (g GroupByResults) Empty() bool {
 	return len(g.resultMap) == 0
 }
-
 
 func ParseGroupByFieldResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (*GroupByFieldResult, error) {
 	groupByResult := new(GroupByFieldResult)
@@ -113,7 +122,7 @@ func ParseGroupByFieldResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (
 				item.SubAggregations = *subAggResults
 			}
 			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
-				subGroupByResults, err :=  ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
 				if err != nil {
 					return nil, err
 				}
@@ -153,7 +162,7 @@ func ParseGroupByRangeResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (
 				item.SubAggregations = *subAggResults
 			}
 			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
-				subGroupByResults, err :=  ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
 				if err != nil {
 					return nil, err
 				}
@@ -191,7 +200,7 @@ func ParseGroupByFilterResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) 
 				item.SubAggregations = *subAggResults
 			}
 			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
-				subGroupByResults, err :=  ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
 				if err != nil {
 					return nil, err
 				}
@@ -231,7 +240,7 @@ func ParseGroupByGeoDistanceResultFromPB(pbGroupByResult *otsprotocol.GroupByRes
 				item.SubAggregations = *subAggResults
 			}
 			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
-				subGroupByResults, err :=  ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
 				if err != nil {
 					return nil, err
 				}
@@ -289,6 +298,45 @@ func ParseGroupByHistogramResultFromPB(pbGroupByResult *otsprotocol.GroupByResul
 	return groupByResult, nil
 }
 
+func ParseGroupByDateHistogramResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (*GroupByDateHistogramResult, error) {
+	groupByResult := new(GroupByDateHistogramResult)
+	groupByResult.Name = *pbGroupByResult.Name
+
+	pbGroupByResultBody := new(otsprotocol.GroupByDateHistogramResult)
+	err := proto.Unmarshal(pbGroupByResult.GroupByResult, pbGroupByResultBody)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to parse group by body: %v", err.Error()))
+	}
+	pbItems := pbGroupByResultBody.GroupByDateHistogramItems
+
+	if len(pbItems) > 0 {
+		var items []GroupByDateHistogramItem
+
+		for _, pbItem := range pbItems {
+			item := GroupByDateHistogramItem{}
+			item.Timestamp = *pbItem.Timestamp
+			item.RowCount = *pbItem.RowCount
+			if pbItem.SubAggsResult != nil && len(pbItem.SubAggsResult.AggResults) > 0 {
+				subAggResults, err := ParseAggregationResultsFromPB(pbItem.SubAggsResult.AggResults)
+				if err != nil {
+					return nil, err
+				}
+				item.SubAggregations = *subAggResults
+			}
+			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				if err != nil {
+					return nil, err
+				}
+				item.SubGroupBys = *subGroupByResults
+			}
+			items = append(items, item)
+		}
+		groupByResult.Items = items
+	}
+	return groupByResult, nil
+}
+
 func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*GroupByResults, error) {
 	groupByResults := GroupByResults{}
 	for _, pbGroupByResult := range pbGroupByResults {
@@ -323,6 +371,13 @@ func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*
 			break
 		case otsprotocol.GroupByType_GROUP_BY_HISTOGRAM:
 			groupByResult, err := ParseGroupByHistogramResultFromPB(pbGroupByResult)
+			if err != nil {
+				return nil, err
+			}
+			groupByResults.Put(groupByResult.Name, groupByResult)
+			break
+		case otsprotocol.GroupByType_GROUP_BY_DATE_HISTOGRAM:
+			groupByResult, err := ParseGroupByDateHistogramResultFromPB(pbGroupByResult)
 			if err != nil {
 				return nil, err
 			}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
 	"github.com/golang/protobuf/proto"
 	"strconv"
 	"sync"
@@ -1373,40 +1374,45 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName).	//设置表名
-		SetIndexName(indexName).	//设置多元索引名
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).	//匹配所有行
-			SetLimit(100).		//限制返回前100行结果
-			GroupBy(search.NewGroupByField("group1", "Col_Keyword").	//对Col_Keyword字段做GroupByField取值聚合
-				GroupBySorters([]search.GroupBySorter{}).	//可以指定返回结果分桶的顺序
-				Size(2).								//仅返回前2个分桶
-				SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).	//对每个分桶进行子统计(Aggregation)
-				SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))).	//对每个分桶进行子聚合(GroupBy)
-			GroupBy(search.NewGroupByRange("group2", "Col_Long").		//对Col_Long字段做GroupByRange范围
-				Range(search.NegInf, 3).			//第一个分桶包含Col_Long在(-∞, 3)的索引行
-				Range(3, 5).			//第二个分桶包含Col_Long在[3, 5)的索引行
-				Range(5, search.Inf)).			//第三个分桶包含Col_Long在[5, +∞)的索引行
-			GroupBy(search.NewGroupByFilter("group3").	//做GroupByFilter过滤聚合
-				Query(&search.TermQuery{					//第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100). //限制返回前100行结果
+			GroupBy(search.NewGroupByField("group1", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
+				GroupBySorters([]search.GroupBySorter{}). //可以指定返回结果分桶的顺序
+				Size(2). //仅返回前2个分桶
+				SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")). //对每个分桶进行子统计(Aggregation)
+				SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))). //对每个分桶进行子聚合(GroupBy)
+			GroupBy(search.NewGroupByRange("group2", "Col_Long"). //对Col_Long字段做GroupByRange范围
+				Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
+				Range(3, 5). //第二个分桶包含Col_Long在[3, 5)的索引行
+				Range(5, search.Inf)). //第三个分桶包含Col_Long在[5, +∞)的索引行
+			GroupBy(search.NewGroupByFilter("group3"). //做GroupByFilter过滤聚合
+				Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
 					FieldName: "Col_Keyword",
 					Term:      "hangzhou",
 				}).
-				Query(&search.RangeQuery{					//第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
+				Query(&search.RangeQuery{ //第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
 					FieldName: "Col_Long",
 					From: 3,
 					To: 5,
 					IncludeLower: true,
 					IncludeUpper: true})).
-			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon:120.08681}).	//对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
-				Range(search.NegInf, 10000).			//第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
-				Range(10000, 15000).		//第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-				Range(15000, search.Inf)).			//第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
+				Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
+				Range(10000, 15000). //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
+				Range(15000, search.Inf)). //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
 			GroupBy(search.NewGroupByHistogram("group5", "Col_Long").
 				SetInterval(10).
 				SetMinDocCount(1).
 				SetFiledRange(0, 100).
-				SetMissing(3)))
+				SetMissing(3)).
+			GroupBy(search.NewGroupByDateHistogram("group6", "Col_date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
+				SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
+				SetMinDocCount(1).
+				SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
+				SetMissing("2022-01-06 12:13:14")))
 
 
 	// 设置返回所有列

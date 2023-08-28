@@ -280,6 +280,13 @@ func NewGroupByHistogram(name string, filedName string) *GroupByHistogram {
 	}
 }
 
+func NewGroupByDateHistogram(name string, filedName string) *GroupByDateHistogram {
+	return &GroupByDateHistogram{
+		GroupByName: name,
+		Field:       filedName,
+	}
+}
+
 func (s *searchQuery) Aggregation(agg ...Aggregation) *searchQuery {
 	for i := 0; i < len(agg); i++ {
 		s.Aggregations = append(s.Aggregations, agg[i])

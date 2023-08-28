@@ -449,3 +449,60 @@ type ComputeSplitsRequest struct {
 	TableName                string
 	searchIndexSplitsOptions *SearchIndexSplitsOptions
 }
+
+type DateTimeValue struct {
+	Value *int32
+	Unit  *DateTimeUnit
+}
+
+type DateTimeUnit int32
+
+const (
+	DateTimeUnit_YEAR         DateTimeUnit = 1
+	DateTimeUnit_QUARTER_YEAR DateTimeUnit = 2
+	DateTimeUnit_MONTH        DateTimeUnit = 3
+	DateTimeUnit_WEEK         DateTimeUnit = 4
+	DateTimeUnit_DAY          DateTimeUnit = 5
+	DateTimeUnit_HOUR         DateTimeUnit = 6
+	DateTimeUnit_MINUTE       DateTimeUnit = 7
+	DateTimeUnit_SECOND       DateTimeUnit = 8
+)
+
+func (d DateTimeUnit) Enum() *DateTimeUnit {
+	p := new(DateTimeUnit)
+	*p = d
+	return p
+}
+
+func (d *DateTimeUnit) ProtoBuffer() *otsprotocol.DateTimeUnit {
+	if d == nil {
+		return nil
+	}
+	switch *d {
+	case DateTimeUnit_YEAR:
+		return otsprotocol.DateTimeUnit_YEAR.Enum()
+	case DateTimeUnit_QUARTER_YEAR:
+		return otsprotocol.DateTimeUnit_QUARTER_YEAR.Enum()
+	case DateTimeUnit_MONTH:
+		return otsprotocol.DateTimeUnit_MONTH.Enum()
+	case DateTimeUnit_WEEK:
+		return otsprotocol.DateTimeUnit_WEEK.Enum()
+	case DateTimeUnit_DAY:
+		return otsprotocol.DateTimeUnit_DAY.Enum()
+	case DateTimeUnit_HOUR:
+		return otsprotocol.DateTimeUnit_HOUR.Enum()
+	case DateTimeUnit_MINUTE:
+		return otsprotocol.DateTimeUnit_MINUTE.Enum()
+	case DateTimeUnit_SECOND:
+		return otsprotocol.DateTimeUnit_SECOND.Enum()
+	default:
+		return nil
+	}
+}
+
+func (d *DateTimeValue) ProtoBuffer() *otsprotocol.DateTimeValue {
+	dateTimeValue := &otsprotocol.DateTimeValue{}
+	dateTimeValue.Unit = d.Unit.ProtoBuffer()
+	dateTimeValue.Value = d.Value
+	return dateTimeValue
+}

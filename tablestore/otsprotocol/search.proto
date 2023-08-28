@@ -302,6 +302,22 @@ enum FieldType {
     DATE = 8;
 }
 
+enum DateTimeUnit {
+    YEAR = 1;
+    QUARTER_YEAR = 2; // 一个季度
+    MONTH = 3;
+    WEEK = 4;
+    DAY = 5;
+    HOUR = 6;
+    MINUTE = 7;
+    SECOND = 8;
+}
+
+message DateTimeValue {
+    optional int32 value = 1;
+    optional DateTimeUnit unit = 2;
+}
+
 message SingleWordAnalyzerParameter {
     optional bool case_sensitive = 1;
     optional bool delimit_word = 2;
@@ -451,6 +467,7 @@ enum GroupByType {
     GROUP_BY_FILTER = 3;
     GROUP_BY_GEO_DISTANCE = 4;
     GROUP_BY_HISTOGRAM = 5;
+    GROUP_BY_DATE_HISTOGRAM = 6;
 }
 
 // agg & group by
@@ -516,6 +533,18 @@ message PercentilesAggregation {
 message FieldRange {
     optional bytes min = 1;
     optional bytes max = 2;
+}
+
+message GroupByDateHistogram {
+    optional string field_name = 1;
+    optional DateTimeValue interval = 2;
+    optional FieldRange field_range = 3;
+    optional bytes missing = 4;
+    optional int64  min_doc_count = 5;
+    optional string time_zone = 6;
+    optional GroupBySort sort = 7;
+    optional Aggregations sub_aggs = 8;
+    optional GroupBys sub_group_bys = 9;
 }
 
 message GroupByHistogram {
@@ -699,6 +728,17 @@ message GroupByHistogramItem {
 
 message GroupByHistogramResult {
     repeated GroupByHistogramItem group_by_histogra_items = 1;
+}
+
+message GroupByDateHistogramItem {
+    optional int64 timestamp = 1;
+    optional int64 row_count = 2;
+    optional AggregationsResult sub_aggs_result = 3;
+    optional GroupBysResult sub_group_bys_result = 4;
+}
+
+message GroupByDateHistogramResult {
+    repeated GroupByDateHistogramItem group_by_date_histogram_items = 1;
 }
 
 /* ParallelScan API, same to Search API */

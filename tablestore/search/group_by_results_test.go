@@ -131,14 +131,35 @@ func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
+	{
+		var value int64 = 2
+		var key int64 = 3
+		items := []*otsprotocol.GroupByDateHistogramItem{
+			{
+				Timestamp: &key,
+				RowCount:  &value,
+			},
+		}
+
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByDateHistogramResult{
+			GroupByDateHistogramItems: items,
+		})
+		groupByResult := otsprotocol.GroupByResult{
+			Name:          proto.String("group_by6"),
+			Type:          otsprotocol.GroupByType_GROUP_BY_DATE_HISTOGRAM.Enum(),
+			GroupByResult: groupByBodyBytes,
+		}
+		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
+	}
 
 	return &pbGroupBysResults
 }
 
 func TestParseGroupByResultsFromPB(t *testing.T) {
 	pbGroupBysResult := genPBGroupBysResult()
-	groupByResults, _ := ParseGroupByResultsFromPB(pbGroupBysResult.GroupByResults)
-	assert.Equal(t, 5, len(groupByResults.resultMap))
+	groupByResults, err := ParseGroupByResultsFromPB(pbGroupBysResult.GroupByResults)
+	assert.Nil(t, err)
+	assert.Equal(t, 6, len(groupByResults.resultMap))
 	assert.Equal(t, false, groupByResults.Empty())
 
 	{
@@ -199,5 +220,13 @@ func TestParseGroupByResultsFromPB(t *testing.T) {
 		assert.Equal(t, 1, len(groupByResult.Items))
 
 		assert.Equal(t, int64(1), groupByResult.Items[0].Value)
+	}
+	{
+		groupByResult, err := groupByResults.GroupByDateHistogram("group_by6")
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(groupByResult.Items))
+
+		assert.Equal(t, int64(2), groupByResult.Items[0].RowCount)
+		assert.Equal(t, int64(3), groupByResult.Items[0].Timestamp)
 	}
 }

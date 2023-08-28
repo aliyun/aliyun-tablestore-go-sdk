@@ -138,6 +138,7 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 	} else {
 		tableStoreTransportProxy = &http.Transport{
 			MaxIdleConnsPerHost: config.MaxIdleConnections,
+			IdleConnTimeout:     config.IdleConnTimeout,
 			Dial: (&net.Dialer{
 				Timeout: config.HTTPTimeout.ConnectionTimeout,
 			}).Dial,
@@ -196,6 +197,7 @@ func NewTimeseriesClientWithConfig(endPoint, instanceName, accessKeyId, accessKe
 	} else {
 		tableStoreTransportProxy = &http.Transport{
 			MaxIdleConnsPerHost: config.MaxIdleConnections,
+			IdleConnTimeout:     config.IdleConnTimeout,
 			Dial: (&net.Dialer{
 				Timeout: config.HTTPTimeout.ConnectionTimeout,
 			}).Dial,
@@ -519,8 +521,12 @@ func (internalClient *internalClient) getNextPause(err error, count uint, end ti
 	} else {
 		if err == io.EOF || err == io.ErrUnexpectedEOF || //retry on special net error contains EOF or reset
 			strings.Contains(err.Error(), io.EOF.Error()) ||
+			strings.Contains(err.Error(), "server closed idle connection") ||
 			strings.Contains(err.Error(), "Connection reset by peer") ||
 			strings.Contains(err.Error(), "connection reset by peer") {
+			// server already close this connection, no need to delay
+			return 1
+		} else if strings.Contains(err.Error(), "connection refused") {
 			retry = true
 		} else if nErr, ok := err.(net.Error); ok {
 			retry = nErr.Temporary()
