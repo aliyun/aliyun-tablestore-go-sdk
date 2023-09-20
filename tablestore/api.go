@@ -122,6 +122,7 @@ func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret st
 	tableStoreClient.accessKeyId = accessKeyId
 	tableStoreClient.accessKeySecret = accessKeySecret
 	tableStoreClient.securityToken = securityToken
+	tableStoreClient.KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc = true
 	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
 	tableStoreClient.credentialsProvider = provider
 	for _, option := range options {
@@ -177,6 +178,7 @@ func NewTimeseriesClientWithConfig(endPoint, instanceName, accessKeyId, accessKe
 	timeseriesClient.accessKeyId = accessKeyId
 	timeseriesClient.accessKeySecret = accessKeySecret
 	timeseriesClient.securityToken = securityToken
+	timeseriesClient.KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc = true
 	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
 	timeseriesClient.credentialsProvider = provider
 	for _, option := range options {
@@ -226,6 +228,8 @@ func NewClientWithExternalHeader(endPoint, instanceName, accessKeyId, accessKeyS
 	return tableStoreClient
 }
 
+type RetryNotify func(requestId string, err error, action string, backoffDuration time.Duration)
+
 // 请求服务端
 func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo) error {
 	end := time.Now().Add(internalClient.config.MaxRetryTime)
@@ -258,6 +262,10 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 			// fmt.Println("hit retry", uri, err, *e.Code, Value)
 			if value <= 0 {
 				return err
+			}
+
+			if internalClient.RetryNotify != nil {
+				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
 			}
 
 			time.Sleep(time.Duration(value) * time.Millisecond)
@@ -301,6 +309,10 @@ func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, r
 				return err
 			}
 
+			if internalClient.RetryNotify != nil {
+				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
+			}
+
 			time.Sleep(time.Duration(value) * time.Millisecond)
 		} else {
 			if len(respBody) == 0 {
@@ -319,6 +331,11 @@ func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, r
 			if value <= 0 {
 				return nil
 			}
+
+			if internalClient.RetryNotify != nil {
+				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
+			}
+
 			time.Sleep(time.Duration(value) * time.Millisecond)
 		}
 	}
@@ -578,6 +595,8 @@ func (internalClient *internalClient) shouldRetry(errorCode string, errorMsg str
 	if internalClient.CustomizedRetryFunc != nil {
 		if internalClient.CustomizedRetryFunc(errorCode, errorMsg, action, statusCode) == true {
 			return true
+		} else if !internalClient.KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc {
+			return false
 		}
 	}
 	return shouldRetryViaErrorAndAction(errorCode, errorMsg, action)
@@ -668,6 +687,20 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 
 func (tableStoreClient *TableStoreClient) GetExternalHeader() map[string]string {
 	return tableStoreClient.externalHeader
+}
+
+func (tableStoreClient *TableStoreClient) GetRetryNotify() RetryNotify {
+	if tableStoreClient.internalClient == nil {
+		return nil
+	}
+	return tableStoreClient.RetryNotify
+}
+
+func (tableStoreClient *TableStoreClient) SetRetryNotify(retryNotify RetryNotify) {
+	if tableStoreClient.internalClient == nil {
+		return
+	}
+	tableStoreClient.RetryNotify = retryNotify
 }
 
 // table API
@@ -1277,6 +1310,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesAnalyticalStore(reques
 	req := new(otsprotocol.DeleteTimeseriesAnalyticalStoreRequest)
 	req.TableName = proto.String(request.timeseriesTableName)
 	req.StoreName = proto.String(request.analyticalStoreName)
+	req.DropMappingTable = proto.Bool(request.dropMappingTable)
 
 	resp := new(otsprotocol.DeleteTimeseriesAnalyticalStoreResponse)
 	response := new(DeleteTimeseriesAnalyticalStoreResponse)

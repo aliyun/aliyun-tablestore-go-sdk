@@ -29,11 +29,14 @@ type internalClient struct {
 	random     *rand.Rand
 	mu         *sync.Mutex
 
-	externalHeader      map[string]string
-	CustomizedRetryFunc CustomizedRetryNotMatterActions
+	externalHeader                                        map[string]string
+	CustomizedRetryFunc                                   CustomizedRetryNotMatterActions
+	KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc bool
 
 	timeseriesConfiguration *TimeseriesConfiguration
 	credentialsProvider     common.CredentialsProvider
+
+	RetryNotify RetryNotify
 }
 
 const initMapLen int = 8
@@ -929,6 +932,7 @@ type IndexMeta struct {
 	Primarykey     []string
 	DefinedColumns []string
 	IndexType      IndexType
+	IndexSyncPhase *SyncPhase
 }
 
 type DefinedColumnSchema struct {
@@ -2327,6 +2331,7 @@ type CreateTimeseriesAnalyticalStoreResponse struct {
 type DeleteTimeseriesAnalyticalStoreRequest struct {
 	timeseriesTableName string
 	analyticalStoreName string
+	dropMappingTable    bool
 }
 
 func NewDeleteTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStoreName string) *DeleteTimeseriesAnalyticalStoreRequest {
@@ -2334,6 +2339,10 @@ func NewDeleteTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analy
 		timeseriesTableName: timeseriesTableName,
 		analyticalStoreName: analyticalStoreName,
 	}
+}
+
+func (deleteTimeseriesAnalyticalStoreRequest *DeleteTimeseriesAnalyticalStoreRequest) SetDropMappingTable(dropMappingTable bool) {
+	deleteTimeseriesAnalyticalStoreRequest.dropMappingTable = dropMappingTable
 }
 
 type DeleteTimeseriesAnalyticalStoreResponse struct {

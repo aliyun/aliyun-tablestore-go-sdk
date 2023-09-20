@@ -24,6 +24,7 @@ var queryTimeseriesMetaTableName = "querytimeseriestable"
 var timeNow = int64(1)
 var timeseriesTableName = "timeseriestable"
 
+var tableStoreClient *TableStoreClient
 var timeseriesClient *TimeseriesClient
 var invalidTimeseriesClient *TimeseriesClient
 
@@ -36,8 +37,23 @@ func (s *TimeseriesSuite) SetUpSuite(c *C) {
 	timeseriesTableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
 	defaultTimeseriesTableName = timeseriesTableNamePrefix + defaultTimeseriesTableName
 
+	tableStoreClient = NewClient(endPoint, instanceName, accessKeyId, accessKeySecret)
 	timeseriesClient = NewTimeseriesClient(endPoint, instanceName, accessKeyId, accessKeySecret)
 	invalidTimeseriesClient = NewTimeseriesClient(endPoint, instanceName, accessKeyId, "invalidsecret")
+}
+
+func (s *TimeseriesSuite) TearDownSuite(c *C) {
+	s.deleteTimeseriesTable("test_analytical_store1")
+	s.deleteTimeseriesTable("test_analytical_store2")
+	s.deleteTimeseriesTable("test_analytical_store3")
+	s.deleteTimeseriesTable("test_create_and_delete_analytical_store1")
+	s.deleteTimeseriesTable("test_create_and_delete_analytical_store2")
+	s.deleteTimeseriesTable("test_update_analytical_store")
+	s.deleteTimeseriesTable("test_describe_index_sync_phase")
+}
+
+func (s *TimeseriesSuite) deleteTimeseriesTable(tableName string) {
+	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest(tableName))
 }
 
 func PrepareTimeseriesTable(timeseriesTableName string) error {
@@ -613,11 +629,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 0)
 }
 
-func (s *TimeseriesSuite) TestAnalyticalStore(c *C) {
-	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store1"))
-	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store2"))
-	_, _ = timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest("test_analytical_store3"))
-
+func (s *TimeseriesSuite) TestCreateAnalyticalStoreWithTimeseriesTable(c *C) {
 	// create table with default analytical store
 	meta := NewTimeseriesTableMeta("test_analytical_store1")
 	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
@@ -643,7 +655,7 @@ func (s *TimeseriesSuite) TestAnalyticalStore(c *C) {
 	c.Assert(analyticalStore.TimeToLive, DeepEquals, proto.Int32(-1))
 	c.Assert(*analyticalStore.SyncOption, Equals, SYNC_TYPE_FULL)
 	syncStat := describeAnalyticalStoreResponse.SyncStat
-	c.Assert(syncStat.SyncPhase, Equals, SYNC_TYPE_FULL)
+	c.Assert(syncStat.SyncPhase, Equals, SYNC_TYPE_INCR)
 	c.Assert(syncStat.CurrentSyncTimestamp, Equals, int64(0))
 	storageSize := describeAnalyticalStoreResponse.StorageSize
 	c.Assert(storageSize, IsNil)
@@ -685,4 +697,155 @@ func (s *TimeseriesSuite) TestAnalyticalStore(c *C) {
 	c.Assert(analyticalStores[0].StoreName, Equals, "custom_analytical_store")
 	c.Assert(analyticalStores[0].TimeToLive, DeepEquals, proto.Int32(888888))
 	c.Assert(*analyticalStores[0].SyncOption, Equals, SYNC_TYPE_FULL)
+}
+
+func (s *TimeseriesSuite) TestCreateAndDeleteAnalyticalStore(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_create_and_delete_analytical_store1")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(false)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	meta = NewTimeseriesTableMeta("test_create_and_delete_analytical_store2")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest = NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(false)
+	_, err = timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// create full sync analytical store
+	analyticalStore := NewTimeseriesAnalyticalStore("full_sync_analytical_store")
+	analyticalStore.SetSyncOption(SYNC_TYPE_FULL)
+	analyticalStore.SetTimeToLive(-1)
+	createAnalyticalStoreRequest := NewCreateTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store1", analyticalStore)
+	_, err = timeseriesClient.CreateTimeseriesAnalyticalStore(createAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	describeAnalyticalStoreRequest := NewDescribeTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store1", "full_sync_analytical_store")
+	describeAnalyticalStoreResponse, err := timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "full_sync_analytical_store")
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(-1))
+	c.Assert(*describeAnalyticalStoreResponse.AnalyticalStore.SyncOption, Equals, SYNC_TYPE_FULL)
+	c.Assert(describeAnalyticalStoreResponse.SyncStat.SyncPhase, Equals, SYNC_TYPE_FULL)
+	c.Assert(describeAnalyticalStoreResponse.SyncStat.CurrentSyncTimestamp, Equals, int64(0))
+	c.Assert(describeAnalyticalStoreResponse.StorageSize, IsNil)
+
+	// delete analytical store without mapping table
+	deleteAnalyticalStoreRequest := NewDeleteTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store1", "full_sync_analytical_store")
+	_, err = timeseriesClient.DeleteTimeseriesAnalyticalStore(deleteAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+
+	// create incremental sync analytical store
+	analyticalStore = NewTimeseriesAnalyticalStore("incr_sync_analytical_store")
+	analyticalStore.SetSyncOption(SYNC_TYPE_INCR)
+	analyticalStore.SetTimeToLive(100000)
+	createAnalyticalStoreRequest = NewCreateTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store2", analyticalStore)
+	_, err = timeseriesClient.CreateTimeseriesAnalyticalStore(createAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	describeAnalyticalStoreRequest = NewDescribeTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store2", "incr_sync_analytical_store")
+	describeAnalyticalStoreResponse, err = timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "incr_sync_analytical_store")
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(100000))
+	c.Assert(*describeAnalyticalStoreResponse.AnalyticalStore.SyncOption, Equals, SYNC_TYPE_INCR)
+	c.Assert(describeAnalyticalStoreResponse.SyncStat.SyncPhase, Equals, SYNC_TYPE_INCR)
+	c.Assert(describeAnalyticalStoreResponse.SyncStat.CurrentSyncTimestamp, Equals, int64(0))
+	c.Assert(describeAnalyticalStoreResponse.StorageSize, IsNil)
+
+	// create sql mapping table
+	createSqlMappingTableRequest := &SQLQueryRequest{Query: "CREATE TABLE `test_create_and_delete_analytical_store2::cpu` (" +
+		"`_m_name` varchar(1024) NOT NULL," +
+		"`_data_source` varchar(1024) NOT NULL," +
+		"`_tags` varchar(1024) NOT NULL," +
+		"`_time` bigint(20) NOT NULL," +
+		"PRIMARY KEY (`_m_name`,`_data_source`,`_tags`,`_time`)" +
+		") ENGINE=AnalyticalStore"}
+	_, err = tableStoreClient.SQLQuery(createSqlMappingTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// delete analytical store with mapping table
+	deleteAnalyticalStoreRequest = NewDeleteTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store2", "incr_sync_analytical_store")
+	_, err = timeseriesClient.DeleteTimeseriesAnalyticalStore(deleteAnalyticalStoreRequest)
+	c.Assert(err, NotNil)
+
+	// delete analytical store and drop mapping table
+	deleteAnalyticalStoreRequest = NewDeleteTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store2", "incr_sync_analytical_store")
+	deleteAnalyticalStoreRequest.SetDropMappingTable(true)
+	_, err = timeseriesClient.DeleteTimeseriesAnalyticalStore(deleteAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	showTablesResponse, err := tableStoreClient.SQLQuery(&SQLQueryRequest{Query: "SHOW TABLES"})
+	c.Assert(err, Equals, nil)
+	for showTablesResponse.ResultSet.HasNext() {
+		row := showTablesResponse.ResultSet.Next()
+		tableName, err := row.GetString(0)
+		c.Assert(err, Equals, nil)
+		c.Assert(tableName, Not(Equals), "test_create_and_delete_analytical_store2::cpu")
+	}
+}
+
+func (s *TimeseriesSuite) TestUpdateAnalyticalStore(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_update_analytical_store")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	describeAnalyticalStoreRequest := NewDescribeTimeseriesAnalyticalStoreRequest("test_update_analytical_store", "default_analytical_store")
+	describeAnalyticalStoreResponse, err := timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "default_analytical_store")
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(-1))
+
+	// update analytical store
+	analyticalStore := NewTimeseriesAnalyticalStore("default_analytical_store")
+	analyticalStore.SetTimeToLive(86400)
+	updateAnalyticalStoreRequest := NewUpdateTimeseriesAnalyticalStoreRequest("test_update_analytical_store", analyticalStore)
+	_, err = timeseriesClient.UpdateTimeseriesAnalyticalStore(updateAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	describeAnalyticalStoreRequest = NewDescribeTimeseriesAnalyticalStoreRequest("test_update_analytical_store", "default_analytical_store")
+	describeAnalyticalStoreResponse, err = timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "default_analytical_store")
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(86400))
+}
+
+func (s *TimeseriesSuite) TestDescribeIndexSyncPhase(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_describe_index_sync_phase")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe table
+	describeTableRequest := &DescribeTableRequest{TableName: "test_describe_index_sync_phase#timeseries"}
+	describeTableResponse, err := tableStoreClient.DescribeTable(describeTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(describeTableResponse.IndexMetas), Equals, 1)
+	c.Assert(*describeTableResponse.IndexMetas[0].IndexSyncPhase, Equals, SyncPhase_INCR)
+
+	// delete default analytical store
+	deleteAnalyticalStoreRequest := NewDeleteTimeseriesAnalyticalStoreRequest("test_describe_index_sync_phase", "default_analytical_store")
+	_, err = timeseriesClient.DeleteTimeseriesAnalyticalStore(deleteAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+
+	// create full sync analytical store
+	analyticalStore := NewTimeseriesAnalyticalStore("full_sync_analytical_store")
+	analyticalStore.SetSyncOption(SYNC_TYPE_FULL)
+	analyticalStore.SetTimeToLive(-1)
+	createAnalyticalStoreRequest := NewCreateTimeseriesAnalyticalStoreRequest("test_describe_index_sync_phase", analyticalStore)
+	_, err = timeseriesClient.CreateTimeseriesAnalyticalStore(createAnalyticalStoreRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe table
+	describeTableRequest = &DescribeTableRequest{TableName: "test_describe_index_sync_phase#timeseries"}
+	describeTableResponse, err = tableStoreClient.DescribeTable(describeTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(describeTableResponse.IndexMetas), Equals, 1)
+	c.Assert(*describeTableResponse.IndexMetas[0].IndexSyncPhase, Equals, SyncPhase_FULL)
 }

@@ -570,6 +570,20 @@ type DescribeSearchIndexRequest struct {
 
 type SyncPhase int32
 
+func (sp *SyncPhase) String() string {
+	if sp == nil {
+		return "UNKNOWN"
+	}
+	switch *sp {
+	case SyncPhase_FULL:
+		return "FULL"
+	case SyncPhase_INCR:
+		return "INCR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
 const (
 	SyncPhase_FULL SyncPhase = 1
 	SyncPhase_INCR SyncPhase = 2

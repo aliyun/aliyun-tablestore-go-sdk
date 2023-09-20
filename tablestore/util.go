@@ -1020,10 +1020,12 @@ func ConvertPbIndexTypeToIndexType(indexType *otsprotocol.IndexType) IndexType {
 		return IT_LOCAL_INDEX
 	}
 }
+
 func ConvertPbIndexMetaToIndexMeta(meta *otsprotocol.IndexMeta) *IndexMeta {
 	indexmeta := &IndexMeta{
-		IndexName: *meta.Name,
-		IndexType: ConvertPbIndexTypeToIndexType(meta.IndexType),
+		IndexName:      *meta.Name,
+		IndexType:      ConvertPbIndexTypeToIndexType(meta.IndexType),
+		IndexSyncPhase: (*SyncPhase)(meta.IndexSyncPhase),
 	}
 
 	for _, pk := range meta.PrimaryKey {
