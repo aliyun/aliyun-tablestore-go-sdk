@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -228,10 +229,10 @@ func NewClientWithExternalHeader(endPoint, instanceName, accessKeyId, accessKeyS
 	return tableStoreClient
 }
 
-type RetryNotify func(requestId string, err error, action string, backoffDuration time.Duration)
+type RetryNotify func(traceId, requestId string, err error, action string, backoffDuration time.Duration)
 
 // 请求服务端
-func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo) error {
+func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo, extraInfo ExtraRequestInfo) error {
 	end := time.Now().Add(internalClient.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", internalClient.endPoint, uri)
 	/* request body */
@@ -251,7 +252,7 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 	var respBody []byte
 	var requestId string
 	for i = 0; ; i++ {
-		respBody, err, requestId = internalClient.doRequest(url, uri, body, resp)
+		respBody, err, requestId = internalClient.doRequest(url, uri, body, resp, extraInfo)
 		responseInfo.RequestId = requestId
 
 		if err == nil {
@@ -265,7 +266,11 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 			}
 
 			if internalClient.RetryNotify != nil {
-				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
+				traceId := ""
+				if extraInfo.userTraceID != nil {
+					traceId = *extraInfo.userTraceID
+				}
+				internalClient.RetryNotify(traceId, requestId, err, uri, time.Duration(value)*time.Millisecond)
 			}
 
 			time.Sleep(time.Duration(value) * time.Millisecond)
@@ -284,7 +289,7 @@ func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp p
 	return nil
 }
 
-func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo) error {
+func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo, extraInfo ExtraRequestInfo) error {
 	end := time.Now().Add(internalClient.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", internalClient.endPoint, uri)
 	/* request body */
@@ -298,7 +303,7 @@ func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, r
 	var requestId string
 	for i := uint(0); ; i++ {
 
-		respBody, err, requestId = internalClient.doRequest(url, uri, body, resp)
+		respBody, err, requestId = internalClient.doRequest(url, uri, body, resp, extraInfo)
 		responseInfo.RequestId = requestId
 
 		if err != nil {
@@ -310,7 +315,11 @@ func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, r
 			}
 
 			if internalClient.RetryNotify != nil {
-				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
+				traceId := ""
+				if extraInfo.userTraceID != nil {
+					traceId = *extraInfo.userTraceID
+				}
+				internalClient.RetryNotify(traceId, requestId, err, uri, time.Duration(value)*time.Millisecond)
 			}
 
 			time.Sleep(time.Duration(value) * time.Millisecond)
@@ -332,8 +341,12 @@ func (internalClient *internalClient) doBatchRequestWithRetry(uri string, req, r
 				return nil
 			}
 
+			traceId := ""
+			if extraInfo.userTraceID != nil {
+				traceId = *extraInfo.userTraceID
+			}
 			if internalClient.RetryNotify != nil {
-				internalClient.RetryNotify(requestId, err, uri, time.Duration(value)*time.Millisecond)
+				internalClient.RetryNotify(traceId, requestId, err, uri, time.Duration(value)*time.Millisecond)
 			}
 
 			time.Sleep(time.Duration(value) * time.Millisecond)
@@ -446,7 +459,7 @@ func generateBatchRequest(resp proto.Message, originRequest proto.Message, uri s
 			for _, rowResult := range table.GetRows() {
 				if !rowResult.GetIsOk() {
 					// 只有所有失败的行可重试时，批量操作才可以重试
-					if !shouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
+					if !ShouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
 						return nil, false, nil
 					}
 					respContainsFailedRows = true
@@ -488,7 +501,7 @@ func generateBatchRequest(resp proto.Message, originRequest proto.Message, uri s
 			for _, rowResult := range table.GetRows() {
 				if !rowResult.GetIsOk() {
 					// 只有所有失败的行可重试时，批量操作才可以重试
-					if !shouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
+					if !ShouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
 						return nil, false, nil
 					}
 
@@ -599,10 +612,10 @@ func (internalClient *internalClient) shouldRetry(errorCode string, errorMsg str
 			return false
 		}
 	}
-	return shouldRetryViaErrorAndAction(errorCode, errorMsg, action)
+	return ShouldRetryViaErrorAndAction(errorCode, errorMsg, action)
 }
 
-func shouldRetryViaErrorAndAction(errorCode string, errorMsg string, action string) bool {
+func ShouldRetryViaErrorAndAction(errorCode string, errorMsg string, action string) bool {
 	if retryNotMatterActions(errorCode, errorMsg) == true {
 		return true
 	}
@@ -636,7 +649,7 @@ func isIdempotent(action string) bool {
 		action == listSearchIndexUri
 }
 
-func (internalClient *internalClient) doRequest(url string, uri string, body []byte, resp proto.Message) ([]byte, error, string) {
+func (internalClient *internalClient) doRequest(url string, uri string, body []byte, resp proto.Message, extraInfo ExtraRequestInfo) ([]byte, error, string) {
 	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err, ""
@@ -663,6 +676,20 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 	otshead.set(xOtsDate, date)
 	otshead.set(xOtsApiversion, ApiVersion)
 	otshead.set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
+
+	if extraInfo.userTraceID != nil {
+		hreq.Header.Set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
+		otshead.set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
+	}
+	if extraInfo.requestExtension != nil && extraInfo.requestExtension.priority != nil {
+		hreq.Header.Set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
+		otshead.set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
+	}
+	if extraInfo.requestExtension != nil && extraInfo.requestExtension.tag != nil {
+		hreq.Header.Set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
+		otshead.set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
+	}
+
 	if akInfo.GetSecurityToken() != "" {
 		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
@@ -818,7 +845,7 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 
 	resp := new(otsprotocol.CreateTableResponse)
 	response := &CreateTableResponse{}
-	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(createTableUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -850,7 +877,7 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateT
 
 	resp := new(otsprotocol.CreateTimeseriesTableResponse)
 	response := &CreateTimeseriesTableResponse{}
-	if err := timeseriesClient.doRequestWithRetry(createTimeseriesTable, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(createTimeseriesTable, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -891,7 +918,7 @@ func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseri
 
 	resp := new(otsprotocol.PutTimeseriesDataResponse)
 	response := &PutTimeseriesDataResponse{}
-	if err := timeseriesClient.doRequestWithRetry(putTimeseriesData, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(putTimeseriesData, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -997,7 +1024,7 @@ func (timeseriesClient *TimeseriesClient) GetTimeseriesData(request *GetTimeseri
 	resp := new(otsprotocol.GetTimeseriesDataResponse)
 	response := new(GetTimeseriesDataResponse)
 
-	if err = timeseriesClient.doRequestWithRetry(getTimeseriesData, req, resp, &response.ResponseInfo); err != nil {
+	if err = timeseriesClient.doRequestWithRetry(getTimeseriesData, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1025,7 +1052,7 @@ func (timeseriesClient *TimeseriesClient) DescribeTimeseriesTable(request *Descr
 
 	resp := new(otsprotocol.DescribeTimeseriesTableResponse)
 	response := new(DescribeTimeseriesTableResponse)
-	if err := timeseriesClient.doRequestWithRetry(describeTimeseriesTable, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(describeTimeseriesTable, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1053,7 +1080,7 @@ func (timeseriesClient *TimeseriesClient) ListTimeseriesTable() (*ListTimeseries
 	resp := new(otsprotocol.ListTimeseriesTableResponse)
 	response := new(ListTimeseriesTableResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(listTimeseriesTable, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(listTimeseriesTable, req, resp, &response.ResponseInfo, ExtraRequestInfo{}); err != nil {
 		return nil, err
 	}
 
@@ -1082,7 +1109,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesTable(request *DeleteT
 	resp := new(otsprotocol.DeleteTimeseriesTableResponse)
 	response := new(DeleteTimeseriesTableResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesTable, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesTable, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1120,7 +1147,7 @@ func (timeseriesClient *TimeseriesClient) QueryTimeseriesMeta(request *QueryTime
 
 	resp := new(otsprotocol.QueryTimeseriesMetaResponse)
 	response := new(QueryTimeseriesMetaResponse)
-	if err := timeseriesClient.doRequestWithRetry(queryTimeseriesMeta, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(queryTimeseriesMeta, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1156,7 +1183,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesTable(request *UpdateT
 	resp := new(otsprotocol.UpdateTimeseriesTableRequest)
 	response := new(UpdateTimeseriesTableResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesTable, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesTable, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1207,7 +1234,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesMeta(request *UpdateTi
 	resp := new(otsprotocol.UpdateTimeseriesMetaResponse)
 	response := new(UpdateTimeseriesMetaResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesMeta, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesMeta, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1255,7 +1282,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesMeta(request *DeleteTi
 	resp := new(otsprotocol.DeleteTimeseriesMetaResponse)
 	response := new(DeleteTimeseriesMetaResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesMeta, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesMeta, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1292,7 +1319,7 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesAnalyticalStore(reques
 	resp := new(otsprotocol.CreateTimeseriesAnalyticalStoreResponse)
 	response := new(CreateTimeseriesAnalyticalStoreResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(createTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(createTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1315,7 +1342,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesAnalyticalStore(reques
 	resp := new(otsprotocol.DeleteTimeseriesAnalyticalStoreResponse)
 	response := new(DeleteTimeseriesAnalyticalStoreResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(deleteTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1337,7 +1364,7 @@ func (timeseriesClient *TimeseriesClient) DescribeTimeseriesAnalyticalStore(requ
 	resp := new(otsprotocol.DescribeTimeseriesAnalyticalStoreResponse)
 	response := new(DescribeTimeseriesAnalyticalStoreResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(describeTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(describeTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1381,7 +1408,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesAnalyticalStore(reques
 	resp := new(otsprotocol.UpdateTimeseriesAnalyticalStoreResponse)
 	response := new(UpdateTimeseriesAnalyticalStoreResponse)
 
-	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo); err != nil {
+	if err := timeseriesClient.doRequestWithRetry(updateTimeseriesAnalyticalStore, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1400,7 +1427,7 @@ func (tableStoreClient *TableStoreClient) CreateIndex(request *CreateIndexReques
 
 	resp := new(otsprotocol.CreateIndexResponse)
 	response := &CreateIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(createIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(createIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1418,7 +1445,7 @@ func (tableStoreClient *TableStoreClient) DeleteIndex(request *DeleteIndexReques
 
 	resp := new(otsprotocol.DropIndexResponse)
 	response := &DeleteIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(dropIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(dropIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1433,7 +1460,7 @@ func (tableStoreClient *TableStoreClient) DeleteIndex(request *DeleteIndexReques
 func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error) {
 	resp := new(otsprotocol.ListTableResponse)
 	response := &ListTableResponse{}
-	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(listTableUri, nil, resp, &response.ResponseInfo, ExtraRequestInfo{}); err != nil {
 		return response, err
 	}
 
@@ -1451,7 +1478,7 @@ func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableReques
 	req.TableName = proto.String(request.TableName)
 
 	response := &DeleteTableResponse{}
-	if err := tableStoreClient.doRequestWithRetry(deleteTableUri, req, nil, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteTableUri, req, nil, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1467,7 +1494,7 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	resp := new(otsprotocol.DescribeTableResponse)
 	response := new(DescribeTableResponse)
 
-	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(describeTableUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return &DescribeTableResponse{}, err
 	}
 
@@ -1596,7 +1623,7 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 	resp := new(otsprotocol.UpdateTableResponse)
 	response := new(UpdateTableResponse)
 
-	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateTableUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1635,7 +1662,7 @@ func (tableStoreClient *TableStoreClient) AddDefinedColumn(request *AddDefinedCo
 
 	resp := new(otsprotocol.AddDefinedColumnResponse)
 	response := &AddDefinedColumnResponse{}
-	if err := tableStoreClient.doRequestWithRetry(adddefinedcolumnuri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(adddefinedcolumnuri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1653,7 +1680,7 @@ func (tableStoreClient *TableStoreClient) DeleteDefinedColumn(request *DeleteDef
 
 	resp := new(otsprotocol.DeleteDefinedColumnResponse)
 	response := &DeleteDefinedColumnResponse{}
-	if err := tableStoreClient.doRequestWithRetry(deletedefinedcolumnuri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deletedefinedcolumnuri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -1698,7 +1725,7 @@ func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRo
 
 	resp := new(otsprotocol.PutRowResponse)
 	response := &PutRowResponse{}
-	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(putRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1735,7 +1762,7 @@ func (tableStoreClient *TableStoreClient) DeleteRow(request *DeleteRowRequest) (
 
 	resp := new(otsprotocol.DeleteRowResponse)
 	response := &DeleteRowResponse{}
-	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1792,7 +1819,7 @@ func (tableStoreClient *TableStoreClient) GetRow(request *GetRowRequest) (*GetRo
 	}
 
 	response := &GetRowResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
-	if err := tableStoreClient.doRequestWithRetry(getRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(getRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1844,7 +1871,7 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 		req.ReturnContent = &content
 	}
 
-	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -1914,7 +1941,7 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 	resp := new(otsprotocol.BatchGetRowResponse)
 
 	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
-	if err := tableStoreClient.doBatchRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doBatchRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2009,7 +2036,7 @@ func (tableStoreClient *TableStoreClient) BatchWriteRow(request *BatchWriteRowRe
 	resp := new(otsprotocol.BatchWriteRowResponse)
 	response := &BatchWriteRowResponse{TableToRowsResult: make(map[string][]RowResult)}
 
-	if err := tableStoreClient.doBatchRequestWithRetry(batchWriteRowUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doBatchRequestWithRetry(batchWriteRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2124,7 +2151,7 @@ func (tableStoreClient *TableStoreClient) GetRange(request *GetRangeRequest) (*G
 
 	resp := new(otsprotocol.GetRangeResponse)
 	response := &GetRangeResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
-	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(getRangeUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2234,7 +2261,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 	// do request
 	pbResp := otsprotocol.SQLQueryResponse{}
 	response := &SQLQueryResponse{SQLQueryConsumed: &SQLQueryConsumed{}}
-	if err := client.doRequestWithRetry(sqlQueryUri, pbReq, &pbResp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(sqlQueryUri, pbReq, &pbResp, &response.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2293,7 +2320,7 @@ func (client *TableStoreClient) ListStream(req *ListStreamRequest) (*ListStreamR
 
 	pbResp := otsprotocol.ListStreamResponse{}
 	resp := ListStreamResponse{}
-	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(listStreamUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2317,7 +2344,7 @@ func (client *TableStoreClient) DescribeStream(req *DescribeStreamRequest) (*Des
 	}
 	pbResp := otsprotocol.DescribeStreamResponse{}
 	resp := DescribeStreamResponse{}
-	if err := client.doRequestWithRetry(describeStreamUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(describeStreamUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2359,7 +2386,7 @@ func (client *TableStoreClient) GetShardIterator(req *GetShardIteratorRequest) (
 
 	pbResp := otsprotocol.GetShardIteratorResponse{}
 	resp := GetShardIteratorResponse{}
-	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(getShardIteratorUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2380,7 +2407,7 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 
 	pbResp := otsprotocol.GetStreamRecordResponse{}
 	resp := GetStreamRecordResponse{}
-	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2508,7 +2535,7 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 
 	pbResp := otsprotocol.ComputeSplitPointsBySizeResponse{}
 	resp := ComputeSplitPointsBySizeResponse{}
-	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp, &resp.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(computeSplitPointsBySizeRequestUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2566,7 +2593,7 @@ func (client *TableStoreClient) StartLocalTransaction(request *StartLocalTransac
 	req.Key = request.PrimaryKey.Build(false)
 
 	response := &StartLocalTransactionResponse{}
-	if err := client.doRequestWithRetry(createlocaltransactionuri, req, resp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(createlocaltransactionuri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2581,7 +2608,7 @@ func (client *TableStoreClient) CommitTransaction(request *CommitTransactionRequ
 	req.TransactionId = request.TransactionId
 
 	response := &CommitTransactionResponse{}
-	if err := client.doRequestWithRetry(committransactionuri, req, resp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(committransactionuri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2595,7 +2622,7 @@ func (client *TableStoreClient) AbortTransaction(request *AbortTransactionReques
 	req.TransactionId = request.TransactionId
 
 	response := &AbortTransactionResponse{}
-	if err := client.doRequestWithRetry(aborttransactionuri, req, resp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(aborttransactionuri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
@@ -2611,7 +2638,7 @@ func (client *TableStoreClient) CreateDeliveryTask(request *CreateDeliveryTaskRe
 	}
 	pbResp := new(otsprotocol.CreateDeliveryTaskResponse)
 	response := new(CreateDeliveryTaskResponse)
-	if err := client.doRequestWithRetry(createDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(createDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -2624,7 +2651,7 @@ func (client *TableStoreClient) DeleteDeliveryTask(request *DeleteDeliveryTaskRe
 	}
 	pbResp := new(otsprotocol.DeleteDeliveryTaskResponse)
 	response := new(DeleteDeliveryTaskResponse)
-	if err := client.doRequestWithRetry(deleteDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(deleteDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -2636,7 +2663,7 @@ func (client *TableStoreClient) ListDeliveryTask(request *ListDeliveryTaskReques
 	}
 	pbResp := new(otsprotocol.ListDeliveryTaskResponse)
 	response := new(ListDeliveryTaskResponse)
-	if err := client.doRequestWithRetry(listDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(listDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	response.Tasks = make([]*DeliveryTaskInfo, len(pbResp.Tasks))
@@ -2657,7 +2684,7 @@ func (client *TableStoreClient) DescribeDeliveryTask(request *DescribeDeliveryTa
 	}
 	pbResp := new(otsprotocol.DescribeDeliveryTaskResponse)
 	response := new(DescribeDeliveryTaskResponse)
-	if err := client.doRequestWithRetry(describeDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(describeDeliveryTaskUri, pbReq, pbResp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	response.TaskType = TaskType(pbResp.GetTaskType())
@@ -2677,7 +2704,7 @@ func (client *TableStoreClient) ComputeSplits(request *ComputeSplitsRequest) (*C
 	}
 
 	response := &ComputeSplitsResponse{}
-	if err := client.doRequestWithRetry(computeSplitsUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := client.doRequestWithRetry(computeSplitsUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 

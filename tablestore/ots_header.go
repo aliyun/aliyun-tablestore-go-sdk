@@ -20,6 +20,9 @@ const (
 	xOtsRequestCompressType     = "x-ots-request-compress-type"
 	xOtsRequestCompressSize     = "x-ots-request-compress-size"
 	xOtsResponseCompressTye     = "x-ots-response-compress-type"
+	xOtsHeaderSDKTraceID        = "x-ots-sdk-traceid"
+	xOtsHeaderRequestPriority   = "x-ots-request-priority"
+	xOtsHeaderRequestTag        = "x-ots-request-tag"
 	xOtsHeaderTunnelType        = "x-ots-tunnel-type"
 	xOtsHeaderPlayerAccountId   = "x-ots-playeraccountid"
 	XOtsHeaderAdminTaskType     = "x-ots-admin-task-type"
@@ -57,6 +60,9 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsHeaderPlayerAccountId, must: false},
 		&otsHeader{name: XOtsHeaderAdminTaskType, must: false},
 		&otsHeader{name: XOtsHeaderAdminTargetUserId, must: false},
+		&otsHeader{name: xOtsHeaderSDKTraceID, must: false},
+		&otsHeader{name: xOtsHeaderRequestPriority, must: false},
+		&otsHeader{name: xOtsHeaderRequestTag, must: false},
 	}
 
 	sort.Sort(h)

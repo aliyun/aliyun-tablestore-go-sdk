@@ -1,6 +1,5 @@
 package search
 
-
 import (
 	"github.com/stretchr/testify/assert"
 	"math"
@@ -19,7 +18,7 @@ func TestGroupByFilter_GetType(t *testing.T) {
 }
 
 func TestGroupByFilter_Query(t *testing.T) {
-	queries := []Query {
+	queries := []Query{
 		&MatchAllQuery{},
 		&TermQuery{FieldName: "field1", Term: "value"},
 	}
@@ -31,7 +30,7 @@ func TestGroupByFilter_Query(t *testing.T) {
 }
 
 func TestGroupByFilter_SubAggregation(t *testing.T) {
-	subAggList := []Aggregation {
+	subAggList := []Aggregation{
 		&MaxAggregation{AggName: "sub_agg1", Field: "field1"},
 		&SumAggregation{AggName: "sub_agg2", Field: "field2"},
 	}
@@ -49,9 +48,9 @@ func TestGroupByFilter_SubAggregation(t *testing.T) {
 }
 
 func TestGroupByFilter_SubGroupBy(t *testing.T) {
-	subGroupByList := []GroupBy {
-		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query {&MatchAllQuery{}}},
-		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from:2, to: math.Inf(1)}}},
+	subGroupByList := []GroupBy{
+		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query{&MatchAllQuery{}}},
+		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from: 2, to: math.Inf(1)}}},
 	}
 
 	{

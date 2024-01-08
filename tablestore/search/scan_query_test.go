@@ -9,9 +9,9 @@ import (
 
 func TestSerialize(t *testing.T) {
 	scanQuery := scanQuery{
-		Query:             &MatchQuery{
-			FieldName:          "field1",
-			Text:               "value1",
+		Query: &MatchQuery{
+			FieldName: "field1",
+			Text:      "value1",
 		},
 		Limit:             proto.Int32(6),
 		AliveTime:         proto.Int32(36),
@@ -23,21 +23,21 @@ func TestSerialize(t *testing.T) {
 
 	//expected
 	matchQueryPB := &otsprotocol.MatchQuery{
-		FieldName:            proto.String("field1"),
-		Text:                 proto.String("value1"),
+		FieldName: proto.String("field1"),
+		Text:      proto.String("value1"),
 	}
 	matchQueryBytes, _ := proto.Marshal(matchQueryPB)
 	queryPB := &otsprotocol.Query{
-		Type:                 QueryType_MatchQuery.ToPB(),
-		Query:                matchQueryBytes,
+		Type:  QueryType_MatchQuery.ToPB(),
+		Query: matchQueryBytes,
 	}
 	scanQueryPB := &otsprotocol.ScanQuery{
-		Query:                queryPB,
-		Limit:                proto.Int32(6),
-		AliveTime:            proto.Int32(36),
-		Token:                []byte("abc"),
-		CurrentParallelId:    proto.Int32(1),
-		MaxParallel:          proto.Int32(12),
+		Query:             queryPB,
+		Limit:             proto.Int32(6),
+		AliveTime:         proto.Int32(36),
+		Token:             []byte("abc"),
+		CurrentParallelId: proto.Int32(1),
+		MaxParallel:       proto.Int32(12),
 	}
 
 	scanQueryBytesExpected, _ := proto.Marshal(scanQueryPB)
@@ -45,7 +45,7 @@ func TestSerialize(t *testing.T) {
 }
 
 func TestSerializeLimit(t *testing.T) {
-	{	//nil
+	{ //nil
 		scanQuery := scanQuery{}
 		scanQueryBytes, _ := scanQuery.Serialize()
 
@@ -54,7 +54,7 @@ func TestSerializeLimit(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.Limit)
 	}
-	{	//<0
+	{ //<0
 		scanQuery := scanQuery{
 			Limit: proto.Int32(-1),
 		}
@@ -65,7 +65,7 @@ func TestSerializeLimit(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.Limit)
 	}
-	{	//>=0
+	{ //>=0
 		scanQuery := scanQuery{
 			Limit: proto.Int32(0),
 		}
@@ -79,7 +79,7 @@ func TestSerializeLimit(t *testing.T) {
 }
 
 func TestSerializeAliveTime(t *testing.T) {
-	{	//nil
+	{ //nil
 		scanQuery := scanQuery{}
 		scanQueryBytes, _ := scanQuery.Serialize()
 
@@ -88,7 +88,7 @@ func TestSerializeAliveTime(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.AliveTime)
 	}
-	{	//<=0
+	{ //<=0
 		scanQuery := scanQuery{
 			AliveTime: proto.Int32(0),
 		}
@@ -99,7 +99,7 @@ func TestSerializeAliveTime(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.AliveTime)
 	}
-	{	//>0
+	{ //>0
 		scanQuery := scanQuery{
 			AliveTime: proto.Int32(1),
 		}
@@ -113,7 +113,7 @@ func TestSerializeAliveTime(t *testing.T) {
 }
 
 func TestSerializeToken(t *testing.T) {
-	{	//token == nil
+	{ //token == nil
 		scanQuery := scanQuery{}
 		scanQueryBytes, _ := scanQuery.Serialize()
 
@@ -122,7 +122,7 @@ func TestSerializeToken(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.Token)
 	}
-	{	//len(token) > 0
+	{ //len(token) > 0
 		scanQuery := scanQuery{
 			Token: []byte("xyz"),
 		}
@@ -136,7 +136,7 @@ func TestSerializeToken(t *testing.T) {
 }
 
 func TestSerializeCurrentParallelID(t *testing.T) {
-	{	//nil
+	{ //nil
 		scanQuery := scanQuery{}
 		scanQueryBytes, _ := scanQuery.Serialize()
 
@@ -145,7 +145,7 @@ func TestSerializeCurrentParallelID(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.CurrentParallelId)
 	}
-	{	//<0
+	{ //<0
 		scanQuery := scanQuery{
 			CurrentParallelID: proto.Int32(-1),
 		}
@@ -156,7 +156,7 @@ func TestSerializeCurrentParallelID(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.CurrentParallelId)
 	}
-	{	//>=0
+	{ //>=0
 		scanQuery := scanQuery{
 			CurrentParallelID: proto.Int32(0),
 		}
@@ -170,7 +170,7 @@ func TestSerializeCurrentParallelID(t *testing.T) {
 }
 
 func TestSerializeMaxParallel(t *testing.T) {
-	{	//nil
+	{ //nil
 		scanQuery := scanQuery{}
 		scanQueryBytes, _ := scanQuery.Serialize()
 
@@ -179,7 +179,7 @@ func TestSerializeMaxParallel(t *testing.T) {
 
 		assert.Nil(t, scanQuery2.MaxParallel)
 	}
-	{	//<=0
+	{ //<=0
 		scanQuery := scanQuery{
 			MaxParallel: proto.Int32(0),
 		}
@@ -191,7 +191,7 @@ func TestSerializeMaxParallel(t *testing.T) {
 		assert.Nil(t, scanQuery2.MaxParallel)
 	}
 
-	{	//>0
+	{ //>0
 		scanQuery := scanQuery{
 			MaxParallel: proto.Int32(1),
 		}

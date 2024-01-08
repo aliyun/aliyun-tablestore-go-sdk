@@ -122,7 +122,7 @@ func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tabl
 		FieldType:        tablestore.FieldType_KEYWORD,
 		Index:            proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
-		IsVirtualField:   proto.Bool(true), //设置字段类型为虚拟列
+		IsVirtualField:   proto.Bool(true),     //设置字段类型为虚拟列
 		SourceFieldNames: []string{"Col_Long"}, //设置虚拟列映射的原始列
 	}
 	schemas = append(schemas, field1, field2, field3)
@@ -190,8 +190,46 @@ func CreateSearchIndexForQueryHighlighting(client *tablestore.TableStoreClient, 
 		Index:              proto.Bool(true),          // 设置开启索引
 		EnableHighlighting: proto.Bool(true),          // 设置开启字段高亮
 	}
+	field2 := &tablestore.FieldSchema{
+		FieldName: proto.String("Col_Nested"),
+		FieldType: tablestore.FieldType_NESTED,
+		FieldSchemas: []*tablestore.FieldSchema{
+			{
+				FieldName:          proto.String("Level1_Text"),
+				FieldType:          tablestore.FieldType_TEXT,
+				Index:              proto.Bool(true),
+				EnableHighlighting: proto.Bool(true),
+			},
+			{
+				FieldName: proto.String("Level1_Nested"),
+				FieldType: tablestore.FieldType_NESTED,
+				FieldSchemas: []*tablestore.FieldSchema{
+					{
+						FieldName:          proto.String("Level2_Text"),
+						FieldType:          tablestore.FieldType_TEXT,
+						Index:              proto.Bool(true),
+						EnableHighlighting: proto.Bool(true),
+					},
+				},
+			},
+		},
+	}
+	schemas = append(schemas, field1, field2)
+
+	createSearchIndex(client, tableName, indexName, schemas)
+}
+
+func CreateSearchIndexForSearchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	var schemas []*tablestore.FieldSchema
+	field1 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
+		Index:            proto.Bool(true),             // 设置开启索引
+		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+	}
+
 	schemas = append(schemas, field1)
-	
+
 	createSearchIndex(client, tableName, indexName, schemas)
 }
 
@@ -207,7 +245,7 @@ func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClie
 		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
 	}
 	field2 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword2"),  // 设置字段名，使用proto.String用于获取字符串指针
+		FieldName:        proto.String("Col_Keyword2"), // 设置字段名，使用proto.String用于获取字符串指针
 		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
 		Index:            proto.Bool(true),             // 设置开启索引
 		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
@@ -225,14 +263,14 @@ func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClie
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	schemas = append(schemas, field1, field2, field3, field4)
-	
+
 	createSearchIndex(client, tableName, indexName, schemas)
 }
 
 func createSearchIndex(client *tablestore.TableStoreClient, tableName string, indexName string, fieldSchemas []*tablestore.FieldSchema) {
 	fmt.Println("Begin to create table:", tableName)
 	createTableRequest := new(tablestore.CreateTableRequest)
-	
+
 	tableMeta := new(tablestore.TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
@@ -245,14 +283,14 @@ func createSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 	createTableRequest.TableMeta = tableMeta
 	createTableRequest.TableOption = tableOption
 	createTableRequest.ReservedThroughput = reservedThroughput
-	
+
 	_, err := client.CreateTable(createTableRequest)
 	if err != nil {
 		fmt.Println("Failed to create table with error:", err)
 	} else {
 		fmt.Println("Create table finished")
 	}
-	
+
 	// create search index
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
@@ -261,7 +299,7 @@ func createSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 	request.IndexSchema = &tablestore.IndexSchema{
 		FieldSchemas: fieldSchemas,
 	}
-	
+
 	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
@@ -340,18 +378,16 @@ func WriteData(client *tablestore.TableStoreClient, tableName string) {
 	}
 }
 
-// WriteDataForQueryHighlighting 为高亮查询测试插入数据
-func WriteDataForQueryHighlighting(client *tablestore.TableStoreClient, tableName string) {
+func WriteDateForSearchQuery(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
-	texts := []string{"When the world is dark and dreary", "And the night is long and weary,", "Look up to the stars above,", "And find the light of hope and love."}
-	
-	for idx, text := range texts {
+
+	for idx := 0; idx < 2000; idx++ {
 		putPK := new(tablestore.PrimaryKey)
 		putPK.AddPrimaryKeyColumn("pk1", strconv.Itoa(idx))
 		putRowChange := new(tablestore.PutRowChange)
 		putRowChange.TableName = tableName
 		putRowChange.PrimaryKey = putPK
-		putRowChange.AddColumn("Col_Text", text)
+		putRowChange.AddColumn("Col_Keyword", strconv.Itoa(idx))
 		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
 		putRowRequest := new(tablestore.PutRowRequest)
 		putRowRequest.PutRowChange = putRowChange
@@ -360,8 +396,71 @@ func WriteDataForQueryHighlighting(client *tablestore.TableStoreClient, tableNam
 		}
 	}
 	time.Sleep(30 * time.Second)
-	
+
 	fmt.Println("Write data finished.")
+}
+
+// WriteDataForQueryHighlighting 为高亮查询测试插入数据
+func WriteDataForQueryHighlighting(client *tablestore.TableStoreClient, tableName string) {
+	fmt.Println("Begin to write data")
+	texts := []string{"When the world is dark and dreary", "And the night is long and weary,", "Look up to the stars above,", "And find the light of hope and love."}
+
+	for idx, text := range texts {
+		putPK := new(tablestore.PrimaryKey)
+		putPK.AddPrimaryKeyColumn("pk1", strconv.Itoa(idx))
+		putRowChange := new(tablestore.PutRowChange)
+		putRowChange.TableName = tableName
+		putRowChange.PrimaryKey = putPK
+		putRowChange.AddColumn("Col_Text", text)
+		nestedData := fmt.Sprintf("[{\"Level1_Text\":\"%s\",\"Level1_Nested\":[{\"Level2_Text\":\"%s\"}]}]", text, text)
+		putRowChange.AddColumn("Col_Nested", nestedData)
+		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+		putRowRequest := new(tablestore.PutRowRequest)
+		putRowRequest.PutRowChange = putRowChange
+		if _, err := client.PutRow(putRowRequest); err != nil {
+			fmt.Println("Put test data failed with err: ", err)
+		}
+	}
+	time.Sleep(30 * time.Second)
+
+	fmt.Println("Write data finished.")
+}
+
+func SearchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to run search query")
+
+	{
+		// search limit set to -1
+		searchRequest := &tablestore.SearchRequest{}
+		searchRequest.
+			SetTableName(tableName).
+			SetColumnsToGet(&tablestore.ColumnsToGet{ReturnAllFromIndex: true}).
+			SetIndexName(indexName).
+			SetSearchQuery(search.NewSearchQuery().
+				SetLimit(-1))
+		if resp, err := client.Search(searchRequest); err != nil {
+			fmt.Println("search query failed with err: ", err)
+		} else {
+			fmt.Println("RequestId: " + resp.RequestId)
+			fmt.Printf("except: 1000, actual: %d\n",  len(resp.SearchHits))
+		}
+
+		// search limit default
+		searchRequest = &tablestore.SearchRequest{}
+		searchRequest.
+			SetTableName(tableName).
+			SetColumnsToGet(&tablestore.ColumnsToGet{ReturnAllFromIndex: true}).
+			SetIndexName(indexName).
+			SetSearchQuery(search.NewSearchQuery())
+		if resp, err := client.Search(searchRequest); err != nil {
+			fmt.Println("search query failed with err: ", err)
+		} else {
+			fmt.Println("RequestId: " + resp.RequestId)
+			fmt.Printf("except: 10, actual: %d\n",  len(resp.SearchHits))
+		}
+	}
+
+	fmt.Println("search query finished")
 }
 
 // QueryHighlightingSample 查询高亮示例
@@ -372,9 +471,67 @@ func QueryHighlightingSample(client *tablestore.TableStoreClient, tableName stri
 		SetTableName(tableName).
 		SetIndexName(indexName).
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchQuery{
-				FieldName: "Col_Text",
-				Text:      "stars dark light",
+			SetLimit(5).
+			SetQuery(&search.BoolQuery{
+				ShouldQueries: []search.Query{
+					&search.MatchQuery{
+						FieldName: "Col_Text",
+						Text:      "stars dark light",
+					},
+					&search.NestedQuery{
+						Path:      "Col_Nested",
+						ScoreMode: search.ScoreMode_Min,
+						Query: &search.BoolQuery{
+							ShouldQueries: []search.Query{
+								&search.MatchQuery{
+									FieldName: "Col_Nested.Level1_Text",
+									Text:      "starts dark light",
+								},
+								&search.NestedQuery{
+									Path:      "Col_Nested.Level1_Nested",
+									ScoreMode: search.ScoreMode_Max,
+									Query: &search.MatchQuery{
+										FieldName: "Col_Nested.Level1_Nested.Level2_Text",
+										Text:      "starts dark light",
+									},
+									InnerHits: &search.InnerHits{
+										Offset: proto.Int32(0),
+										Limit:  proto.Int32(3),
+										Highlight: &search.Highlight{
+											FieldHighlightParameters: map[string]*search.HighlightParameter{
+												"Col_Nested.Level1_Nested.Level2_Text": {
+													NumberOfFragments: proto.Int32(5),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+						InnerHits: &search.InnerHits{
+							Offset: proto.Int32(0),
+							Limit:  proto.Int32(3),
+							Sort: &search.Sort{
+								Sorters: []search.Sorter{
+									&search.ScoreSort{
+										Order: search.SortOrder_ASC.Enum(),
+									},
+								},
+							},
+							Highlight: &search.Highlight{
+								HighlightEncoder: search.PlainMode.Enum(),
+								FieldHighlightParameters: map[string]*search.HighlightParameter{
+									"Col_Nested.Level1_Text": {
+										NumberOfFragments: proto.Int32(5),
+										FragmentSize:      proto.Int32(100),
+										PreTag:            proto.String("<b>"),
+										PostTag:           proto.String("</b>"),
+									},
+								},
+							},
+						},
+					},
+				},
 			}).
 			SetHighlight(search.NewHighlight().
 				SetHighlightEncoder(search.PlainMode).
@@ -387,26 +544,43 @@ func QueryHighlightingSample(client *tablestore.TableStoreClient, tableName stri
 		fmt.Println("Highlighting query failed with err: ", err)
 	} else {
 		fmt.Println("RequestId: " + resp.RequestId)
-		for _, searchHit := range resp.SearchHits {
-			if rowBytes, err := json.Marshal(searchHit.Row); err != nil {
-				fmt.Println("marshal response row failed with err: ", err)
-				return
-			} else {
-				fmt.Println("Row: ")
-				fmt.Println(string(rowBytes))
-			}
-			
-			// json序列化将"<"、">"转义
-			if highlightResultItemByte, err := json.Marshal(searchHit.HighlightResultItem); err != nil {
-				fmt.Println("marshal response highlight result item failed with err: ", err)
-				return
-			} else {
-				fmt.Println("Highlight: ")
-				fmt.Println(string(highlightResultItemByte))
-			}
-		}
+		printSearchHit(resp.SearchHits, "  ")
 	}
 	fmt.Println("highlight query finished")
+}
+
+func printSearchHit(searchHits []*tablestore.SearchHit, padding string) {
+	for _, searchHit := range searchHits {
+		if searchHit.Score != nil {
+			fmt.Printf("%sScore: %f\n", padding, *searchHit.Score)
+		}
+
+		if searchHit.NestedDocOffset != nil {
+			fmt.Printf("%sOffset: %d\n", padding, *searchHit.NestedDocOffset)
+		}
+
+		if searchHit.Row != nil {
+			fmt.Printf("%sRow: %v\n", padding, *searchHit.Row)
+		}
+
+		if searchHit.HighlightResultItem != nil && len(searchHit.HighlightResultItem.HighlightFields) != 0 {
+			fmt.Printf("%sHighlight: \n", padding)
+			for colName, highlightResult := range searchHit.HighlightResultItem.HighlightFields {
+				fmt.Printf("%sColumnName: %s, Highlight_Fragments: %v\n", padding+padding, colName, highlightResult.Fragments)
+			}
+		}
+
+		if searchHit.SearchInnerHits != nil && len(searchHit.SearchInnerHits) != 0 {
+			fmt.Printf("%sInnerHits: \n", padding)
+			for path, innerSearchHit := range searchHit.SearchInnerHits {
+				fmt.Printf("%sPath: %s\n", padding+padding, path)
+				fmt.Printf("%sSearchHit: \n", padding+padding)
+				printSearchHit(innerSearchHit.SearchHits, padding+padding)
+			}
+		}
+
+		fmt.Println("")
+	}
 }
 
 /**
@@ -414,19 +588,19 @@ func QueryHighlightingSample(client *tablestore.TableStoreClient, tableName stri
  */
 func WriteDataForAggregationAndGroupBy(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
-	keywords := []string {"hangzhou", "tablestore", "ots"}
-	keywords2 := []string {"red", "blue"}
-	geopoints := []string {
-		"30.137817,120.08681", //飞天园区
-		"30.135131,120.088355",//中大银座
-		"30.181877,120.152818",//中医药地铁站
-		"30.20223,120.13787",//六和塔
-		"30.216961,120.157633",//八卦田
-		"30.231566,120.148578",//太子湾
-		"30.26058,120.170712", //龙翔桥
-		"30.269501,120.169347",//凤起路
-		"30.28073,120.168843",//运河
-		"30.296946,120.21958",//杭州东站
+	keywords := []string{"hangzhou", "tablestore", "ots"}
+	keywords2 := []string{"red", "blue"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
 	}
 
 	for i := 0; i < 10; i++ {
@@ -532,10 +706,10 @@ func FieldSort_missingField(client *tablestore.TableStoreClient, tableName strin
 	searchQuery.SetSort(&search.Sort{
 		Sorters: []search.Sorter{
 			&search.FieldSort{
-				FieldName: "Col_Long",
-				Order:     search.SortOrder_ASC.Enum(),
+				FieldName:    "Col_Long",
+				Order:        search.SortOrder_ASC.Enum(),
 				MissingField: proto.String("Col_Long_Sec"), //如果排序字段Col_Long缺失的时候用Col_Long_Sec替换
-				MissingValue: 50, // 如果排序字段及替换字段都缺失情况下用missingValue替换
+				MissingValue: 50,                           // 如果排序字段及替换字段都缺失情况下用missingValue替换
 				//MissingValue: search.FirstWhenMissing, // 如果missingValue设置为FirstWhenMissing，当排序字段值缺省时候排在最前面
 			},
 		},
@@ -555,7 +729,8 @@ func FieldSort_missingField(client *tablestore.TableStoreClient, tableName strin
 			panic(err)
 		}
 		fmt.Println("Row: ", string(jsonBody))
-	}}
+	}
+}
 
 /**
  *  查询表中Col_Keyword这一列的值能够匹配"hangzhou"的数据，返回匹配到的总行数和一些匹配成功的行。
@@ -1038,41 +1213,41 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 
 	analyzer1 := tablestore.Analyzer_SingleWord
 	analyzerParam1 := tablestore.SingleWordAnalyzerParameter{
-		CaseSensitive:	proto.Bool(true),
-		DelimitWord:	proto.Bool(true),
+		CaseSensitive: proto.Bool(true),
+		DelimitWord:   proto.Bool(true),
 	}
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_SingleWord"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		Analyzer:         &analyzer1,                      // 设置分词器
+		FieldName:         proto.String("Col_SingleWord"), // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:         tablestore.FieldType_TEXT,      // 设置字段类型
+		Index:             proto.Bool(true),               // 设置开启索引
+		Analyzer:          &analyzer1,                     // 设置分词器
 		AnalyzerParameter: analyzerParam1,                 // 设置分词器参数(可选)
 	}
 
 	analyzer2 := tablestore.Analyzer_MaxWord
 	field2 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_MaxWord"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		Analyzer:         &analyzer2,                      // 设置分词器
+		FieldName: proto.String("Col_MaxWord"), // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType: tablestore.FieldType_TEXT,   // 设置字段类型
+		Index:     proto.Bool(true),            // 设置开启索引
+		Analyzer:  &analyzer2,                  // 设置分词器
 	}
 
 	analyzer3 := tablestore.Analyzer_MinWord
 	field3 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_MinWord"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		Analyzer:         &analyzer3,                      // 设置分词器
+		FieldName: proto.String("Col_MinWord"), // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType: tablestore.FieldType_TEXT,   // 设置字段类型
+		Index:     proto.Bool(true),            // 设置开启索引
+		Analyzer:  &analyzer3,                  // 设置分词器
 	}
 
 	analyzer4 := tablestore.Analyzer_Split
-	analyzerParam4 := tablestore.SplitAnalyzerParameter{Delimiter:proto.String("-")}
+	analyzerParam4 := tablestore.SplitAnalyzerParameter{Delimiter: proto.String("-")}
 	field4 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Split"),    // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		Analyzer:         &analyzer4,                      // 设置分词器
-		AnalyzerParameter: analyzerParam4,                 // 设置分词器参数(可选)
+		FieldName:         proto.String("Col_Split"), // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:         tablestore.FieldType_TEXT, // 设置字段类型
+		Index:             proto.Bool(true),          // 设置开启索引
+		Analyzer:          &analyzer4,                // 设置分词器
+		AnalyzerParameter: analyzerParam4,            // 设置分词器参数(可选)
 	}
 
 	analyzer5 := tablestore.Analyzer_Fuzzy
@@ -1081,11 +1256,11 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		MaxChars: 4,
 	}
 	field5 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Fuzzy"),    // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_TEXT,       // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		Analyzer:         &analyzer5,                      // 设置分词器
-		AnalyzerParameter: analyzerParam5,                 // 设置分词器参数(可选)
+		FieldName:         proto.String("Col_Fuzzy"), // 设置字段名，使用proto.String用于获取字符串指针
+		FieldType:         tablestore.FieldType_TEXT, // 设置字段类型
+		Index:             proto.Bool(true),          // 设置开启索引
+		Analyzer:          &analyzer5,                // 设置分词器
+		AnalyzerParameter: analyzerParam5,            // 设置分词器参数(可选)
 	}
 
 	schemas = append(schemas, field1, field2, field3, field4, field5)
@@ -1160,9 +1335,9 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query := &search.MatchQuery{}   // 设置查询类型为MatchQuery
 		query.FieldName = "Col_MaxWord" // 设置要匹配的字段
-		query.Text = "中华人民共和国"        // 设置要匹配的值
+		query.Text = "中华人民共和国"          // 设置要匹配的值
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
@@ -1191,9 +1366,9 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query := &search.MatchQuery{} // 设置查询类型为MatchQuery
 		query.FieldName = "Col_Split" // 设置要匹配的字段
-		query.Text = "2019"        // 设置要匹配的值
+		query.Text = "2019"           // 设置要匹配的值
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
@@ -1222,9 +1397,9 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
+		query := &search.MatchQuery{} // 设置查询类型为MatchQuery
 		query.FieldName = "Col_Fuzzy" // 设置要匹配的字段
-		query.Text = "程"        // 设置要匹配的值
+		query.Text = "程"              // 设置要匹配的值
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
@@ -1279,11 +1454,11 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 					},
 				},
 			})).
-			Aggregation(search.NewPercentilesAggregation("agg7","Col_Long").SetMissing(10).SetPercents(percentiles)))
+			Aggregation(search.NewPercentilesAggregation("agg7", "Col_Long").SetMissing(10).SetPercents(percentiles)))
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
-		ReturnAll: false,
+		ReturnAll:          false,
 		ReturnAllFromIndex: true,
 	})
 	searchResponse, err := client.Search(searchRequest)
@@ -1301,53 +1476,53 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults	//获取所有统计结果
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
 
 	//avg agg
-	agg1, err := aggResults.Avg("agg1")		//获取名字为"agg1"的Aggregation结果，类型为Avg
+	agg1, err := aggResults.Avg("agg1") //获取名字为"agg1"的Aggregation结果，类型为Avg
 	if err != nil {
 		panic(err)
 	}
-	if agg1.HasValue() {							//名字为"agg1"的Aggregation结果 是否Value值
-		fmt.Println("(avg) agg1: ", agg1.Value)	//打印Col_Long字段平均值
+	if agg1.HasValue() { //名字为"agg1"的Aggregation结果 是否Value值
+		fmt.Println("(avg) agg1: ", agg1.Value) //打印Col_Long字段平均值
 	} else {
-		fmt.Println("(avg) agg1: no value")		//所有行都不存在Col_Long字段
+		fmt.Println("(avg) agg1: no value") //所有行都不存在Col_Long字段
 	}
 
 	//distinct count agg
-	agg2, err := aggResults.DistinctCount("agg2")	//获取名字为"agg2"的Aggregation结果，类型为DistinctCount
+	agg2, err := aggResults.DistinctCount("agg2") //获取名字为"agg2"的Aggregation结果，类型为DistinctCount
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(distinct) agg2: ", agg2.Value)		//打印Col_Long字段不同取值的个数
+	fmt.Println("(distinct) agg2: ", agg2.Value) //打印Col_Long字段不同取值的个数
 
 	//max agg
-	agg3, err := aggResults.Max("agg3")		//获取名字为"agg3"的Aggregation结果，类型为Max
+	agg3, err := aggResults.Max("agg3") //获取名字为"agg3"的Aggregation结果，类型为Max
 	if err != nil {
 		panic(err)
 	}
 	if agg3.HasValue() {
-		fmt.Println("(max) agg3: ", agg3.Value)	//打印Col_Long字段最大值
+		fmt.Println("(max) agg3: ", agg3.Value) //打印Col_Long字段最大值
 	} else {
-		fmt.Println("(max) agg3: no value")		//所有行都不存在Col_Long字段
+		fmt.Println("(max) agg3: no value") //所有行都不存在Col_Long字段
 	}
 
 	//sum agg
-	agg4, err := aggResults.Sum("agg4")		//获取名字为"agg4"的Aggregation结果，类型为Sum
+	agg4, err := aggResults.Sum("agg4") //获取名字为"agg4"的Aggregation结果，类型为Sum
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(sum) agg4: ", agg4.Value)		//打印Col_Long字段的和
+	fmt.Println("(sum) agg4: ", agg4.Value) //打印Col_Long字段的和
 
 	//count agg
-	agg5, err := aggResults.Count("agg5")		//获取名字为"agg5"的Aggregation结果，类型为Count
+	agg5, err := aggResults.Count("agg5") //获取名字为"agg5"的Aggregation结果，类型为Count
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(count) agg5: ", agg5.Value)  //打印存在Col_Long字段的个数
+	fmt.Println("(count) agg5: ", agg5.Value) //打印存在Col_Long字段的个数
 
 	//topRows agg
-	agg6, err := aggResults.TopRows("agg6")   //获取名字为"agg5"的Aggregation结果，类型为TopRows
+	agg6, err := aggResults.TopRows("agg6") //获取名字为"agg6"的Aggregation结果，类型为TopRows
 	if err != nil {
 		panic(err)
 	}
@@ -1355,15 +1530,315 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("TowRow: ", string(jsonBody))	 //打印返回的row
+	fmt.Println("TowRow: ", string(jsonBody)) //打印返回的row
 
 	//percentiles agg
-	agg7, err := aggResults.Percentiles("agg7") //获取名字为"agg5"的Aggregation结果，类型为Percentiles
+	agg7, err := aggResults.Percentiles("agg7") //获取名字为"agg7"的Aggregation结果，类型为Percentiles
 	if err != nil {
 		panic(err)
 	}
 	for _, item := range agg7.PercentilesAggregationItems {
-		fmt.Println("\t(percentiles)key: ", item.Key, ", value: ", item.Value.Value) 	//打印返回的value
+		fmt.Println("\t(percentiles)key: ", item.Key, ", value: ", item.Value.Value) //打印返回的value
+	}
+}
+
+func AvgAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+			Aggregation(search.NewAvgAggregation("avg_agg", "Col_Long")))           //计算Col_Long字段的平均值
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	//avg agg
+	aggregationResult, err := aggResults.Avg("avg_agg") //获取名字为"avg_agg"的Aggregation结果，类型为Avg
+	if err != nil {
+		panic(err)
+	}
+	if aggregationResult.HasValue() {
+		fmt.Println("avg_agg: ", aggregationResult.Value) //打印Col_Long字段平均值
+	} else {
+		fmt.Println("avg_agg: no value") //所有行都不存在Col_Long字段
+	}
+}
+
+func DistinctAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewDistinctCountAggregation("distinct_count_agg", "Col_Long"))) //计算Col_Long字段不同取值的个数
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.DistinctCount("distinct_count_agg") //获取名字为"distinct_count_agg"的Aggregation结果，类型为DistinctCount
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("distinct_count_agg: ", aggregationResult.Value) //打印Col_Long字段不同取值的个数
+}
+
+func MaxAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewMaxAggregation("max_agg", "Col_Long")))           //计算Col_Long字段的最大值
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.Max("max_agg") //获取名字为"max_agg"的Aggregation结果，类型为Max
+	if err != nil {
+		panic(err)
+	}
+	if aggregationResult.HasValue() {
+		fmt.Println("max_agg: ", aggregationResult.Value) //打印Col_Long字段最大值
+	} else {
+		fmt.Println("max_agg: no value") //所有行都不存在Col_Long字段
+	}
+}
+
+func SumAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewSumAggregation("sum_agg", "Col_Long")))           //计算Col_Long字段的和
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.Sum("sum_agg") //获取名字为"sum_agg"的Aggregation结果，类型为Sum
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("sum_agg: ", aggregationResult.Value) //打印Col_Long字段的和
+}
+
+func CountAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewCountAggregation("count_agg", "Col_Long")))         //计算存在Col_Long字段的行数
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.Count("count_agg") //获取名字为"count_agg"的Aggregation结果，类型为Count
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("count_agg: ", aggregationResult.Value) //打印存在Col_Long字段的个数
+}
+
+func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewTopRowsAggregation("top_rows_agg").SetLimit(1).SetSort(&search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName: "Col_Long",
+					Order:     search.SortOrder_DESC.Enum(),
+				},
+			},
+		})))
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.TopRows("top_rows_agg") //获取名字为"top_rows_agg"的Aggregation结果，类型为TopRows
+	if err != nil {
+		panic(err)
+	}
+	jsonBody, err := json.Marshal(aggregationResult.Value)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("top_rows_agg: ", string(jsonBody)) //打印返回的row
+}
+
+func PercentilesAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+	var percentiles = make([]float64, 3)
+	percentiles[0] = 0.0
+	percentiles[1] = 50.0
+	percentiles[2] = 100.0
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
+			SetLimit(100).                                                       //限制返回前100行结果
+		Aggregation(search.NewPercentilesAggregation("percentiles_agg", "Col_Long").SetMissing(10).SetPercents(percentiles)))
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll:          false,
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	aggResults := searchResponse.AggregationResults //获取所有统计结果
+
+	aggregationResult, err := aggResults.Percentiles("percentiles_agg") //获取名字为"percentiles_agg"的Aggregation结果，类型为Percentiles
+	if err != nil {
+		panic(err)
+	}
+	for _, item := range aggregationResult.PercentilesAggregationItems {
+		fmt.Println("\tkey: ", item.Key, ", value: ", item.Value.Value) //打印返回的value
 	}
 }
 
@@ -1377,43 +1852,45 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
-			SetLimit(100). //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
 			GroupBy(search.NewGroupByField("group1", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
-				GroupBySorters([]search.GroupBySorter{}). //可以指定返回结果分桶的顺序
-				Size(2). //仅返回前2个分桶
-				SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")). //对每个分桶进行子统计(Aggregation)
-				SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))). //对每个分桶进行子聚合(GroupBy)
-			GroupBy(search.NewGroupByRange("group2", "Col_Long"). //对Col_Long字段做GroupByRange范围
-				Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
-				Range(3, 5). //第二个分桶包含Col_Long在[3, 5)的索引行
-				Range(5, search.Inf)). //第三个分桶包含Col_Long在[5, +∞)的索引行
-			GroupBy(search.NewGroupByFilter("group3"). //做GroupByFilter过滤聚合
-				Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+											GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
+											Size(2).                                                           //仅返回前2个分桶
+											SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
+											SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))). //对每个分桶进行子聚合(GroupBy)
+			GroupBy(search.NewGroupByRange("group2", "Col_Long").    //对Col_Long字段做GroupByRange范围
+											Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
+											Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
+											Range(5, search.Inf)).   //第三个分桶包含Col_Long在[5, +∞)的索引行
+			GroupBy(search.NewGroupByFilter("group3").               //做GroupByFilter过滤聚合
+											Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
 					FieldName: "Col_Keyword",
 					Term:      "hangzhou",
 				}).
 				Query(&search.RangeQuery{ //第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
-					FieldName: "Col_Long",
-					From: 3,
-					To: 5,
-					IncludeLower: true,
-					IncludeUpper: true})).
+																			FieldName:    "Col_Long",
+																			From:         3,
+																			To:           5,
+																			IncludeLower: true,
+																			IncludeUpper: true})).
 			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
-				Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
-				Range(10000, 15000). //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-				Range(15000, search.Inf)). //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+																		Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
+																		Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
+																		Range(15000, search.Inf)).   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
 			GroupBy(search.NewGroupByHistogram("group5", "Col_Long").
-				SetInterval(10).
-				SetMinDocCount(1).
-				SetFiledRange(0, 100).
-				SetMissing(3)).
+											SetInterval(10).
+											SetMinDocCount(1).
+											SetFiledRange(0, 100).
+											SetMissing(3)).
 			GroupBy(search.NewGroupByDateHistogram("group6", "Col_date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
-				SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
-				SetMinDocCount(1).
-				SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
-				SetMissing("2022-01-06 12:13:14")))
-
+											SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
+											SetMinDocCount(1).
+											SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
+											SetMissing("2022-01-06 12:13:14")).
+			GroupBy(search.NewGroupByGeoGrid("group7", "Col_geo").
+				SetPrecision(model.GHP_156KM_156KM_3).
+				SetSize(10)))
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -1434,86 +1911,441 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults	//获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
 
-	group1, err := groupByResults.GroupByField("group1")	//获取名字为"group1"的GroupBy结果，类型为GroupByField
+	group1, err := groupByResults.GroupByField("group1") //获取名字为"group1"的GroupBy结果，类型为GroupByField
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group1: ")
-	for _, item := range group1.Items {	//遍历返回的所有分桶
+	for _, item := range group1.Items { //遍历返回的所有分桶
 		//item
-		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount)	//打印本次分桶的行数
+		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) //打印本次分桶的行数
 
 		//sub agg
-		subAgg1, err := item.SubAggregations.Avg("sub_agg1")	//获取名字为sub_agg1的子统计的结果
+		subAgg1, err := item.SubAggregations.Avg("sub_agg1") //获取名字为sub_agg1的子统计的结果
 		if err != nil {
 			panic(err)
 		}
-		if subAgg1.HasValue() {	//如果子统计sub_agg1计算出了Col_Long字段的平均值，则HasValue()返回true
-			fmt.Println("\t\tsub_agg1: ", subAgg1.Value)	//打印本次分桶中，子统计计算出来的Col_Long字段的平均值
+		if subAgg1.HasValue() { //如果子统计sub_agg1计算出了Col_Long字段的平均值，则HasValue()返回true
+			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) //打印本次分桶中，子统计计算出来的Col_Long字段的平均值
 		}
 
 		//sub group by
-		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1")	//获取名字为sub_group1的子聚合的结果
+		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") //获取名字为sub_group1的子聚合的结果
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println("\t\tsub_group1")
-		for _, subItem := range subGroup1.Items {	//遍历名字为sub_group1的子聚合结果
-			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount)	//打印sub_group1子聚合的结果分桶，即分桶中的行数
+		for _, subItem := range subGroup1.Items { //遍历名字为sub_group1的子聚合结果
+			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) //打印sub_group1子聚合的结果分桶，即分桶中的行数
 			tablestore.Assert(subItem.SubAggregations.Empty(), "")
 			tablestore.Assert(subItem.SubGroupBys.Empty(), "")
 		}
 	}
 
 	//group by range
-	group2, err := groupByResults.GroupByRange("group2")	//获取名字为"group2"的GroupBy结果，类型为GroupByRange
+	group2, err := groupByResults.GroupByRange("group2") //获取名字为"group2"的GroupBy结果，类型为GroupByRange
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group2: ")
-	for _, item := range group2.Items {	//遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount)	//打印本次分桶的行数
+	for _, item := range group2.Items { //遍历返回的所有分桶
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
 	}
 
 	//group by filter
-	group3, err := groupByResults.GroupByFilter("group3")	//获取名字为"group3"的GroupBy结果，类型为GroupByFilter
+	group3, err := groupByResults.GroupByFilter("group3") //获取名字为"group3"的GroupBy结果，类型为GroupByFilter
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group3: ")
-	for _, item := range group3.Items {	//遍历返回的所有分桶
-		fmt.Println("\trowCount: ", item.RowCount)	//打印本次分桶的行数
+	for _, item := range group3.Items { //遍历返回的所有分桶
+		fmt.Println("\trowCount: ", item.RowCount) //打印本次分桶的行数
 	}
 
 	//group by geo distance
-	group4, err := groupByResults.GroupByGeoDistance("group4")	//获取名字为"group4"的GroupBy结果，类型为GroupByGeoDistance
+	group4, err := groupByResults.GroupByGeoDistance("group4") //获取名字为"group4"的GroupBy结果，类型为GroupByGeoDistance
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group4: ")
-	for _, item := range group4.Items {	//遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount)	//打印本次分桶的行数
+	for _, item := range group4.Items { //遍历返回的所有分桶
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
 	}
 
 	//group by histogram
-	group5, err := groupByResults.GroupByHistogram("group5")		//获取名字为"group5"的GroupBy结果，类型为GroupByHistogram
+	group5, err := groupByResults.GroupByHistogram("group5") //获取名字为"group5"的GroupBy结果，类型为GroupByHistogram
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group5: ")
 	for _, item := range group5.Items {
-		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value)		//打印返回的value
+		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) //打印返回的value
 	}
 
+	//group by geo grid
+	group7, err := groupByResults.GroupByGeoGrid("group7") //获取名字为"group7"的GroupBy结果，类型为GroupByGeoGrid
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group7: ")
+	for _, item := range group7.Items {
+		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) //打印返回的value
+	}
+}
+
+func GroupByFieldSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByField("group_by_field", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
+				GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
+				Size(2).                                                           //仅返回前2个分桶
+				SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
+				SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2")))) //对每个分桶进行子聚合(GroupBy)
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByFieldResult, err := groupByResults.GroupByField("group_by_field") //获取名字为"group_by_field"的GroupBy结果，类型为GroupByField
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_field: ")
+	for _, item := range groupByFieldResult.Items { //遍历返回的所有分桶
+		//item
+		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) //打印本次分桶的行数
+
+		//sub agg
+		subAgg1, err := item.SubAggregations.Avg("sub_agg1") //获取名字为sub_agg1的子统计的结果
+		if err != nil {
+			panic(err)
+		}
+		if subAgg1.HasValue() { //如果子统计sub_agg1计算出了Col_Long字段的平均值，则HasValue()返回true
+			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) //打印本次分桶中，子统计计算出来的Col_Long字段的平均值
+		}
+
+		//sub group by
+		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") //获取名字为sub_group1的子聚合的结果
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("\t\tsub_group1")
+		for _, subItem := range subGroup1.Items { //遍历名字为sub_group1的子聚合结果
+			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) //打印sub_group1子聚合的结果分桶，即分桶中的行数
+			tablestore.Assert(subItem.SubAggregations.Empty(), "")
+			tablestore.Assert(subItem.SubGroupBys.Empty(), "")
+		}
+	}
+}
+
+func GroupByRangeSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByRange("group_by_range", "Col_Long").    //对Col_Long字段做GroupByRange范围
+				Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
+				Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
+				Range(5, search.Inf)))   //第三个分桶包含Col_Long在[5, +∞)的索引行
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByRangeResult, err := groupByResults.GroupByRange("group_by_range") //获取名字为"group_by_range"的GroupBy结果，类型为GroupByRange
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_range: ")
+	for _, item := range groupByRangeResult.Items { //遍历返回的所有分桶
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	}
+}
+
+func GroupByFilterSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByFilter("group_by_filter").               //做GroupByFilter过滤聚合
+				Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+					FieldName: "Col_Keyword",
+					Term:      "hangzhou",
+				}).
+				Query(&search.RangeQuery{ //第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
+					FieldName:    "Col_Long",
+					From:         3,
+					To:           5,
+					IncludeLower: true,
+					IncludeUpper: true})))
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByFilterResult, err := groupByResults.GroupByFilter("group_by_filter") //获取名字为"group_by_filter"的GroupBy结果，类型为GroupByFilter
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_filter: ")
+	for _, item := range groupByFilterResult.Items { //遍历返回的所有分桶
+		fmt.Println("\trowCount: ", item.RowCount) //打印本次分桶的行数
+	}
+}
+
+func GroupByGeoDistanceSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByGeoDistance("group_by_geo_distance", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
+				Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
+				Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
+				Range(15000, search.Inf)))   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByGeoDistanceResult, err := groupByResults.GroupByGeoDistance("group_by_geo_distance") //获取名字为"group_by_geo_distance"的GroupBy结果，类型为GroupByGeoDistance
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_geo_distance: ")
+	for _, item := range groupByGeoDistanceResult.Items { //遍历返回的所有分桶
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	}
+}
+
+func GroupByHistogramSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByHistogram("group_by_histogram", "Col_Long").
+				SetInterval(10).
+				SetMinDocCount(1).
+				SetFiledRange(0, 100).
+				SetMissing(3)))
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByHistogramResult, err := groupByResults.GroupByHistogram("group_by_histogram") //获取名字为"group_by_histogram"的GroupBy结果，类型为GroupByHistogram
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_histogram: ")
+	for _, item := range groupByHistogramResult.Items {
+		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) //打印返回的value
+	}
+}
+
+func GroupByDateHistogramSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByDateHistogram("group_by_date_histogram", "Col_date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
+				SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
+				SetMinDocCount(1).
+				SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
+				SetMissing("2022-01-06 12:13:14")))
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByDateHistogramResult, err := groupByResults.GroupByDateHistogram("group_by_date_histogram") //获取名字为"group_by_date_histogram"的GroupBy结果，类型为GroupByHistogram
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_date_histogram: ")
+	for _, item := range groupByDateHistogramResult.Items {
+		fmt.Println("timestamp: ", item.Timestamp, ", row_count: ", item.RowCount) //打印返回的value
+	}
+}
+
+func GroupByGeoGridSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+
+	searchRequest.
+		SetTableName(tableName). //设置表名
+		SetIndexName(indexName). //设置多元索引名
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
+			SetLimit(100).                                           //限制返回前100行结果
+			GroupBy(search.NewGroupByGeoGrid("group_by_geo_grid", "Col_geo").
+				SetPrecision(model.GHP_156KM_156KM_3).
+				SetSize(10)))
+
+	// 设置返回所有列
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("RequestId: ", searchResponse.RequestId)
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess)
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+
+	groupByGeoGridResult, err := groupByResults.GroupByGeoGrid("group_by_geo_grid") //获取名字为"group_by_geo_grid"的GroupBy结果，类型为GroupByGeoGrid
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group_by_geo_grid: ")
+	for _, item := range groupByGeoGridResult.Items {
+		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) //打印返回的value
+	}
 }
 
 func computeSplits(client *tablestore.TableStoreClient, tableName string, indexName string) (*tablestore.ComputeSplitsResponse, error) {
 	req := &tablestore.ComputeSplitsRequest{}
 	req.
 		SetTableName(tableName).
-		SetSearchIndexSplitsOptions(tablestore.SearchIndexSplitsOptions{IndexName:indexName})
+		SetSearchIndexSplitsOptions(tablestore.SearchIndexSplitsOptions{IndexName: indexName})
 	res, err := client.ComputeSplits(req)
 	if err != nil {
 		return nil, err

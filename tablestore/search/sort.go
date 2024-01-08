@@ -30,7 +30,7 @@ func (s *Sort) ProtoBuffer() (*otsprotocol.Sort, error) {
 
 func (s *Sort) MarshalJSON() ([]byte, error) {
 	type SorterInJson struct {
-		Name string
+		Name   string
 		Sorter Sorter
 	}
 
@@ -47,6 +47,8 @@ func (s *Sort) MarshalJSON() ([]byte, error) {
 			sorterName = "ScoreSort"
 		case *FieldSort:
 			sorterName = "FieldSort"
+		case *DocSort:
+			sorterName = "DocSort"
 		default:
 			return nil, errors.New("Unknown sort type.")
 		}
@@ -109,6 +111,10 @@ func (r *Sort) UnmarshalJSON(data []byte) (err error) {
 			r.Sorters = append(r.Sorters, s)
 		case "FieldSort":
 			s := &FieldSort{}
+			err = json.Unmarshal(sorterRawMessage, s)
+			r.Sorters = append(r.Sorters, s)
+		case "DocSort":
+			s := &DocSort{}
 			err = json.Unmarshal(sorterRawMessage, s)
 			r.Sorters = append(r.Sorters, s)
 		default:

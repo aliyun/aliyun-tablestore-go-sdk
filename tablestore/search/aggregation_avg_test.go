@@ -32,8 +32,8 @@ func TestAvgAggregation_GetType(t *testing.T) {
 
 func TestAvgAggregation_ProtoBuffer(t *testing.T) {
 	agg := AvgAggregation{
-		AggName: "agg1",
-		Field:   "col1",
+		AggName:      "agg1",
+		Field:        "col1",
 		MissingValue: 66.66,
 	}
 
@@ -41,7 +41,7 @@ func TestAvgAggregation_ProtoBuffer(t *testing.T) {
 	assert.Nil(t, err)
 
 	//type
-	assert.Equal(t, pbAgg.GetType(),otsprotocol.AggregationType_AGG_AVG)
+	assert.Equal(t, pbAgg.GetType(), otsprotocol.AggregationType_AGG_AVG)
 
 	//name
 	assert.Equal(t, pbAgg.GetName(), "agg1")

@@ -32,8 +32,8 @@ func TestSumAggregation_GetType(t *testing.T) {
 
 func TestSumAggregation_ProtoBuffer(t *testing.T) {
 	agg := SumAggregation{
-		AggName: "agg1",
-		Field:   "col1",
+		AggName:      "agg1",
+		Field:        "col1",
 		MissingValue: 66.66,
 	}
 
@@ -41,7 +41,7 @@ func TestSumAggregation_ProtoBuffer(t *testing.T) {
 	assert.Nil(t, err)
 
 	//type
-	assert.Equal(t, pbAgg.GetType(),otsprotocol.AggregationType_AGG_SUM)
+	assert.Equal(t, pbAgg.GetType(), otsprotocol.AggregationType_AGG_SUM)
 
 	//name
 	assert.Equal(t, pbAgg.GetName(), "agg1")

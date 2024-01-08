@@ -21,6 +21,7 @@ enum QueryType {
     GEO_POLYGON_QUERY = 14;
     TERMS_QUERY = 15;
     EXISTS_QUERY = 16;
+    FUNCTIONS_SCORE_QUERY = 18;
 }
 
 enum QueryOperator {
@@ -92,6 +93,111 @@ message FunctionScoreQuery {
     optional FieldValueFactor field_value_factor = 2;
 }
 
+message FunctionsScoreQuery {
+    optional Query query = 1;
+    repeated Function functions = 2;
+    optional FunctionScoreMode socre_mode = 3;
+    optional FunctionCombineMode combine_mode = 4;
+    optional float min_score = 5;
+    optional float max_score = 6;
+}
+
+message Function {
+    optional FieldValueFactorFunction field_value_factor = 1;
+    optional RandomScoreFunction random = 2;
+    optional DecayFunction decay = 3;
+    optional float weight = 4;
+    optional Query filter = 5;
+}
+
+message FieldValueFactorFunction {
+    optional string field_name = 1;
+    optional float factor = 2;
+    optional FunctionModifier modifier = 3;
+    optional double missing = 4;
+}
+
+enum FunctionModifier {
+    FM_NONE = 1;
+    FM_LOG = 2;
+    FM_LOG1P = 3;
+    FM_LOG2P = 4;
+    FM_LN = 5;
+    FM_LN1P = 6;
+    FM_LN2P = 7;
+    FM_SQUARE = 8;
+    FM_SQRT = 9;
+    FM_RECIPROCAL = 10;
+}
+
+message DecayFunction {
+    optional string field_name = 1;
+    optional DecayMathFunction math_function = 2;
+    optional DecayFuncParamType param_type = 3;
+    optional bytes param = 4;
+    optional double decay = 5;
+    optional MultiValueMode multi_value_mode = 6;
+}
+
+enum DecayFuncParamType {
+    DF_DATE_PARAM = 1;
+    DF_NUMERIC_PARAM = 2;
+    DF_GEO_PARAM = 3;
+}
+
+message DecayFuncDateParam{
+    optional int64 origin_long = 1;
+    optional string origin_string = 2;
+    optional DateTimeValue scale = 3;
+    optional DateTimeValue offset = 4;
+}
+
+message  DecayFuncNumericParam{
+    optional double origin = 1;
+    optional double scale = 2;
+    optional double offset = 3;
+}
+
+message DecayFuncGeoParam{
+    optional string origin = 1;
+    optional double scale = 2;
+    optional double offset = 3;
+}
+
+enum DecayMathFunction {
+    GAUSS = 1;
+    EXP = 2;
+    LINEAR = 3;
+}
+
+enum MultiValueMode {
+    MVM_MAX = 1;
+    MVM_MIN = 2;
+    MVM_SUM = 3;
+    MVM_AVG = 4;
+}
+
+message RandomScoreFunction {
+}
+
+enum FunctionScoreMode {
+    FSM_AVG = 1;
+    FSM_MAX = 2;
+    FSM_SUM = 3;
+    FSM_MIN = 4;
+    FSM_MULTIPLY = 5;
+    FSM_FIRST = 6;
+}
+
+enum FunctionCombineMode {
+    FCM_MULTIPLY = 1;
+    FCM_AVG = 2;
+    FCM_MAX = 3;
+    FCM_SUM = 4;
+    FCM_MIN = 5;
+    FCM_REPLACE = 6;
+}
+
 enum ScoreMode {
     SCORE_MODE_NONE = 1;
     SCORE_MODE_AVG = 2;
@@ -104,6 +210,14 @@ message NestedQuery {
     optional string path = 1;
     optional Query query = 2;
     optional ScoreMode score_mode = 3;
+    optional InnerHits inner_hits = 5;
+}
+
+message InnerHits {
+    optional Sort sort = 1;
+    optional int32 offset = 2;
+    optional int32 limit = 3;
+    optional Highlight highlight = 4;
 }
 
 message GeoBoundingBoxQuery {
@@ -152,6 +266,10 @@ enum SortMode {
     SORT_MODE_AVG = 2;
 }
 
+message DocSort {
+    optional SortOrder order = 1;
+}
+
 message ScoreSort {
     optional SortOrder order = 1;
 }
@@ -188,6 +306,7 @@ message Sorter {
     optional GeoDistanceSort geo_distance_sort = 2;
     optional ScoreSort score_sort = 3;
     optional PrimaryKeySort pk_sort = 4;
+    optional DocSort doc_sort = 5;
 }
 
 message Sort {
@@ -269,7 +388,15 @@ message SearchResponse {
 }
 
 message SearchHit {
+    optional double score = 3;
     optional HighlightResult highlight_result = 4;
+    repeated SearchInnerHit search_inner_hits = 5;
+    optional int32 nested_doc_offset = 6;
+}
+
+message SearchInnerHit {
+    optional string path = 1;
+    repeated SearchHit search_hits = 2;
 }
 
 message HighlightResult {
@@ -468,6 +595,7 @@ enum GroupByType {
     GROUP_BY_GEO_DISTANCE = 4;
     GROUP_BY_HISTOGRAM = 5;
     GROUP_BY_DATE_HISTOGRAM = 6;
+    GROUP_BY_GEO_GRID = 7;
 }
 
 // agg & group by
@@ -619,6 +747,35 @@ message GroupByGeoDistance {
     optional Aggregations sub_aggs = 4;
     optional GroupBys sub_group_bys = 5;
 }
+
+message GroupByGeoGrid {
+    optional string field_name = 1;
+    optional GeoHashPrecision precision = 2;
+    optional int64 size = 3;
+    optional Aggregations sub_aggs = 4;
+    optional GroupBys sub_group_bys = 5;
+}
+
+enum GeoHashPrecision {
+    GHP_5009KM_4992KM_1 = 1;
+    GHP_1252KM_624KM_2 = 2;
+    GHP_156KM_156KM_3 = 3;
+    GHP_39KM_19KM_4 = 4;
+    GHP_4900M_4900M_5 = 5;
+    GHP_1200M_609M_6 = 6;
+    GHP_152M_152M_7 = 7;
+    GHP_38M_19M_8 = 8;
+    GHP_480CM_480CM_9 = 9;
+    GHP_120CM_595MM_10 = 10;
+    GHP_149MM_149MM_11 = 11;
+    GHP_37MM_19MM_12 = 12;
+}
+
+message GeoGrid {
+    optional GeoPoint top_left = 1;
+    optional GeoPoint bottom_right = 2;
+}
+
 //single agg result
 message AvgAggregationResult {
     optional double value = 1;
@@ -707,6 +864,18 @@ message GroupByFilterResultItem {
 }
 message GroupByFilterResult {
     repeated GroupByFilterResultItem group_by_filter_result_items = 1;
+}
+
+message GroupByGeoGridResult {
+    repeated GroupByGeoGridResultItem group_by_geo_gird_result_items = 1;
+}
+
+message GroupByGeoGridResultItem {
+    optional string key = 1;
+    optional GeoGrid geo_grid = 2;
+    optional int64 row_count = 3;
+    optional AggregationsResult sub_aggs_result = 4;
+    optional GroupBysResult sub_group_bys_result = 5;
 }
 
 message GroupByResult {

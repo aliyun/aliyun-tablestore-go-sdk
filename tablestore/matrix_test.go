@@ -67,7 +67,7 @@ func rangeFuzzyTableBuf(table string, blockType DataBlockType, count int32, cols
 
 	resp := new(otsprotocol.GetRangeResponse)
 	response := &GetRangeResponse{ConsumedCapacityUnit: &ConsumedCapacityUnit{}}
-	if err := client.(*TableStoreClient).doRequestWithRetry(getRangeUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := client.(*TableStoreClient).doRequestWithRetry(getRangeUri, req, resp, &response.ResponseInfo, ExtraRequestInfo{}); err != nil {
 		return nil, err
 	}
 	//if len(resp.NextStartPrimaryKey) != 0 {

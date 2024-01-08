@@ -32,8 +32,8 @@ func TestMaxAggregation_GetType(t *testing.T) {
 
 func TestMaxAggregation_ProtoBuffer(t *testing.T) {
 	agg := MaxAggregation{
-		AggName: "agg1",
-		Field:   "col1",
+		AggName:      "agg1",
+		Field:        "col1",
 		MissingValue: 66.66,
 	}
 
@@ -41,7 +41,7 @@ func TestMaxAggregation_ProtoBuffer(t *testing.T) {
 	assert.Nil(t, err)
 
 	//type
-	assert.Equal(t, pbAgg.GetType(),otsprotocol.AggregationType_AGG_MAX)
+	assert.Equal(t, pbAgg.GetType(), otsprotocol.AggregationType_AGG_MAX)
 
 	//name
 	assert.Equal(t, pbAgg.GetName(), "agg1")

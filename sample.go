@@ -52,11 +52,31 @@ func main() {
 	//SearchIndex
 	sample.CreateSearchIndexWithVirtualField(client, "virtual_sample_table", "virtual_sample_index")
 
+	// SearchQuery
+	sample.CreateSearchIndexForSearchQuery(client, "query_sample_table", "query_sample_index")
+	sample.WriteDateForSearchQuery(client, "query_sample_table")
+	sample.SearchQuery(client, "query_sample_table", "query_sample_index")
+
 	//SearchIndex: agg & group by
 	sample.CreateSearchIndexForAggregationAndGroupBy(client, "agg_sample_table", "agg_sample_index")
 	sample.WriteDataForAggregationAndGroupBy(client, "agg_sample_table")
 	sample.AggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.AvgAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.DistinctAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.MaxAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.SumAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.CountAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.TopRowsAggregationSample(client, "agg_sample_table", "agg_sample_index")
+	sample.PercentilesAggregationSample(client, "agg_sample_table", "agg_sample_index")
+
 	sample.GroupBySample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByFieldSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByRangeSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByFilterSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByGeoDistanceSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByHistogramSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByDateHistogramSample(client, "agg_sample_table", "agg_sample_index")
+	sample.GroupByGeoGridSample(client, "agg_sample_table", "agg_sample_index")
 
 	sample.ParallelScanSingleConcurrency(client, "scan_sample_table", "scan_sample_index")
 	sample.ParallelScanMultiConcurrency(client, "scan_sample_table", "scan_sample_index")
@@ -65,7 +85,7 @@ func main() {
 	sample.CreateSearchIndexForQueryHighlighting(client, "highlighting_sample_table", "highlighting_sample_index")
 	sample.WriteDataForQueryHighlighting(client, "highlighting_sample_table")
 	sample.QueryHighlightingSample(client, "highlighting_sample_table", "highlighting_sample_index")
-	
+
 	// update searchIndex schema
 	sample.UpdateSearchIndexSchema(client, "go_sdk_test_table", "go_sdk_test_index", "go_sdk_test_index_reindex")
 

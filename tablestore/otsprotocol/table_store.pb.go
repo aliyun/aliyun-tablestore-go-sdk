@@ -5716,7 +5716,9 @@ func init() {
 	proto.RegisterType((*SQLQueryResponse)(nil), "otsprotocol.SQLQueryResponse")
 }
 
-func init() { proto.RegisterFile("table_store.proto", fileDescriptor_f723cea3e4fa0cb7) }
+func init() {
+	proto.RegisterFile("table_store.proto", fileDescriptor_f723cea3e4fa0cb7)
+}
 
 var fileDescriptor_f723cea3e4fa0cb7 = []byte{
 	// 3571 bytes of a gzipped FileDescriptorProto

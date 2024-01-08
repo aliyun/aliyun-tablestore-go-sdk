@@ -65,7 +65,7 @@ func TestBuildPBForGroupByInvalidBody(t *testing.T) {
 
 func TestBuildPBForGroupBys(t *testing.T) {
 	mockGroupBy := &mockGroupBy{}
-	groupBys := []GroupBy {
+	groupBys := []GroupBy{
 		mockGroupBy,
 	}
 	pbGroupBys, err := BuildPBForGroupBys(groupBys)
@@ -80,7 +80,7 @@ func TestBuildPBForGroupBys(t *testing.T) {
 func TestBuildPBForGroupBysInvalid(t *testing.T) {
 	mockGroupBy := &mockGroupBy{}
 	invalidBodyGroupBy := &invalidBodyGroupBy{}
-	groupBys := []GroupBy {
+	groupBys := []GroupBy{
 		mockGroupBy,
 		invalidBodyGroupBy,
 	}

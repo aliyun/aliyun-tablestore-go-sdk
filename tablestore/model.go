@@ -108,17 +108,20 @@ type CreateTableRequest struct {
 	IndexMetas         []*IndexMeta
 	SSESpecification   *SSESpecification
 	EnableLocalTxn     *bool
+	ExtraRequestInfo
 }
 
 type CreateIndexRequest struct {
 	MainTableName   string
 	IndexMeta       *IndexMeta
 	IncludeBaseData bool
+	ExtraRequestInfo
 }
 
 type DeleteIndexRequest struct {
 	MainTableName string
 	IndexName     string
+	ExtraRequestInfo
 }
 
 type ResponseInfo struct {
@@ -174,10 +177,12 @@ type ListTableResponse struct {
 
 type DeleteTableRequest struct {
 	TableName string
+	ExtraRequestInfo
 }
 
 type DescribeTableRequest struct {
 	TableName string
+	ExtraRequestInfo
 }
 
 type DescribeTableResponse struct {
@@ -195,6 +200,7 @@ type UpdateTableRequest struct {
 	TableOption        *TableOption
 	ReservedThroughput *ReservedThroughput
 	StreamSpec         *StreamSpecification
+	ExtraRequestInfo
 }
 
 type UpdateTableResponse struct {
@@ -207,11 +213,13 @@ type UpdateTableResponse struct {
 type AddDefinedColumnRequest struct {
 	TableName      string
 	DefinedColumns []*DefinedColumnSchema
+	ExtraRequestInfo
 }
 
 type DeleteDefinedColumnRequest struct {
 	TableName      string
 	DefinedColumns []string
+	ExtraRequestInfo
 }
 
 type AddDefinedColumnResponse struct {
@@ -467,6 +475,7 @@ type PutRowChange struct {
 
 type PutRowRequest struct {
 	PutRowChange *PutRowChange
+	ExtraRequestInfo
 }
 
 type DeleteRowChange struct {
@@ -478,6 +487,7 @@ type DeleteRowChange struct {
 
 type DeleteRowRequest struct {
 	DeleteRowChange *DeleteRowChange
+	ExtraRequestInfo
 }
 
 type SingleRowQueryCriteria struct {
@@ -504,6 +514,7 @@ type UpdateRowChange struct {
 
 type UpdateRowRequest struct {
 	UpdateRowChange *UpdateRowChange
+	ExtraRequestInfo
 }
 
 func (rowQueryCriteria *SingleRowQueryCriteria) AddColumnToGet(columnName string) {
@@ -536,6 +547,7 @@ func (rowQueryCriteria *MultiRowQueryCriteria) AddRow(pk *PrimaryKey) {
 
 type GetRowRequest struct {
 	SingleRowQueryCriteria *SingleRowQueryCriteria
+	ExtraRequestInfo
 }
 
 type MultiRowQueryCriteria struct {
@@ -551,6 +563,7 @@ type MultiRowQueryCriteria struct {
 
 type BatchGetRowRequest struct {
 	MultiRowQueryCriteria []*MultiRowQueryCriteria
+	ExtraRequestInfo
 }
 
 type ColumnMap struct {
@@ -598,6 +611,7 @@ type BatchGetRowResponse struct {
 type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
 	IsAtomic               bool
+	ExtraRequestInfo
 }
 
 type BatchWriteRowResponse struct {
@@ -672,24 +686,12 @@ type RangeRowQueryCriteria struct {
 
 type GetRangeRequest struct {
 	RangeRowQueryCriteria *RangeRowQueryCriteria
+	ExtraRequestInfo
 }
 
 type Row struct {
 	PrimaryKey *PrimaryKey
 	Columns    []*AttributeColumn
-}
-
-type HighlightResultItem struct {
-	HighlightFields map[string]*HighlightField
-}
-
-type HighlightField struct {
-	Fragments []string
-}
-
-type SearchHit struct {
-	Row                 *Row
-	HighlightResultItem *HighlightResultItem
 }
 
 type GetRangeResponse struct {
@@ -703,6 +705,7 @@ type GetRangeResponse struct {
 
 type SQLQueryRequest struct {
 	Query string
+	ExtraRequestInfo
 }
 
 type SearchConsumedCU struct {
@@ -731,6 +734,7 @@ type SQLQueryResponse struct {
 
 type ListStreamRequest struct {
 	TableName *string
+	ExtraRequestInfo
 }
 
 type Stream struct {
@@ -762,6 +766,7 @@ type DescribeStreamRequest struct {
 	StreamId              *StreamId // required
 	InclusiveStartShardId *ShardId  // optional
 	ShardLimit            *int32    // optional
+	ExtraRequestInfo
 }
 
 type DescribeStreamResponse struct {
@@ -780,6 +785,7 @@ type GetShardIteratorRequest struct {
 	ShardId   *ShardId  // required
 	Timestamp *int64
 	Token     *string
+	ExtraRequestInfo
 }
 
 type GetShardIteratorResponse struct {
@@ -792,6 +798,7 @@ type GetStreamRecordRequest struct {
 	ShardIterator *ShardIterator // required
 	Limit         *int32         // optional. max records which will reside in response
 	TableName     *string
+	ExtraRequestInfo
 }
 
 type GetStreamRecordResponse struct {
@@ -807,6 +814,7 @@ type ComputeSplitPointsBySizeRequest struct {
 	SplitSize           int64
 	SplitSizeUnitInByte *int64
 	SplitPointLimit     *int32
+	ExtraRequestInfo
 }
 
 type ComputeSplitPointsBySizeResponse struct {
@@ -979,6 +987,7 @@ const (
 type StartLocalTransactionRequest struct {
 	PrimaryKey *PrimaryKey
 	TableName  string
+	ExtraRequestInfo
 }
 
 type StartLocalTransactionResponse struct {
@@ -988,6 +997,7 @@ type StartLocalTransactionResponse struct {
 
 type CommitTransactionRequest struct {
 	TransactionId *string
+	ExtraRequestInfo
 }
 
 type CommitTransactionResponse struct {
@@ -996,6 +1006,7 @@ type CommitTransactionResponse struct {
 
 type AbortTransactionRequest struct {
 	TransactionId *string
+	ExtraRequestInfo
 }
 
 type AbortTransactionResponse struct {
@@ -1010,6 +1021,7 @@ type SearchIndexSplitsOptions struct {
 type ComputeSplitsRequest struct {
 	TableName                string
 	searchIndexSplitsOptions *SearchIndexSplitsOptions
+	ExtraRequestInfo
 }
 
 type ComputeSplitsResponse struct {
@@ -1093,6 +1105,7 @@ type CreateTimeseriesTableRequest struct {
 	timeseriesTableMeta   *TimeseriesTableMeta
 	analyticalStores      []*TimeseriesAnalyticalStore
 	enableAnalyticalStore bool
+	ExtraRequestInfo
 }
 
 func NewCreateTimeseriesTableRequest() *CreateTimeseriesTableRequest {
@@ -1132,6 +1145,7 @@ type CreateTimeseriesTableResponse struct {
 type PutTimeseriesDataRequest struct {
 	timeseriesTableName string
 	rows                []*TimeseriesRow
+	ExtraRequestInfo
 }
 
 func NewPutTimeseriesDataRequest(timeseriesTableName string) *PutTimeseriesDataRequest {
@@ -1324,6 +1338,7 @@ type GetTimeseriesDataRequest struct {
 	limit               int32
 	backward            bool
 	fieldsToGet         []*FieldToGet
+	ExtraRequestInfo
 }
 
 func NewGetTimeseriesDataRequest(timeseriesTableName string) *GetTimeseriesDataRequest {
@@ -1418,6 +1433,7 @@ func (getTimeseriesDataResp *GetTimeseriesDataResponse) GetNextToken() []byte {
 
 type DescribeTimeseriesTableRequest struct {
 	timeseriesTableName string
+	ExtraRequestInfo
 }
 
 func NewDescribeTimeseriesTableRequset(timeseriesTableName string) *DescribeTimeseriesTableRequest {
@@ -1449,6 +1465,7 @@ func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetAnalytica
 }
 
 type ListTimeseriesTableRequest struct {
+	ExtraRequestInfo
 }
 
 func NewListTimeseriesTableRequest() *ListTimeseriesTableRequest {
@@ -1474,6 +1491,7 @@ func (listTimeseriesTableResponse *ListTimeseriesTableResponse) GetTimeseriesTab
 
 type DeleteTimeseriesTableRequest struct {
 	timeseriesTableName string
+	ExtraRequestInfo
 }
 
 func NewDeleteTimeseriesTableRequest(timeseriesTableName string) *DeleteTimeseriesTableRequest {
@@ -1497,6 +1515,7 @@ type DeleteTimeseriesTableResponse struct {
 type UpdateTimeseriesMetaRequest struct {
 	timeseriesTableName string
 	metas               []*TimeseriesMeta
+	ExtraRequestInfo
 }
 
 func NewUpdateTimeseriesMetaRequest(timeseriesTableName string) *UpdateTimeseriesMetaRequest {
@@ -1533,6 +1552,7 @@ func (updateTimeseriesMetaResponse *UpdateTimeseriesMetaResponse) GetFailedRowRe
 type DeleteTimeseriesMetaRequest struct {
 	timeseriesTableName string
 	keys                []*TimeseriesKey
+	ExtraRequestInfo
 }
 
 func NewDeleteTimeseriesMetaRequest(timeseriesTableName string) *DeleteTimeseriesMetaRequest {
@@ -1572,6 +1592,7 @@ type QueryTimeseriesMetaRequest struct {
 	getTotalHits        bool
 	nextToken           []byte
 	limit               int32
+	ExtraRequestInfo
 }
 
 func NewQueryTimeseriesMetaRequest(timeseriesTableName string) *QueryTimeseriesMetaRequest {
@@ -2236,6 +2257,7 @@ func (queryTimeseriesMetaResponse *QueryTimeseriesMetaResponse) GetNextToken() [
 type UpdateTimeseriesTableRequest struct {
 	timeseriesTableName    string
 	timeseriesTableOptions *TimeseriesTableOptions
+	ExtraRequestInfo
 }
 
 func NewUpdateTimeseriesTableRequest(timeseriesTableName string) *UpdateTimeseriesTableRequest {
@@ -2315,6 +2337,7 @@ type AnalyticalStoreStorageSize struct {
 type CreateTimeseriesAnalyticalStoreRequest struct {
 	timeseriesTableName string
 	analyticalStore     *TimeseriesAnalyticalStore
+	ExtraRequestInfo
 }
 
 func NewCreateTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStore *TimeseriesAnalyticalStore) *CreateTimeseriesAnalyticalStoreRequest {
@@ -2332,6 +2355,7 @@ type DeleteTimeseriesAnalyticalStoreRequest struct {
 	timeseriesTableName string
 	analyticalStoreName string
 	dropMappingTable    bool
+	ExtraRequestInfo
 }
 
 func NewDeleteTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStoreName string) *DeleteTimeseriesAnalyticalStoreRequest {
@@ -2352,6 +2376,7 @@ type DeleteTimeseriesAnalyticalStoreResponse struct {
 type DescribeTimeseriesAnalyticalStoreRequest struct {
 	timeseriesTableName string
 	analyticalStoreName string
+	ExtraRequestInfo
 }
 
 func NewDescribeTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStoreName string) *DescribeTimeseriesAnalyticalStoreRequest {
@@ -2371,6 +2396,7 @@ type DescribeTimeseriesAnalyticalStoreResponse struct {
 type UpdateTimeseriesAnalyticalStoreRequest struct {
 	timeseriesTableName string
 	analyticalStore     *TimeseriesAnalyticalStore
+	ExtraRequestInfo
 }
 
 func NewUpdateTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analyticalStore *TimeseriesAnalyticalStore) *UpdateTimeseriesAnalyticalStoreRequest {
@@ -2382,4 +2408,38 @@ func NewUpdateTimeseriesAnalyticalStoreRequest(timeseriesTableName string, analy
 
 type UpdateTimeseriesAnalyticalStoreResponse struct {
 	ResponseInfo
+}
+
+type ExtraRequestInfo struct {
+	userTraceID      *string
+	requestExtension *RequestExtension
+}
+
+func (ex *ExtraRequestInfo) SetTraceID(traceID string) {
+	ex.userTraceID = &traceID
+}
+
+func (ex *ExtraRequestInfo) SetRequestExtension(requestExtension RequestExtension) {
+	ex.requestExtension = &requestExtension
+}
+
+type Priority int
+
+const (
+	LOW Priority = iota
+	NORMAL
+	HIGH
+)
+
+type RequestExtension struct {
+	priority *Priority
+	tag      *string
+}
+
+func (re *RequestExtension) SetPriority(priority Priority) {
+	re.priority = &priority
+}
+
+func (re *RequestExtension) SetTag(tag string) {
+	re.tag = &tag
 }

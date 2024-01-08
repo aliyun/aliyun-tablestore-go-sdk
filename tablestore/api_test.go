@@ -1334,7 +1334,7 @@ func (s *TableStoreSuite) TestFuzzyGetRangeMatrix(c *C) {
 		DataBlockType:   SimpleRowMatrix,
 	}
 	for {
-		resp, err := client.GetRange(&GetRangeRequest{criteria})
+		resp, err := client.GetRange(&GetRangeRequest{criteria, ExtraRequestInfo{}})
 		c.Assert(err, IsNil)
 		c.Assert(resp.DataBlockType, Equals, SimpleRowMatrix)
 		for _, row := range resp.Rows {
@@ -1414,7 +1414,7 @@ func PrepareFuzzyTableData(tableName string, maxStringLen, maxBlobLen int, rowCo
 				attrs[nameType] = v
 			}
 		}
-		_, err := client.PutRow(&PutRowRequest{change})
+		_, err := client.PutRow(&PutRowRequest{change, ExtraRequestInfo{}})
 		if err != nil {
 			return nil, err
 		}
@@ -2692,4 +2692,61 @@ func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
 		c.Assert(err, IsNil)
 		c.Assert(isnull, Equals, true)
 	}
+}
+
+var globalTraceID string
+var globalAction string
+
+func alwaysRetry(errorCode string, errorMsg string, action string, httpStatus int) bool {
+	return true
+}
+
+func userRetryNotify(traceId, requestId string, err error, action string, backoffDuration time.Duration) {
+	globalTraceID = traceId
+	globalAction = action
+}
+
+func (s *TableStoreSuite) TestUserSetTraceIDAlwaysRetry(c *C) {
+	log.Println("TestUserSetTraceIDAlwaysRetry started")
+
+	tsClient := client.(*TableStoreClient)
+	tsClient.CustomizedRetryFunc = alwaysRetry
+	tsClient.RetryNotify = userRetryNotify
+	tsClient.config.RetryTimes = 1
+
+	// error putRow request
+	putRowChange := CreatePutRowChangeV2("putinbatchkey1", " putinbatchkey2", "datainput1", defaultTableName)
+	putRowRequest := PutRowRequest{}
+	putRowRequest.PutRowChange = putRowChange
+	putRowRequest.SetTraceID("testTraceID--1")
+
+	// error deleteRow request
+	deleteRowChange := DeleteRowChange{}
+	deleteRowChange.TableName = defaultTableName
+	pk := PrimaryKey{}
+	pk.AddPrimaryKeyColumn("pk1", "putinbatchkey1")
+	pk.AddPrimaryKeyColumn("pk2", "putinbatchkey2")
+	deleteRowChange.PrimaryKey = &pk
+	deleteRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+	deleteRowReq := DeleteRowRequest{}
+	deleteRowReq.DeleteRowChange = &deleteRowChange
+	deleteRowReq.SetTraceID("testTraceID--2")
+
+	_, err := tsClient.PutRow(&putRowRequest)
+
+	c.Assert(err, NotNil)
+	c.Assert(globalTraceID, Equals, "testTraceID--1")
+	c.Assert(globalAction, Equals, "/PutRow")
+
+	_, err = tsClient.DeleteRow(&deleteRowReq)
+
+	c.Assert(err, NotNil)
+	c.Assert(globalTraceID, Equals, "testTraceID--2")
+	c.Assert(globalAction, Equals, "/DeleteRow")
+
+	tsClient.CustomizedRetryFunc = nil
+	tsClient.RetryNotify = nil
+	tsClient.config.RetryTimes = 10
+
+	log.Println("TestUserSetTraceIDAlwaysRetry finished")
 }

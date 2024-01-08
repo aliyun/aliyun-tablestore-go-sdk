@@ -7,15 +7,15 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
-func CreateGetTimeseriesDataResponse(pbResponse *otsprotocol.GetTimeseriesDataResponse) (*GetTimeseriesDataResponse , error) {
+func CreateGetTimeseriesDataResponse(pbResponse *otsprotocol.GetTimeseriesDataResponse) (*GetTimeseriesDataResponse, error) {
 	response := new(GetTimeseriesDataResponse)
 	if pbResponse.GetRowsData() != nil && len(pbResponse.GetRowsData()) > 0 {
 		rows, err := readRowsWithHeader(bytes.NewReader(pbResponse.RowsData))
 		if err != nil {
-			return nil, fmt.Errorf("parser response failed with err : %v" , err)
+			return nil, fmt.Errorf("parser response failed with err : %v", err)
 		}
 
-		for _ , row := range rows {
+		for _, row := range rows {
 			timeseriesKey := NewTimeseriesKey()
 			measurement := row.primaryKey[1].cellValue.Value.(string)
 			source := row.primaryKey[2].cellValue.Value.(string)
@@ -31,17 +31,17 @@ func CreateGetTimeseriesDataResponse(pbResponse *otsprotocol.GetTimeseriesDataRe
 
 			timeseriesRow := NewTimeseriesRow(timeseriesKey)
 			timeseriesRow.SetTimeInus(timestamp)
-			for _ , field := range row.cells {
-				timeseriesRow.AddField(convertColumnName(field.cellName) , field.cellValue)
+			for _, field := range row.cells {
+				timeseriesRow.AddField(convertColumnName(field.cellName), field.cellValue)
 			}
-			response.rows = append(response.rows , timeseriesRow)
+			response.rows = append(response.rows, timeseriesRow)
 		}
 	}
 
-	if pbResponse.GetNextToken() != nil && len(pbResponse.GetNextToken()) != 0{
+	if pbResponse.GetNextToken() != nil && len(pbResponse.GetNextToken()) != 0 {
 		response.nextToken = pbResponse.NextToken
 	}
-	return response , nil
+	return response, nil
 
 }
 
@@ -73,8 +73,7 @@ func parseTimeseriesMeta(pbResponseMeta *otsprotocol.TimeseriesMeta) (*Timeserie
 	return timeseriesMeta, nil
 }
 
-
-func ParseTimeseriesTableMeta(pbResponseTableMeta *otsprotocol.TimeseriesTableMeta) (*TimeseriesTableMeta) {
+func ParseTimeseriesTableMeta(pbResponseTableMeta *otsprotocol.TimeseriesTableMeta) *TimeseriesTableMeta {
 	timeseriesTableMeta := NewTimeseriesTableMeta(pbResponseTableMeta.GetTableName())
 	timeseriesTableOptions := NewTimeseriesTableOptions(int64(pbResponseTableMeta.GetTableOptions().GetTimeToLive()))
 	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)
@@ -95,37 +94,37 @@ func parseTagsOrAttrs(tagsStr string) (map[string]string, error) {
 		return nil, fmt.Errorf("tags string is empty")
 	}
 
-	if len(tagsStr) < 2 || tagsStr[0] != '[' || tagsStr[len(tagsStr) - 1] != ']' {
-		return nil, fmt.Errorf("invalid tags or attributes string: %v" , tagsStr)
+	if len(tagsStr) < 2 || tagsStr[0] != '[' || tagsStr[len(tagsStr)-1] != ']' {
+		return nil, fmt.Errorf("invalid tags or attributes string: %v", tagsStr)
 	}
 
 	tags := map[string]string{}
 	keyStart := -1
 	valueStart := -1
-	for i := 1; i < len(tagsStr) - 1; i++ {
+	for i := 1; i < len(tagsStr)-1; i++ {
 		if tagsStr[i] != '"' {
-			return nil, fmt.Errorf("invalid tags or attributes string: %v" , tagsStr)
+			return nil, fmt.Errorf("invalid tags or attributes string: %v", tagsStr)
 		}
 		i += 1
 		keyStart = i
-		for ;(i < len(tagsStr) - 1) && (tagsStr[i] != '=') && (tagsStr[i] != '"'); {
+		for (i < len(tagsStr)-1) && (tagsStr[i] != '=') && (tagsStr[i] != '"') {
 			i++
 		}
 		if tagsStr[i] != '=' {
-			return nil, fmt.Errorf("invalid tags or attributes string: %v" , tagsStr)
+			return nil, fmt.Errorf("invalid tags or attributes string: %v", tagsStr)
 		}
 		i += 1
 		valueStart = i
-		for ;(i < len(tagsStr) - 1) && (tagsStr[i] != '"'); {
+		for (i < len(tagsStr)-1) && (tagsStr[i] != '"') {
 			i++
 		}
 		if tagsStr[i] != '"' {
-			return nil, fmt.Errorf("invalid tags or attributes string: %v" , tagsStr)
+			return nil, fmt.Errorf("invalid tags or attributes string: %v", tagsStr)
 		}
 		tags[tagsStr[keyStart:valueStart-1]] = tagsStr[valueStart:i]
 		i += 1
-		if i < len(tagsStr) - 1 && tagsStr[i] != ',' {
-			return nil, fmt.Errorf("invalid tags or attributes string: %v" , tagsStr)
+		if i < len(tagsStr)-1 && tagsStr[i] != ',' {
+			return nil, fmt.Errorf("invalid tags or attributes string: %v", tagsStr)
 		}
 	}
 	return tags, nil

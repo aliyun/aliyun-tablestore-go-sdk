@@ -8,6 +8,7 @@ const (
 	FirstWhenMissing = "_first"
 	LastWhenMissing  = "_last"
 )
+
 type NestedFilter struct {
 	Path   string
 	Filter Query
@@ -30,7 +31,7 @@ type FieldSort struct {
 	Order        *SortOrder
 	Mode         *SortMode
 	NestedFilter *NestedFilter
-	MissingValue interface{} // 当排序的字段某些行没有填充值时，排序行为支持三种方式：1、设置为FirstWhenMissing，当排序字段值缺省时候排在最前面；2、设置为LastWhenMissing，当排序字段值缺省时候排在最后面；3、自定义值，当排序字段值缺省时候使用指定的值进行排序。 
+	MissingValue interface{} // 当排序的字段某些行没有填充值时，排序行为支持三种方式：1、设置为FirstWhenMissing，当排序字段值缺省时候排在最前面；2、设置为LastWhenMissing，当排序字段值缺省时候排在最后面；3、自定义值，当排序字段值缺省时候使用指定的值进行排序。
 	MissingField *string
 }
 

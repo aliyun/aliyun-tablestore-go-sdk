@@ -3,6 +3,7 @@ package tablestore
 import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"math"
@@ -124,8 +125,8 @@ func getNormalTestIndexSchema() *IndexSchema {
 				FieldType: FieldType_KEYWORD,
 			},
 			{
-				FieldName: proto.String("col2"),
-				FieldType: FieldType_TEXT,
+				FieldName:          proto.String("col2"),
+				FieldType:          FieldType_TEXT,
 				EnableHighlighting: proto.Bool(true),
 			},
 		},
@@ -205,7 +206,7 @@ func WaitDataSyncByMatchAllQuery(c *C, client TableStoreApi, expectCount int64, 
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
 	searchQuery := search.NewSearchQuery()
-	searchQuery.Limit = 0
+	searchQuery.Limit = proto.Int32(0)
 	searchQuery.SetQuery(&search.MatchAllQuery{})
 	searchQuery.SetGetTotalCount(true)
 	searchRequest.SetSearchQuery(searchQuery)
@@ -328,9 +329,9 @@ func createSearchIndex1(c *C) {
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field6 := &FieldSchema{
-		FieldName: proto.String("Col_Text"),
-		FieldType: FieldType_TEXT,
-		Index:     proto.Bool(true),
+		FieldName:          proto.String("Col_Text"),
+		FieldType:          FieldType_TEXT,
+		Index:              proto.Bool(true),
 		EnableHighlighting: proto.Bool(true),
 	}
 	field7 := &FieldSchema{
@@ -454,15 +455,60 @@ func createSearchIndex1(c *C) {
 		},
 	}
 	schemas = append(schemas, field11, field12, field13, field14, field15, field16, field17)
-	
+
 	// highlight column
 	field18 := &FieldSchema{
-		FieldName: proto.String("Col_Highlight_Text"),
-		FieldType: FieldType_TEXT,
-		Index:     proto.Bool(true),
+		FieldName:          proto.String("Col_Highlight_Text"),
+		FieldType:          FieldType_TEXT,
+		Index:              proto.Bool(true),
 		EnableHighlighting: proto.Bool(true),
 	}
 	schemas = append(schemas, field18)
+
+	// nested highlight column
+	field19 := &FieldSchema {
+		FieldName: proto.String("Col_Nested_Highlight"),
+		FieldType: FieldType_NESTED,
+		FieldSchemas: []*FieldSchema{
+			{
+				FieldName: proto.String("Level1_Text"),
+				FieldType: FieldType_TEXT,
+				Index: proto.Bool(true),
+				Store: proto.Bool(true),
+				EnableHighlighting: proto.Bool(true),
+			},
+			{
+				FieldName: proto.String("Level1_Nested"),
+				FieldType: FieldType_NESTED,
+				FieldSchemas: []*FieldSchema{
+					{
+						FieldName: proto.String("Level2_Text"),
+						FieldType: FieldType_TEXT,
+						Index: proto.Bool(true),
+						Store: proto.Bool(true),
+						EnableHighlighting: proto.Bool(true),
+					},
+				},
+			},
+		},
+	}
+	schemas = append(schemas, field19)
+
+	field20 := &FieldSchema{
+		FieldName:        proto.String("Col_Date"),
+		FieldType:        FieldType_DATE,
+		DateFormats:      []string{"yyyy-MM-dd'T'HH:mm:ss.SSSSSS", "yyyy-MM-dd'T'HH:mm:ss.SSS", "yyyy-MM-dd'T'HH:mm:ss.SSSSSSSSS"},
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field21 := &FieldSchema{
+		FieldName:        proto.String("Col_Date_Epoch"),
+		FieldType:        FieldType_DATE,
+		DateFormats:      []string{"epoch_nanos"},
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	schemas = append(schemas, field20, field21)
 
 	request.IndexSchema = &IndexSchema{
 		FieldSchemas: schemas,
@@ -580,7 +626,7 @@ func deleteSearchIndex(tableName string, indexName string) {
 
 func writeData1(c *C) {
 	strs := []string{"hangzhou", "tablestore", "ots"}
-	highlightText := []string{"dengcai <em>street</em>, xihu district, hangzhou city"}
+	highlightText := []string{"dengcai <em>street</em>", "xihu district", "hangzhou city"}
 	geopoints := []string{
 		"30.137817,120.08681",  //飞天园区
 		"30.135131,120.088355", //中大银座
@@ -592,6 +638,31 @@ func writeData1(c *C) {
 		"30.269501,120.169347", //凤起路
 		"30.28073,120.168843",  //运河
 		"30.296946,120.21958",  //杭州东站
+	}
+	date := []string{
+		"2017-05-01T11:00:00.123",
+		"2017-05-01T13:00:00.123456",
+		"2022-01-24T20:18:45.000",
+		"1985-02-04T08:31:50.806",
+		"1993-04-13T05:45:56.360",
+		"1988-02-02T12:37:59.651",
+		"2019-08-13T00:10:30.655",
+		"2004-02-05T19:52:57.806",
+		"2002-04-15T00:11:56.849",
+		"2019-03-19T02:42:44.977",
+	}
+
+	dataEpoch := []int64{
+		1642767525_123456789,
+		1642681125_123456789,
+		1642940325_123456789,
+		476353910806299500,
+		734679956360779800,
+		570803879651508800,
+		1565655030655528700,
+		1076010777806859500,
+		1018829516849699300,
+		1552963364977482000,
 	}
 
 	for i := 0; i < 10; i++ { //0, 1, ..., 9
@@ -611,6 +682,9 @@ func writeData1(c *C) {
 		geoPointValue := geopoints[i]
 		textValue := strs[i%len(strs)]
 		highlightTextValue := highlightText[i % len(highlightText)]
+		nestedHighlightValue := fmt.Sprintf("[{\"Level1_Text\":\"%v\",\"Level1_Nested\":[{\"Level2_Text\":\"%v\"}]}]", highlightTextValue, highlightTextValue)
+		dateValue := date[i]
+		dateEpochValue := dataEpoch[i]
 		nestedValue := fmt.Sprintf("[{\"Col_Long_Nested\": %v, \"Col_Double_Nested\": %v, \"Col_Boolean_Nested\": %v, \"Col_Keyword_Nested\": \"%v\", \"Col_GeoPoint_Nested\": \"%v\", \"Col_Text_Nested\": \"%v\"}]",
 			longValue, doubleValue, boolValue, keywordValue, geoPointValue, textValue)
 		nestedMissingValue := fmt.Sprintf("[{\"Col_Long_Missing_Nested\": %v, \"Col_Double_Missing_Nested\": %v, \"Col_Boolean_Missing_Nested\": %v, \"Col_Keyword_Missing_Nested\": \"%v\", \"Col_GeoPoint_Missing_Nested\": \"%v\", \"Col_Text_Missing_Nested\": \"%v\"}]",
@@ -625,6 +699,9 @@ func writeData1(c *C) {
 		putRowChange.AddColumn("Col_Text", textValue)
 		putRowChange.AddColumn("Col_Nested", nestedValue)
 		putRowChange.AddColumn("Col_Highlight_Text", highlightTextValue)
+		putRowChange.AddColumn("Col_Nested_Highlight", nestedHighlightValue)
+		putRowChange.AddColumn("Col_Date", dateValue)
+		putRowChange.AddColumn("Col_Date_Epoch", dateEpochValue)
 
 		if i >= 5 { //leave out the first 5 rows
 			putRowChange.AddColumn("Col_Long_Missing", longValue)
@@ -1972,6 +2049,81 @@ func (s *SearchSuite) TestGroupByNestedFieldUnderGroupBy(c *C) {
 	}
 }
 
+func (s *SearchSuite) TestQueryFunctionsScore_1(c *C) {
+	searchRequest := &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName1).
+		SetIndexName(searchAPITestIndexName1).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(search.NewFunctionsScoreQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				AddFunction(search.NewScoreFunction().
+					SetDecayFunction(search.NewDecayFunction().
+						SetFieldName("Col_GeoPoint").
+						SetMathFunction(search.GAUSS).
+						SetDecayParam(search.NewDecayFuncGeoParam().
+							SetOrigin("30.137817,120.08681").
+							SetScale(1000).
+							SetOffset(0)).
+						SetDecay(0.6).
+						SetMultiValueMode(search.MVM_SUM)).
+					SetFilter(&search.ExistsQuery{FieldName: "Col_GeoPoint"}).
+					SetWeight(2)).
+				SetMaxScore(1000).
+				SetMinScore(0).
+				SetScoreMode(search.SM_MAX).
+				SetCombineMode(search.CM_MAX))).
+		SetColumnsToGet(&ColumnsToGet{
+			ReturnAll: false,
+		})
+	resp, err := client.Search(searchRequest)
+	c.Check(err, IsNil)
+	c.Check(resp.SearchHits, NotNil)
+	c.Check(resp.SearchHits[0].Score, NotNil)
+	c.Check(*resp.SearchHits[0].Score, Equals, 2.0)
+}
+
+func (s *SearchSuite) TestQueryFunctionsScore_2(c *C) {
+	searchRequest := &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName1).
+		SetIndexName(searchAPITestIndexName1).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(search.NewFunctionsScoreQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				AddFunction(search.NewScoreFunction().
+					SetDecayFunction(search.NewDecayFunction().
+						SetFieldName("Col_GeoPoint").
+						SetMathFunction(search.GAUSS).
+						SetDecayParam(search.NewDecayFuncGeoParam().
+							SetOrigin("30.137817,120.08681").
+							SetScale(1000).
+							SetOffset(0)).
+						SetDecay(0.6).
+						SetMultiValueMode(search.MVM_SUM)).
+					SetFilter(&search.ExistsQuery{FieldName: "Col_GeoPoint"}).
+					SetWeight(2)).
+				AddFunction(search.NewScoreFunction().
+					SetRandomFunction(search.NewRandomFunction())).
+				AddFunction(search.NewScoreFunction().
+					SetFieldValueFactorFunction(search.NewFieldValueFactorFunction().
+						SetFieldName("Col_Double").
+						SetFactor(1.1).
+						SetFunctionModifier(search.LN).
+						SetMissing(1.0))).
+				SetMaxScore(1000).
+				SetMinScore(0).
+				SetScoreMode(search.SM_MAX).
+				SetCombineMode(search.CM_MAX))).
+		SetColumnsToGet(&ColumnsToGet{
+			ReturnAll: false,
+		})
+	resp, err := client.Search(searchRequest)
+	c.Check(err, IsNil)
+	c.Check(resp.SearchHits, NotNil)
+	c.Check(resp.SearchHits[0].Score, NotNil)
+}
+
 func (s *SearchSuite) TestSearchQueryWithHighlight(c *C) {
 	searchRequest := &SearchRequest{}
 	searchRequest.
@@ -1980,7 +2132,7 @@ func (s *SearchSuite) TestSearchQueryWithHighlight(c *C) {
 		SetSearchQuery(search.NewSearchQuery().
 			SetQuery(&search.MatchQuery{
 				FieldName: "Col_Highlight_Text",
-				Text:      "xihu dengcai",
+				Text:      "dengcai",
 			}).
 			SetHighlight(search.NewHighlight().
 				SetHighlightEncoder(search.HtmlMode).
@@ -1991,14 +2143,139 @@ func (s *SearchSuite) TestSearchQueryWithHighlight(c *C) {
 					SetHighlightFragmentOrder(search.TextSequence).
 					SetNumberOfFragments(5)))).
 		SetColumnsToGet(&ColumnsToGet{
-			ReturnAll: true,
+			ReturnAllFromIndex: true,
 		})
 	resp, err := client.Search(searchRequest)
 	c.Check(err, IsNil)
 	c.Check(resp.SearchHits, NotNil)
 	c.Check(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"], NotNil)
-	c.Check(strings.Contains(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"].Fragments[0], "<em>xihu</em>"), Equals, true)
 	c.Check(strings.Contains(resp.SearchHits[0].HighlightResultItem.HighlightFields["Col_Highlight_Text"].Fragments[0], "&lt;em&gt;street&lt;&#x2F;em&gt;"), Equals, true)
+}
+
+func (s *SearchSuite) TestSearchQueryWithNestedHighlight(c *C) {
+	searchRequest := &SearchRequest{
+		TableName: searchAPITestTableName1,
+		IndexName: searchAPITestIndexName1,
+		ColumnsToGet: &ColumnsToGet{
+			ReturnAllFromIndex: true,
+		},
+
+		SearchQuery: search.NewSearchQuery().
+				SetLimit(5).
+				SetQuery(&search.NestedQuery{
+					Path:      "Col_Nested_Highlight",
+					ScoreMode: search.ScoreMode_Min,
+					InnerHits: &search.InnerHits{
+						Limit:  proto.Int32(2),
+						Offset: proto.Int32(0),
+						Sort: &search.Sort{
+							Sorters: []search.Sorter{
+								&search.DocSort{
+									SortOrder: search.SortOrder_ASC.Enum(),
+								},
+							},
+						},
+						Highlight: &search.Highlight{
+							FieldHighlightParameters: map[string]*search.HighlightParameter{
+								"Col_Nested_Highlight.Level1_Text": {
+									PreTag:  proto.String("<b>"),
+									PostTag: proto.String("</b>"),
+								},
+							},
+						},
+					},
+					Query: &search.BoolQuery{
+						ShouldQueries: []search.Query{
+							&search.MatchQuery{
+								FieldName: "Col_Nested_Highlight.Level1_Text",
+								Text:      "xihu dengcai",
+							},
+							&search.NestedQuery{
+								Path:      "Col_Nested_Highlight.Level1_Nested",
+								ScoreMode: search.ScoreMode_Min,
+								InnerHits: &search.InnerHits{
+									Limit:  proto.Int32(2),
+									Offset: proto.Int32(0),
+									Sort: &search.Sort{
+										Sorters: []search.Sorter{
+											&search.ScoreSort{
+												Order: search.SortOrder_DESC.Enum(),
+											},
+										},
+									},
+									Highlight: &search.Highlight{
+										FieldHighlightParameters: map[string]*search.HighlightParameter{
+											"Col_Nested_Highlight.Level1_Nested.Level2_Text": {
+												PreTag:  proto.String("<b1>"),
+												PostTag: proto.String("</b1>"),
+											},
+										},
+									},
+								},
+								Query: &search.MatchQuery{
+									FieldName: "Col_Nested_Highlight.Level1_Nested.Level2_Text",
+									Text:      "xihu dengcai",
+								},
+							},
+						},
+					},
+				}),
+	}
+	resp, err := client.Search(searchRequest)
+	c.Check(err, Equals, nil)
+	c.Check(len(resp.SearchHits), Equals, 5)
+	highlightLevel1 := map[string]bool {
+		"<b>dengcai</b> <em>street</em>": true,
+		"<b>xihu</b> district": true,
+	}
+	highlightLevel2 := map[string]bool {
+		"<b1>dengcai</b1> <em>street</em>": true,
+		"<b1>xihu</b1> district": true,
+	}
+	for _, searchHit := range resp.SearchHits {
+		for _, searchInnerHit := range searchHit.SearchInnerHits {
+			c.Check(searchInnerHit.Path, Equals, "Col_Nested_Highlight")
+			for _, innerSearchHit := range searchInnerHit.SearchHits {
+				c.Check(highlightLevel1[innerSearchHit.HighlightResultItem.HighlightFields["Col_Nested_Highlight.Level1_Text"].Fragments[0]], Equals, true)
+				for _, searchInnerHit1 := range innerSearchHit.SearchInnerHits {
+					c.Check(searchInnerHit1.Path, Equals, "Col_Nested_Highlight.Level1_Nested")
+					for _, innerSearchHit1 := range searchInnerHit1.SearchHits {
+						c.Check(highlightLevel2[innerSearchHit1.HighlightResultItem.HighlightFields["Col_Nested_Highlight.Level1_Nested.Level2_Text"].Fragments[0]], Equals, true)
+					}
+				}
+			}
+		}
+	}
+}
+
+func (s *SearchSuite) TestGroupByGroupByGeoGrid(c *C) {
+	searchRequest := &SearchRequest{}
+	// 30.137817,120.08681 飞天
+	searchRequest.
+		SetTableName(searchAPITestTableName2).
+		SetIndexName(searchAPITestIndexName2).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).
+			SetLimit(100).
+			GroupBy(search.NewGroupByGeoGrid("group_by_geo_grid", "Col_GeoPoint").
+				SetPrecision(model.GHP_156KM_156KM_3).
+				SetSize(100))).
+		SetColumnsToGet(&ColumnsToGet{
+			ReturnAll: true,
+		})
+	searchResponse, err := client.Search(searchRequest)
+	c.Check(err, Equals, nil)
+	groupByResult, err := searchResponse.GroupByResults.GroupByGeoGrid("group_by_geo_grid")
+	c.Check(err, Equals, nil)
+
+	c.Check(len(groupByResult.Items), Equals, 1)
+
+	c.Check(int64(4), Equals, groupByResult.Items[0].RowCount)
+	c.Check("wtm", Equals, groupByResult.Items[0].Key)
+	c.Check(float64(30.9375), Equals, groupByResult.Items[0].GeoGrid.TopLeft.Lat)
+	c.Check(float64(119.53125), Equals, groupByResult.Items[0].GeoGrid.TopLeft.Lon)
+	c.Check(float64(29.53125), Equals, groupByResult.Items[0].GeoGrid.BottomRight.Lat)
+	c.Check(float64(120.9375), Equals, groupByResult.Items[0].GeoGrid.BottomRight.Lon)
 }
 
 /* compute splits */

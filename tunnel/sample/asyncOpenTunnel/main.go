@@ -50,8 +50,8 @@ func main() {
 			ShutdownFunc: func(ctx *tunnel.ChannelContext) {
 				fmt.Println("shutdown hook")
 			},
-			NeedBinaryRecord:     true,
-			SyncCloseResource:    false,
+			NeedBinaryRecord:  true,
+			SyncCloseResource: false,
 		},
 	}
 

@@ -1,8 +1,8 @@
 package sample
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 )
 
 func CreateTableWithGlobalIndexSample(client *tablestore.TableStoreClient, tableName string) {
@@ -42,9 +42,8 @@ func CreateTableWithGlobalIndexSample(client *tablestore.TableStoreClient, table
 		fmt.Println("Create table finished")
 	}
 
-
 	indexMeta.IndexName = "index2"
-	indexReq := &tablestore.CreateIndexRequest{ MainTableName:tableName, IndexMeta: indexMeta, IncludeBaseData: false }
+	indexReq := &tablestore.CreateIndexRequest{MainTableName: tableName, IndexMeta: indexMeta, IncludeBaseData: false}
 	resp, err := client.CreateIndex(indexReq)
 	if err != nil {
 		fmt.Println("Failed to create table with error:", err)
@@ -52,7 +51,7 @@ func CreateTableWithGlobalIndexSample(client *tablestore.TableStoreClient, table
 		fmt.Println("Create index finished", resp)
 	}
 
-	deleteIndex := &tablestore.DeleteIndexRequest{ MainTableName:tableName, IndexName: indexMeta.IndexName }
+	deleteIndex := &tablestore.DeleteIndexRequest{MainTableName: tableName, IndexName: indexMeta.IndexName}
 	resp2, err := client.DeleteIndex(deleteIndex)
 
 	if err != nil {

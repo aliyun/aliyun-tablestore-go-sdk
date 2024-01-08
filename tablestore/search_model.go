@@ -22,6 +22,7 @@ type SearchRequest struct {
 	ColumnsToGet  *ColumnsToGet
 	RoutingValues []*PrimaryKey
 	TimeoutMs     *int32
+	ExtraRequestInfo
 }
 
 func (r *SearchRequest) SetTableName(tableName string) *SearchRequest {
@@ -557,6 +558,7 @@ type CreateSearchIndexRequest struct {
 	IndexSchema     *IndexSchema
 	SourceIndexName *string
 	TimeToLive      *int32
+	ExtraRequestInfo
 }
 
 type CreateSearchIndexResponse struct {
@@ -566,6 +568,7 @@ type CreateSearchIndexResponse struct {
 type DescribeSearchIndexRequest struct {
 	TableName string
 	IndexName string
+	ExtraRequestInfo
 }
 
 type SyncPhase int32
@@ -613,6 +616,7 @@ type DescribeSearchIndexResponse struct {
 
 type ListSearchIndexRequest struct {
 	TableName string
+	ExtraRequestInfo
 }
 
 type IndexInfo struct {
@@ -628,6 +632,7 @@ type ListSearchIndexResponse struct {
 type DeleteSearchIndexRequest struct {
 	TableName string
 	IndexName string
+	ExtraRequestInfo
 }
 
 type DeleteSearchIndexResponse struct {
@@ -645,6 +650,7 @@ type UpdateSearchIndexRequest struct {
 	SwitchIndexName  *string
 	QueryFlowWeights []*QueryFlowWeight
 	TimeToLive       *int32
+	ExtraRequestInfo
 }
 
 type UpdateSearchIndexResponse struct {
@@ -660,6 +666,7 @@ type ParallelScanRequest struct {
 	ColumnsToGet *ColumnsToGet
 	SessionId    []byte
 	TimeoutMs    *int32
+	ExtraRequestInfo
 }
 
 type ParallelScanResponse struct {
@@ -729,4 +736,77 @@ func (r *ParallelScanRequest) ProtoBuffer() (*otsprotocol.ParallelScanRequest, e
 	req.ColumnsToGet = pbColumns
 
 	return req, err
+}
+
+type HighlightField struct {
+	Fragments []string
+}
+
+type HighlightResultItem struct {
+	HighlightFields map[string]*HighlightField
+}
+
+func buildHighlightResult(pbHighlightResult *otsprotocol.HighlightResult) *HighlightResultItem {
+	highlightResultItem := &HighlightResultItem{
+		HighlightFields: make(map[string]*HighlightField, initMapLen),
+	}
+	for _, pbHighlightField := range pbHighlightResult.HighlightFields {
+		highlightField := new(HighlightField)
+		highlightField.Fragments = append([]string{}, pbHighlightField.FieldFragments...)
+		highlightResultItem.HighlightFields[pbHighlightField.GetFieldName()] = highlightField
+	}
+
+	return highlightResultItem
+}
+
+type SearchHit struct {
+	Row                 *Row
+	Score               *float64
+	NestedDocOffset     *int32
+	HighlightResultItem *HighlightResultItem
+	SearchInnerHits     map[string]*SearchInnerHit
+}
+
+type SearchInnerHit struct {
+	Path       string
+	SearchHits []*SearchHit
+}
+
+func buildSearchHit(pbSearchHit *otsprotocol.SearchHit, row *Row) *SearchHit {
+	searchHit := &SearchHit{
+		Row:             row,
+		SearchInnerHits: make(map[string]*SearchInnerHit, initMapLen),
+	}
+
+	if pbSearchHit.HighlightResult != nil {
+		searchHit.HighlightResultItem = buildHighlightResult(pbSearchHit.HighlightResult)
+	}
+
+	if pbSearchHit.NestedDocOffset != nil {
+		searchHit.NestedDocOffset = pbSearchHit.NestedDocOffset
+	}
+
+	if pbSearchHit.Score != nil {
+		searchHit.Score = pbSearchHit.Score
+	}
+
+	for _, searchInnerHits := range pbSearchHit.GetSearchInnerHits() {
+		searchHit.SearchInnerHits[searchInnerHits.GetPath()] = buildSearchInnerHit(searchInnerHits)
+	}
+
+	return searchHit
+}
+
+func buildSearchInnerHit(pbSearchInnerHits *otsprotocol.SearchInnerHit) *SearchInnerHit {
+	searchInnerHits := &SearchInnerHit{}
+
+	if pbSearchInnerHits.Path != nil {
+		searchInnerHits.Path = *pbSearchInnerHits.Path
+	}
+
+	for _, innerSearchHit := range pbSearchInnerHits.GetSearchHits() {
+		searchInnerHits.SearchHits = append(searchInnerHits.SearchHits, buildSearchHit(innerSearchHit, nil))
+	}
+
+	return searchInnerHits
 }

@@ -31,7 +31,7 @@ func TestGroupByGeoDistance_CenterPoint(t *testing.T) {
 }
 
 func TestGroupByGeoDistance_Range(t *testing.T) {
-	ranges := []Range {
+	ranges := []Range{
 		{from: math.Inf(-1), to: 6.6},
 		{from: 6.6, to: 9.9},
 		{from: 9.9, to: math.Inf(1)},
@@ -44,7 +44,7 @@ func TestGroupByGeoDistance_Range(t *testing.T) {
 }
 
 func TestGroupByGeoDistance_SubAggregation(t *testing.T) {
-	subAggList := []Aggregation {
+	subAggList := []Aggregation{
 		&MaxAggregation{AggName: "sub_agg1", Field: "field1"},
 		&SumAggregation{AggName: "sub_agg2", Field: "field2"},
 	}
@@ -62,9 +62,9 @@ func TestGroupByGeoDistance_SubAggregation(t *testing.T) {
 }
 
 func TestGroupByGeoDistance_SubGroupBy(t *testing.T) {
-	subGroupByList := []GroupBy {
-		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query {&MatchAllQuery{}}},
-		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from:2, to: math.Inf(1)}}},
+	subGroupByList := []GroupBy{
+		&GroupByFilter{AggName: "sub_group_by1", Queries: []Query{&MatchAllQuery{}}},
+		&GroupByRange{AggName: "sub_group_by2", Field: "field3", RangeList: []Range{{from: 1, to: 2}, {from: 2, to: math.Inf(1)}}},
 	}
 
 	{

@@ -92,6 +92,16 @@ func (g GroupByResults) GroupByDateHistogram(name string) (*GroupByDateHistogram
 	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
 }
 
+func (g *GroupByResults) GroupByGeoGrid(name string) (*GroupByGeoGridResult, error) {
+	if result, ok := g.resultMap[name]; ok {
+		if result.GetType() != GroupByGeoGridType {
+			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByDateHistogramType.String()))
+		}
+		return result.(*GroupByGeoGridResult), nil
+	}
+	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
+}
+
 func (g GroupByResults) Empty() bool {
 	return len(g.resultMap) == 0
 }
@@ -337,6 +347,51 @@ func ParseGroupByDateHistogramResultFromPB(pbGroupByResult *otsprotocol.GroupByR
 	return groupByResult, nil
 }
 
+func ParseGroupByGeoGridResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (*GroupByGeoGridResult, error) {
+	groupByResult := new(GroupByGeoGridResult)
+	groupByResult.Name = *pbGroupByResult.Name
+
+	pbGroupByResultBody := new(otsprotocol.GroupByGeoGridResult)
+	err := proto.Unmarshal(pbGroupByResult.GroupByResult, pbGroupByResultBody)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to parse group by body: %v", err.Error()))
+	}
+	pbItems := pbGroupByResultBody.GroupByGeoGirdResultItems
+
+	if len(pbItems) > 0 {
+		var items []GroupByGeoGridResultItem
+
+		for _, pbItem := range pbItems {
+			item := GroupByGeoGridResultItem{}
+			item.Key = *pbItem.Key
+			var geoGrid GeoGrid
+			geoGrid.TopLeft.Lat = *pbItem.GeoGrid.TopLeft.Lat
+			geoGrid.TopLeft.Lon = *pbItem.GeoGrid.TopLeft.Lon
+			geoGrid.BottomRight.Lat = *pbItem.GeoGrid.BottomRight.Lat
+			geoGrid.BottomRight.Lon = *pbItem.GeoGrid.BottomRight.Lon
+			item.GeoGrid = geoGrid
+			item.RowCount = *pbItem.RowCount
+			if pbItem.SubAggsResult != nil && len(pbItem.SubAggsResult.AggResults) > 0 {
+				subAggResults, err := ParseAggregationResultsFromPB(pbItem.SubAggsResult.AggResults)
+				if err != nil {
+					return nil, err
+				}
+				item.SubAggregations = *subAggResults
+			}
+			if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
+				subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+				if err != nil {
+					return nil, err
+				}
+				item.SubGroupBys = *subGroupByResults
+			}
+			items = append(items, item)
+		}
+		groupByResult.Items = items
+	}
+	return groupByResult, nil
+}
+
 func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*GroupByResults, error) {
 	groupByResults := GroupByResults{}
 	for _, pbGroupByResult := range pbGroupByResults {
@@ -378,6 +433,13 @@ func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*
 			break
 		case otsprotocol.GroupByType_GROUP_BY_DATE_HISTOGRAM:
 			groupByResult, err := ParseGroupByDateHistogramResultFromPB(pbGroupByResult)
+			if err != nil {
+				return nil, err
+			}
+			groupByResults.Put(groupByResult.Name, groupByResult)
+			break
+		case otsprotocol.GroupByType_GROUP_BY_GEO_GRID:
+			groupByResult, err := ParseGroupByGeoGridResultFromPB(pbGroupByResult)
 			if err != nil {
 				return nil, err
 			}

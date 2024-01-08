@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
@@ -28,7 +28,7 @@ func (tableStoreClient *TableStoreClient) CreateSearchIndex(request *CreateSearc
 	}
 	resp := new(otsprotocol.CreateSearchIndexResponse)
 	response := &CreateSearchIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(createSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(createSearchIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -43,7 +43,7 @@ func (tableStoreClient *TableStoreClient) UpdateSearchIndex(request *UpdateSearc
 	req.SwitchIndexName = request.SwitchIndexName
 	resp := new(otsprotocol.UpdateSearchIndexResponse)
 	response := new(UpdateSearchIndexResponse)
-	if err := tableStoreClient.doRequestWithRetry(updateSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(updateSearchIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -56,7 +56,7 @@ func (tableStoreClient *TableStoreClient) DeleteSearchIndex(request *DeleteSearc
 
 	resp := new(otsprotocol.DeleteSearchIndexResponse)
 	response := &DeleteSearchIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(deleteSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(deleteSearchIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	return response, nil
@@ -68,7 +68,7 @@ func (tableStoreClient *TableStoreClient) ListSearchIndex(request *ListSearchInd
 
 	resp := new(otsprotocol.ListSearchIndexResponse)
 	response := &ListSearchIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(listSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(listSearchIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	indexs := make([]*IndexInfo, 0)
@@ -89,7 +89,7 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 
 	resp := new(otsprotocol.DescribeSearchIndexResponse)
 	response := &DescribeSearchIndexResponse{}
-	if err := tableStoreClient.doRequestWithRetry(describeSearchIndexUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(describeSearchIndexUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	schema, err := ParseFromPbSchema(resp.Schema)
@@ -155,11 +155,11 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 	}
 	resp := new(otsprotocol.SearchResponse)
 	response := &SearchResponse{}
-	if err := tableStoreClient.doRequestWithRetry(searchUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := tableStoreClient.doRequestWithRetry(searchUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 	response.TotalCount = *resp.TotalHits
-	
+
 	rows := make([]*PlainBufferRow, 0)
 	for _, buf := range resp.Rows {
 		row, err := readRowsWithHeader(bytes.NewReader(buf))
@@ -183,29 +183,12 @@ func (tableStoreClient *TableStoreClient) Search(request *SearchRequest) (*Searc
 		}
 		response.Rows = append(response.Rows, currentRow)
 	}
-	
+
 	if len(resp.SearchHits) != 0 && len(resp.Rows) != len(resp.SearchHits) {
 		log.Fatal("the row count is not equal to search extra result item count in server response body, ignore the search extra result items.")
 	} else {
 		for idx, pbSearchHit := range resp.GetSearchHits() {
-			searchHit := &SearchHit{}
-			searchHit.Row = response.Rows[idx]
-			
-			if pbSearchHit.HighlightResult == nil {
-				response.SearchHits = append(response.SearchHits, searchHit)
-				continue
-			}
-			
-			highlightResultItem := &HighlightResultItem{
-				HighlightFields: make(map[string]*HighlightField, initMapLen),
-			}
-			for _, pbHighlightField := range pbSearchHit.HighlightResult.HighlightFields {
-				highlightField := new(HighlightField)
-				highlightField.Fragments = append([]string{}, pbHighlightField.FieldFragments...)
-				highlightResultItem.HighlightFields[pbHighlightField.GetFieldName()] = highlightField
-			}
-			searchHit.HighlightResultItem = highlightResultItem
-			
+			searchHit := buildSearchHit(pbSearchHit, response.Rows[idx])
 			response.SearchHits = append(response.SearchHits, searchHit)
 		}
 	}
@@ -257,7 +240,7 @@ func (TableStoreClient *TableStoreClient) ParallelScan(request *ParallelScanRequ
 	}
 	resp := new(otsprotocol.ParallelScanResponse)
 	response := &ParallelScanResponse{}
-	if err := TableStoreClient.doRequestWithRetry(parallelScanUri, req, resp, &response.ResponseInfo); err != nil {
+	if err := TableStoreClient.doRequestWithRetry(parallelScanUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
 		return nil, err
 	}
 
