@@ -530,15 +530,8 @@ func (internalClient *internalClient) getPartitionFailedNextPause(count uint, en
 		return 0
 	}
 
-	// lock/unlock when accessing the rand from a goroutine
-	internalClient.mu.Lock()
-	value := lastInterval*2 + internalClient.random.Int63n(DefaultRetryInterval-1) + 1
-	internalClient.mu.Unlock()
-	if value > MaxRetryInterval {
-		value = MaxRetryInterval
-	}
-
-	return value
+	newInterval := internalClient.computeNewRetryInterval(lastInterval)
+	return newInterval
 }
 
 func (internalClient *internalClient) getNextPause(err error, count uint, end time.Time, lastInterval int64, action string) int64 {
@@ -563,17 +556,29 @@ func (internalClient *internalClient) getNextPause(err error, count uint, end ti
 		}
 	}
 	if retry {
-		// lock/unlock when accessing the rand from a goroutine
-		internalClient.mu.Lock()
-		value := lastInterval*2 + internalClient.random.Int63n(DefaultRetryInterval-1) + 1
-		internalClient.mu.Unlock()
-		if value > MaxRetryInterval {
-			value = MaxRetryInterval
-		}
-
-		return value
+		newInterval := internalClient.computeNewRetryInterval(lastInterval)
+		return newInterval
 	}
 	return 0
+}
+
+func (internalClient *internalClient) computeNewRetryInterval(lastInterval int64) int64 {
+	defaultRetryInterval := internalClient.config.DefaultRetryInterval / time.Millisecond
+	if defaultRetryInterval <= 0 {
+		defaultRetryInterval = DefaultRetryInterval
+	}
+	maxRetryInterval := internalClient.config.MaxRetryInterval / time.Millisecond
+	if maxRetryInterval <= 0 {
+		maxRetryInterval = MaxRetryInterval
+	}
+	// lock/unlock when accessing the rand from a goroutine
+	internalClient.mu.Lock()
+	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval))
+	internalClient.mu.Unlock()
+	if value > int64(maxRetryInterval) {
+		value = int64(maxRetryInterval)
+	}
+	return value
 }
 
 func (internalClient *internalClient) postReq(req *http.Request, url string) ([]byte, error, string) {
@@ -677,7 +682,7 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 	otshead.set(xOtsApiversion, ApiVersion)
 	otshead.set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
 
-	if extraInfo.userTraceID != nil {
+	if extraInfo.userTraceID != nil && *extraInfo.userTraceID != "" {
 		hreq.Header.Set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
 		otshead.set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
 	}
@@ -685,7 +690,7 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 		hreq.Header.Set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
 		otshead.set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
 	}
-	if extraInfo.requestExtension != nil && extraInfo.requestExtension.tag != nil {
+	if extraInfo.requestExtension != nil && extraInfo.requestExtension.tag != nil && *extraInfo.requestExtension.tag != "" {
 		hreq.Header.Set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
 		otshead.set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
 	}

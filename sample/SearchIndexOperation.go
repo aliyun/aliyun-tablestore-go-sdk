@@ -219,6 +219,104 @@ func CreateSearchIndexForQueryHighlighting(client *tablestore.TableStoreClient, 
 	createSearchIndex(client, tableName, indexName, schemas)
 }
 
+// CreateSearchIndexForVectorQuery: Create Searchindex with vector field.
+func CreateSearchIndexForVectorQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	field1 := &tablestore.FieldSchema{
+		FieldName:        proto.String("col_keyword"),
+		FieldType:        tablestore.FieldType_KEYWORD,
+		Index:            proto.Bool(true),
+		Store:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field2 := &tablestore.FieldSchema{
+		FieldName: proto.String("col_text"),
+		FieldType: tablestore.FieldType_TEXT,
+		Index:     proto.Bool(true),
+	}
+	field3 := &tablestore.FieldSchema{
+		FieldName: proto.String("col_vector"),
+		FieldType: tablestore.FieldType_VECTOR,
+		Index:     proto.Bool(true),
+		VectorOptions: &tablestore.VectorOptions{
+			Dimension:        proto.Int32(8),
+			VectorDataType:   tablestore.VectorDataType_FLOAT_32.Enum(),
+			VectorMetricType: tablestore.VectorMetricType_DOT_PRODUCT.Enum(),
+		},
+	}
+	createSearchIndex(client, tableName, indexName, []*tablestore.FieldSchema{field1, field2, field3})
+}
+// WriteDataForVectorQuery 为高亮查询测试插入数据
+func WriteDataForVectorQuery(client *tablestore.TableStoreClient, tableName string) {
+	fmt.Println("Begin to write data")
+	keyword := []string{"tablestore", "searchindex", "vectorquery"}
+	text := []string{"table store", "search index", "vector query"}
+	for i := 0; i < 100; i++ {
+		putPK := new(tablestore.PrimaryKey)
+		putPK.AddPrimaryKeyColumn("pk1", strconv.Itoa(i))
+		putRowChange := new(tablestore.PutRowChange)
+		putRowChange.TableName = tableName
+		putRowChange.PrimaryKey = putPK
+		putRowChange.AddColumn("col_keyword", keyword[i%len(keyword)])
+		putRowChange.AddColumn("col_text", text[i%len(text)])
+		putRowChange.AddColumn("col_vector", fmt.Sprintf("[%f, %f, %f, %f, %f, %f, %f, %f]", float32(i)+1.5, float32(i)-1.5, float32(i)+5.5, float32(i)-5.5, float32(i)+10.5, float32(i)-10.5, float32(i)+20.5, float32(i)-20.5))
+		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+		putRowRequest := new(tablestore.PutRowRequest)
+		putRowRequest.PutRowChange = putRowChange
+		if _, err := client.PutRow(putRowRequest); err != nil {
+			fmt.Println("Put test data failed with err: ", err)
+		}
+	}
+	time.Sleep(30 * time.Second)
+	fmt.Println("Write data finished.")
+}
+func VectorQuerySample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to run vector query")
+	searchQuery := search.NewSearchQuery()
+	float32VectorQuery := &search.KnnVectorQuery{
+		FieldName: "col_vector",
+		TopK:      proto.Int32(10),
+		Filter: &search.BoolQuery{
+			ShouldQueries: []search.Query{
+				&search.TermQuery{
+					FieldName: "col_keyword",
+					Term:      "vectorquery",
+				},
+				&search.MatchQuery{
+					FieldName: "col_text",
+					Text:      "search",
+				},
+			},
+		},
+		Float32QueryVector: []float32{1.5, -1.5, 5.5, -5.5, 10.5, -10.5, 20.5, -20.5},
+	}
+	searchQuery.Query = float32VectorQuery
+	searchQuery.Sort = &search.Sort{
+		Sorters: []search.Sorter{
+			search.NewScoreSort(),
+		},
+	}
+	searchRequest := &tablestore.SearchRequest{
+		SearchQuery:  searchQuery,
+		TableName:    tableName,
+		IndexName:    indexName,
+		ColumnsToGet: &tablestore.ColumnsToGet{ReturnAllFromIndex: true},
+	}
+
+	if resp, err := client.Search(searchRequest); err != nil {
+		fmt.Println("float32 vector query failed: " + err.Error())
+	} else {
+		for _, row := range resp.SearchHits {
+			fmt.Printf("PK: %v ", row.Row.PrimaryKey.PrimaryKeys)
+			fmt.Printf("Column: [")
+			for _, column := range row.Row.Columns {
+				fmt.Printf("{Name: %v, Value: %v}", column.ColumnName, column.Value)
+			}
+			fmt.Println("]")
+		}
+	}
+	fmt.Println("Vector query sample finished")
+}
+
 func CreateSearchIndexForSearchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	var schemas []*tablestore.FieldSchema
 	field1 := &tablestore.FieldSchema{

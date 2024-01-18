@@ -79,12 +79,14 @@ type HTTPTimeout struct {
 }
 
 type TableStoreConfig struct {
-	RetryTimes         uint
-	MaxRetryTime       time.Duration
-	HTTPTimeout        HTTPTimeout
-	MaxIdleConnections int
-	IdleConnTimeout    time.Duration
-	Transport          http.RoundTripper
+	RetryTimes           uint
+	MaxRetryTime         time.Duration
+	HTTPTimeout          HTTPTimeout
+	MaxIdleConnections   int
+	IdleConnTimeout      time.Duration
+	Transport            http.RoundTripper
+	DefaultRetryInterval time.Duration
+	MaxRetryInterval     time.Duration
 }
 
 func NewDefaultTableStoreConfig() *TableStoreConfig {
@@ -92,11 +94,14 @@ func NewDefaultTableStoreConfig() *TableStoreConfig {
 		ConnectionTimeout: time.Second * 15,
 		RequestTimeout:    time.Second * 30}
 	config := &TableStoreConfig{
-		RetryTimes:         10,
-		HTTPTimeout:        *httpTimeout,
-		MaxRetryTime:       time.Second * 5,
-		MaxIdleConnections: 2000,
-		IdleConnTimeout:    time.Second * 25}
+		RetryTimes:           10,
+		HTTPTimeout:          *httpTimeout,
+		MaxRetryTime:         time.Second * 5,
+		MaxIdleConnections:   2000,
+		IdleConnTimeout:      time.Second * 25,
+		DefaultRetryInterval: time.Millisecond * DefaultRetryInterval,
+		MaxRetryInterval:     time.Millisecond * MaxRetryInterval,
+	}
 	return config
 }
 

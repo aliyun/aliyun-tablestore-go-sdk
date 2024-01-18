@@ -200,6 +200,9 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 			}
 			field.DateFormats = dateFormatsArray
 		}
+		if value.VectorOptions != nil {
+			field.VectorOptions = convertToPBVectorOptions(value.VectorOptions)
+		}
 
 		schemas = append(schemas, field)
 	}
@@ -247,6 +250,7 @@ func parseQueryFlowWeightFromPb(queryFlowWeights []*otsprotocol.QueryFlowWeight)
 	}
 	return flowWeights
 }
+
 func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldSchema {
 	var schemas []*FieldSchema
 	for _, value := range pbFieldSchemas {
@@ -306,6 +310,9 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		}
 		if field.FieldType == FieldType_NESTED {
 			field.FieldSchemas = parseFieldSchemaFromPb(value.FieldSchemas)
+		}
+		if value.VectorOptions != nil {
+			field.VectorOptions, _ = parseVectorOptionsFromPB(value.VectorOptions)
 		}
 		schemas = append(schemas, field)
 	}
@@ -367,6 +374,7 @@ const (
 	FieldType_NESTED    FieldType = 6
 	FieldType_GEO_POINT FieldType = 7
 	FieldType_DATE      FieldType = 8
+	FieldType_VECTOR    FieldType = 9
 )
 
 func (ft FieldType) String() string {
@@ -387,6 +395,8 @@ func (ft FieldType) String() string {
 		return "GEO_POINT"
 	case FieldType_DATE:
 		return "DATE"
+	case FieldType_VECTOR:
+		return "VECTOR"
 	default:
 		return string(ft)
 	}
@@ -410,6 +420,8 @@ func ToFieldType(fieldType string) (FieldType, error) {
 		return FieldType_GEO_POINT, nil
 	case "DATE":
 		return FieldType_DATE, nil
+	case "VECTOR":
+		return FieldType_VECTOR, nil
 	default:
 		return FieldType_LONG, errors.New("Invalid field type: " + fieldType)
 	}
@@ -467,6 +479,125 @@ type FuzzyAnalyzerParameter struct {
 	MaxChars int32
 }
 
+type VectorDataType string
+
+const (
+	VectorDataType_FLOAT_32 VectorDataType = "float_32"
+)
+
+func (dataType VectorDataType) Enum() *VectorDataType {
+	x := new(VectorDataType)
+	*x = dataType
+	return x
+}
+
+func convertToPBDataType(dataType VectorDataType) *otsprotocol.VectorDataType {
+	switch dataType {
+	case VectorDataType_FLOAT_32:
+		return otsprotocol.VectorDataType_VD_FLOAT_32.Enum()
+	default:
+		return otsprotocol.VectorDataType_VD_FLOAT_32.Enum()
+	}
+}
+
+func parseDataTypeFromPB(dataType *otsprotocol.VectorDataType) (VectorDataType, error) {
+	switch *dataType {
+	case otsprotocol.VectorDataType_VD_FLOAT_32:
+		return VectorDataType_FLOAT_32, nil
+	default:
+		return VectorDataType("unknown"), errors.New("unknown proto vector data type " + dataType.String())
+	}
+}
+
+type VectorMetricType string
+
+const (
+	VectorMetricType_EUCLIDEAN   VectorMetricType = "euclidean"
+	VectorMetricType_COSINE      VectorMetricType = "cosine"
+	VectorMetricType_DOT_PRODUCT VectorMetricType = "dot_product"
+)
+
+func (metricType VectorMetricType) Enum() *VectorMetricType {
+	x := new(VectorMetricType)
+	*x = metricType
+	return x
+}
+
+func convertToPBMetricType(metricType VectorMetricType) *otsprotocol.VectorMetricType {
+	switch metricType {
+	case VectorMetricType_EUCLIDEAN:
+		return otsprotocol.VectorMetricType_VM_EUCLIDEAN.Enum()
+	case VectorMetricType_COSINE:
+		return otsprotocol.VectorMetricType_VM_COSINE.Enum()
+	case VectorMetricType_DOT_PRODUCT:
+		return otsprotocol.VectorMetricType_VM_DOT_PRODUCT.Enum()
+	default:
+		return otsprotocol.VectorMetricType_VM_EUCLIDEAN.Enum()
+	}
+}
+
+func parseMetricTypeFromPB(pbMetricType *otsprotocol.VectorMetricType) (VectorMetricType, error) {
+	switch *pbMetricType {
+	case otsprotocol.VectorMetricType_VM_EUCLIDEAN:
+		return VectorMetricType_EUCLIDEAN, nil
+	case otsprotocol.VectorMetricType_VM_COSINE:
+		return VectorMetricType_COSINE, nil
+	case otsprotocol.VectorMetricType_VM_DOT_PRODUCT:
+		return VectorMetricType_DOT_PRODUCT, nil
+	default:
+		return VectorMetricType("unknown"), errors.New("unknown proto vector metric type " + pbMetricType.String())
+	}
+}
+
+type VectorOptions struct {
+	VectorDataType       *VectorDataType
+	VectorMetricType     *VectorMetricType
+	Dimension            *int32
+}
+
+func convertToPBVectorOptions(vectorOptions *VectorOptions) *otsprotocol.VectorOptions {
+	pbVectorOptions := &otsprotocol.VectorOptions{}
+	if vectorOptions.VectorDataType != nil {
+		pbVectorOptions.DataType = convertToPBDataType(*vectorOptions.VectorDataType)
+	}
+
+	if vectorOptions.VectorMetricType != nil {
+		pbVectorOptions.MetricType = convertToPBMetricType(*vectorOptions.VectorMetricType)
+	}
+
+	if vectorOptions.Dimension != nil {
+		pbVectorOptions.Dimension = vectorOptions.Dimension
+	}
+
+	return pbVectorOptions
+}
+
+func parseVectorOptionsFromPB(pbVectorOptions *otsprotocol.VectorOptions) (*VectorOptions, error) {
+	vectorOptions := &VectorOptions{}
+
+	if pbVectorOptions.DataType != nil {
+		if dataType, err := parseDataTypeFromPB(pbVectorOptions.DataType); err != nil {
+			return nil, err
+		} else {
+			vectorOptions.VectorDataType = &dataType
+		}
+	}
+
+	if pbVectorOptions.MetricType != nil {
+		if metricType, err := parseMetricTypeFromPB(pbVectorOptions.MetricType); err != nil {
+			return nil, err
+		} else {
+			vectorOptions.VectorMetricType = &metricType
+		}
+	}
+
+	if pbVectorOptions.Dimension != nil {
+		vectorOptions.Dimension = pbVectorOptions.Dimension
+	}
+
+	return vectorOptions, nil
+}
+
 type FieldSchema struct {
 	FieldName          *string
 	FieldType          FieldType
@@ -482,6 +613,7 @@ type FieldSchema struct {
 	IsVirtualField     *bool
 	SourceFieldNames   []string
 	DateFormats        []string
+	VectorOptions      *VectorOptions
 }
 
 func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
@@ -506,6 +638,7 @@ func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
 	r.IsVirtualField = copyFS.IsVirtualField
 	r.SourceFieldNames = copyFS.SourceFieldNames
 	r.DateFormats = copyFS.DateFormats
+	r.VectorOptions = copyFS.VectorOptions
 
 	apJson, err := json.Marshal(r.AnalyzerParameter)
 	if err != nil {

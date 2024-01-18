@@ -86,6 +86,11 @@ func main() {
 	sample.WriteDataForQueryHighlighting(client, "highlighting_sample_table")
 	sample.QueryHighlightingSample(client, "highlighting_sample_table", "highlighting_sample_index")
 
+	// SearchIndex: Vector Query
+	sample.CreateSearchIndexForVectorQuery(client, "vector_query_sample_table", "vector_query_sample_index")
+	sample.WriteDataForVectorQuery(client, "vector_query_sample_table")
+	sample.VectorQuerySample(client, "vector_query_sample_table", "vector_query_sample_index")
+
 	// update searchIndex schema
 	sample.UpdateSearchIndexSchema(client, "go_sdk_test_table", "go_sdk_test_index", "go_sdk_test_index_reindex")
 

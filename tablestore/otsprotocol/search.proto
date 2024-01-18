@@ -21,6 +21,7 @@ enum QueryType {
     GEO_POLYGON_QUERY = 14;
     TERMS_QUERY = 15;
     EXISTS_QUERY = 16;
+    KNN_VECTOR_QUERY = 17;
     FUNCTIONS_SCORE_QUERY = 18;
 }
 
@@ -241,6 +242,13 @@ message ExistsQuery {
     optional string field_name = 1;
 }
 
+message KnnVectorQuery {
+    optional string field_name = 1;
+    optional int32 top_k = 2;
+    repeated float float32_query_vector = 4;
+    optional Query filter = 5;
+}
+
 message Query {
     optional QueryType type = 1;
     optional bytes query = 2;
@@ -419,14 +427,15 @@ enum IndexOptions {
 }
 
 enum FieldType {
-    LONG = 1;
-    DOUBLE = 2;
-    BOOLEAN = 3;
-    KEYWORD = 4;
-    TEXT = 5;
-    NESTED = 6;
-    GEO_POINT = 7;
-    DATE = 8;
+  LONG = 1;
+  DOUBLE = 2;
+  BOOLEAN = 3;
+  KEYWORD = 4;
+  TEXT = 5;
+  NESTED = 6;
+  GEO_POINT = 7;
+  DATE = 8;
+  VECTOR = 9;
 }
 
 enum DateTimeUnit {
@@ -474,6 +483,23 @@ message FieldSchema {
     repeated string source_field_names = 12;
     repeated string date_formats = 13;
     optional bool enable_highlighting = 14;
+    optional VectorOptions vector_options = 15;
+}
+
+enum VectorDataType {
+    VD_FLOAT_32 = 2;
+}
+
+message VectorOptions {
+    optional VectorDataType data_type = 1;
+    optional int32 dimension = 2;
+    optional VectorMetricType metric_type = 3;
+}
+
+enum VectorMetricType {
+    VM_EUCLIDEAN = 0;
+    VM_COSINE = 1;
+    VM_DOT_PRODUCT = 2;
 }
 
 message IndexSchema {
