@@ -573,7 +573,7 @@ func (internalClient *internalClient) computeNewRetryInterval(lastInterval int64
 	}
 	// lock/unlock when accessing the rand from a goroutine
 	internalClient.mu.Lock()
-	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval))
+	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval) - 1) + 1
 	internalClient.mu.Unlock()
 	if value > int64(maxRetryInterval) {
 		value = int64(maxRetryInterval)
