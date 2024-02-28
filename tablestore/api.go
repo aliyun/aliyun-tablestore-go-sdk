@@ -96,9 +96,11 @@ var RowsSerializeType = otsprotocol.RowsSerializeType_RST_FLAT_BUFFER
 // @param instanceName
 // @param accessId The Access ID. 用于标示用户的ID。
 // @param accessKey The Access Key. 用于签名和验证的密钥。
+// @param securityToken The STS security token. 使用STS时用于验证accessKey的token。
+
 // @param options set client config
-func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, options ...ClientOption) *TableStoreClient {
-	client := NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret, "", nil, options...)
+func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, options ...ClientOption) *TableStoreClient {
+	client := NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret, securityToken, nil, options...)
 	// client options parse
 	for _, option := range options {
 		option(client)
