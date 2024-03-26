@@ -648,6 +648,41 @@ type BatchGetRowResponse struct {
 	TableToRowsResult map[string][]RowResult
 	ResponseInfo
 }
+type SingleRow struct {
+	PrimaryKey map[string]interface{} // 主键
+	Row        map[string]interface{} // 行数据
+	Err        Error                  // 错误信息
+}
+type Rows struct {
+	mu   sync.Mutex
+	Data RowData
+}
+type RowData map[int32]*SingleRow
+
+func (response GetRangeResponse) Marshal() (*RowData, error) {
+	rows := &Rows{Data: make(map[int32]*SingleRow)}
+	var wg sync.WaitGroup
+
+	for index, data := range response.Rows { // 假设response.Rows是Row类型的切片，且Row实现了Marshal方法
+		wg.Add(1)
+		go func(index int32, data *Row) {
+			defer wg.Done()
+
+			singleRow := new(SingleRow)
+			singleRow.PrimaryKey, singleRow.Row = data.Marshal() // 假设Row类型有Marshal方法可以直接使用
+
+			// 在写入之前锁定mutex
+			rows.mu.Lock()
+			rows.Data[index] = singleRow
+			rows.mu.Unlock()
+		}(int32(index), data)
+	}
+
+	wg.Wait()
+
+	// 返回指向Rows.Data的指针，满足函数签名的要求
+	return &rows.Data, nil
+}
 
 // BatchWriteRowRequest
 // IsAtomic 设置是否为批量原子写
