@@ -53,6 +53,37 @@ func CreateTableKeyAutoIncrementSample(client *tablestore.TableStoreClient) {
 	client.CreateTable(createtableRequest)
 }
 
+func CopyTableSample(sourceClient *tablestore.TableStoreClient, targetClient *tablestore.TableStoreClient) {
+	list, err := sourceClient.ListTable()
+	fmt.Println("list: ", list, "err: ", err)
+	for _, tableName := range list.TableNames {
+		fmt.Println("table: ", tableName)
+		sourceTable, _ := sourceClient.DescribeTable(&tablestore.DescribeTableRequest{TableName: tableName})
+		response, err := targetClient.DescribeTable(&tablestore.DescribeTableRequest{TableName: tableName})
+		if err != nil {
+			fmt.Println("get tableStore ", tableName, ": ", err)
+			createRequest := tablestore.CreateTableRequest{
+				TableMeta:          sourceTable.TableMeta,
+				TableOption:        sourceTable.TableOption,
+				ReservedThroughput: sourceTable.ReservedThroughput,
+				StreamSpec: &tablestore.StreamSpecification{
+					EnableStream:   sourceTable.StreamDetails.EnableStream,
+					ExpirationTime: sourceTable.StreamDetails.ExpirationTime,
+				},
+				IndexMetas: sourceTable.IndexMetas,
+			}
+			res, err := targetClient.CreateTable(&createRequest)
+			if err != nil {
+				fmt.Println("create table fail: ", err)
+			} else {
+				fmt.Println("create table success: ", res)
+			}
+		} else {
+			fmt.Println("has response: ", response)
+		}
+	}
+}
+
 func DeleteTableSample(client *tablestore.TableStoreClient) {
 	fmt.Println("Begin to delete table")
 	tableName := "tabletodeletesample"
