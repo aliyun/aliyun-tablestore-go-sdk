@@ -954,6 +954,37 @@ func (response *GetRowResponse) GetColumnMap() *ColumnMap {
 	}
 }
 
+func (row *Row) GetColumnMap() *ColumnMap {
+	if row == nil {
+		return nil
+	}
+	if row.columnMap != nil {
+		return row.columnMap
+	} else {
+		row.columnMap = &ColumnMap{}
+		row.columnMap.Columns = make(map[string][]*AttributeColumn)
+
+		if len(row.Columns) == 0 {
+			return row.columnMap
+		} else {
+			for _, column := range row.Columns {
+				if _, ok := row.columnMap.Columns[column.ColumnName]; ok {
+					row.columnMap.Columns[column.ColumnName] = append(row.columnMap.Columns[column.ColumnName], column)
+				} else {
+					row.columnMap.columnsKey = append(row.columnMap.columnsKey, column.ColumnName)
+					value := []*AttributeColumn{}
+					value = append(value, column)
+					row.columnMap.Columns[column.ColumnName] = value
+				}
+			}
+
+			sort.Strings(row.columnMap.columnsKey)
+			return row.columnMap
+		}
+	}
+
+}
+
 func Assert(cond bool, msg string) {
 	if !cond {
 		panic(msg)
