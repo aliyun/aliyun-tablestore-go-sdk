@@ -659,10 +659,18 @@ type Rows struct {
 }
 type RowData map[int32]*SingleRow
 
-func (response GetRangeResponse) Marshal() (*RowData, error) {
+func (response *GetRangeResponse) Marshal() (*RowData, error) {
 	rows := &Rows{Data: make(map[int32]*SingleRow)}
 	var wg sync.WaitGroup
+	if len(response.Rows) <= 256 {
+		rowData := make(RowData)
 
+		for index, data := range response.Rows {
+			pk, row := data.Marshal()
+			rowData[int32(index)] = &SingleRow{PrimaryKey: pk, Row: row}
+		}
+		return &rowData, nil
+	}
 	for index, data := range response.Rows { // 假设response.Rows是Row类型的切片，且Row实现了Marshal方法
 		wg.Add(1)
 		go func(index int32, data *Row) {
@@ -677,9 +685,7 @@ func (response GetRangeResponse) Marshal() (*RowData, error) {
 			rows.mu.Unlock()
 		}(int32(index), data)
 	}
-
 	wg.Wait()
-
 	// 返回指向Rows.Data的指针，满足函数签名的要求
 	return &rows.Data, nil
 }
