@@ -5,13 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"io"
 	"log"
 	"math/rand"
 	"net/http"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -50,10 +50,10 @@ var client TableStoreApi
 var invalidClient TableStoreApi
 
 func (s *TableStoreSuite) SetUpSuite(c *C) {
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
@@ -74,7 +74,7 @@ func (s *TableStoreSuite) SetUpSuite(c *C) {
 	PrepareSQLSearchIndex(c, sqlTableNameWithSearch, sqlSearchName)
 	WaitDataSyncByMatchAllQuery(c, client, 4, sqlTableNameWithSearch, sqlSearchName, 40)
 
-	invalidClient = NewClient(endpoint, instanceName, accessKeyId, "invalidsecret")
+	invalidClient = NewClient(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, "invalidsecret")
 }
 
 func (s *TableStoreSuite) SetUpTest(c *C) {
@@ -2533,10 +2533,10 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 		sqlRow := timeTpResSet.Next()
 		val1, err := sqlRow.GetDateTime(0)
 		c.Assert(err, IsNil)
-		c.Assert(val1, Equals, time.Unix(1668585138, 995000000).UTC())
+		c.Assert(val1, Equals, time.Unix(1668585138, 995000000))
 		val1, err = sqlRow.GetDateTimeByName("from_unixtime(1668585138.995)")
 		c.Assert(err, IsNil)
-		c.Assert(val1, Equals, time.Unix(1668585138, 995000000).UTC())
+		c.Assert(val1, Equals, time.Unix(1668585138, 995000000))
 		val1, err = sqlRow.GetDateTimeByName("from_unixtime(16685138.995)")
 		c.Assert(err.Error(), Equals, "SQLRow doesn't contains Name: from_unixtime(16685138.995)")
 		_, err = sqlRow.GetTime(0)
@@ -2651,7 +2651,8 @@ func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
 
 func (s *TableStoreSuite) TestSQLTimeSeries(c *C) {
 	// devops_25w is timeseries table, prepared in advanced.
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
+	instanceName := testConfig.InstanceName
+
 	if !strings.Contains(instanceName, "test-sql-e2e") {
 		c.Skip("devops_25w is timeseries table, should prepared in advanced.")
 	}

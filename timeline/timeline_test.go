@@ -2,8 +2,8 @@ package timeline
 
 import (
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"math/rand"
-	"os"
 	"testing"
 	"time"
 
@@ -106,11 +106,11 @@ func BenchmarkTmLine_BatchStore_WriteSpread_IgnoreMessageLost(b *testing.B) {
 
 func initStoreOptionFromEnv(table string) *StoreOption {
 	return &StoreOption{
-		Endpoint:  os.Getenv("OTS_TEST_ENDPOINT"),
-		Instance:  os.Getenv("OTS_TEST_INSTANCENAME"),
+		Endpoint:  testConfig.OtsEndpoint,
+		Instance:  testConfig.InstanceName,
 		TableName: table,
-		AkId:      os.Getenv("OTS_TEST_KEYID"),
-		AkSecret:  os.Getenv("OTS_TEST_SECRET"),
+		AkId:      testConfig.OtsAccessId,
+		AkSecret:  testConfig.OtsAccessKey,
 		WriterConfig: &writer.Config{
 			Concurrent:    300,
 			FlushInterval: 20 * time.Millisecond,

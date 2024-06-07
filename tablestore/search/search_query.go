@@ -291,6 +291,12 @@ func NewGroupByGeoGrid(name string, fieldName string) *GroupByGeoGrid {
 	}
 }
 
+func NewGroupByComposite(groupByName string) *GroupByComposite {
+	return &GroupByComposite{
+		GroupByName: groupByName,
+	}
+}
+
 func (s *searchQuery) Aggregation(agg ...Aggregation) *searchQuery {
 	for i := 0; i < len(agg); i++ {
 		s.Aggregations = append(s.Aggregations, agg[i])

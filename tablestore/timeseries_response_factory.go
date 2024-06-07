@@ -15,24 +15,39 @@ func CreateGetTimeseriesDataResponse(pbResponse *otsprotocol.GetTimeseriesDataRe
 			return nil, fmt.Errorf("parser response failed with err : %v", err)
 		}
 
+		var timeseriesKeyCount int
 		for _, row := range rows {
 			timeseriesKey := NewTimeseriesKey()
-			measurement := row.primaryKey[1].cellValue.Value.(string)
-			source := row.primaryKey[2].cellValue.Value.(string)
-			tagsStr := row.primaryKey[3].cellValue.Value.(string)
-			timestamp := row.primaryKey[4].cellValue.Value.(int64)
-			tags, err := parseTagsOrAttrs(tagsStr)
-			if err != nil {
-				return nil, err
+		parseTimeseriesKey:
+			for i, pk := range row.primaryKey {
+				switch string(pk.cellName) {
+				case "_#h":
+				case "_m_name":
+					timeseriesKey.measurement = pk.cellValue.Value.(string)
+				case "_data_source":
+					timeseriesKey.source = pk.cellValue.Value.(string)
+				case "_tags":
+					tagsStr := pk.cellValue.Value.(string)
+					tags, err := parseAttrs(tagsStr)
+					if err != nil {
+						return nil, err
+					}
+					timeseriesKey.AddTags(tags)
+				case "_time":
+					timeseriesKeyCount = i
+					break parseTimeseriesKey
+				default:
+					timeseriesKey.AddTag(string(pk.cellName), pk.cellValue.Value.(string))
+				}
 			}
-			timeseriesKey.SetMeasurementName(measurement)
-			timeseriesKey.SetDataSource(source)
-			timeseriesKey.AddTags(tags)
-
+			timestamp := row.primaryKey[timeseriesKeyCount].cellValue.Value.(int64)
 			timeseriesRow := NewTimeseriesRow(timeseriesKey)
 			timeseriesRow.SetTimeInus(timestamp)
 			for _, field := range row.cells {
 				timeseriesRow.AddField(convertColumnName(field.cellName), field.cellValue)
+			}
+			for _, pk := range row.primaryKey[timeseriesKeyCount+1:] {
+				timeseriesRow.AddField(string(pk.cellName), pk.cellValue)
 			}
 			response.rows = append(response.rows, timeseriesRow)
 		}
@@ -48,20 +63,15 @@ func CreateGetTimeseriesDataResponse(pbResponse *otsprotocol.GetTimeseriesDataRe
 func parseTimeseriesMeta(pbResponseMeta *otsprotocol.TimeseriesMeta) (*TimeseriesMeta, error) {
 	timeseriesKey := NewTimeseriesKey()
 
-	currentMetaTagStr := pbResponseMeta.GetTimeSeriesKey().GetTags()
-	tags, err := parseTagsOrAttrs(currentMetaTagStr)
-	if err != nil {
-		return nil, err
-	}
+	tags := parseTags(pbResponseMeta.GetTimeSeriesKey().GetTagList())
 	timeseriesKey.AddTags(tags)
-
 	timeseriesKey.source = pbResponseMeta.GetTimeSeriesKey().GetSource()
 	timeseriesKey.measurement = pbResponseMeta.GetTimeSeriesKey().GetMeasurement()
 
 	timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
 
 	if pbResponseMeta.Attributes != nil {
-		attrs, err := parseTagsOrAttrs(*pbResponseMeta.Attributes)
+		attrs, err := parseAttrs(*pbResponseMeta.Attributes)
 		if err != nil {
 			return nil, err
 		}
@@ -77,6 +87,12 @@ func ParseTimeseriesTableMeta(pbResponseTableMeta *otsprotocol.TimeseriesTableMe
 	timeseriesTableMeta := NewTimeseriesTableMeta(pbResponseTableMeta.GetTableName())
 	timeseriesTableOptions := NewTimeseriesTableOptions(int64(pbResponseTableMeta.GetTableOptions().GetTimeToLive()))
 	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)
+	for _, pk := range pbResponseTableMeta.GetTimeseriesKeySchema() {
+		timeseriesTableMeta.AddTimeseriesKey(pk)
+	}
+	for _, pk := range pbResponseTableMeta.GetFieldPrimaryKeySchema() {
+		timeseriesTableMeta.AddFieldPrimaryKey(pk.GetName(), PrimaryKeyType(pk.GetType()))
+	}
 	return timeseriesTableMeta
 }
 
@@ -89,9 +105,17 @@ func convertColumnName(serverColName []byte) string {
 	return ""
 }
 
-func parseTagsOrAttrs(tagsStr string) (map[string]string, error) {
+func parseTags(tagList []*otsprotocol.TimeseriesTag) map[string]string {
+	tags := map[string]string{}
+	for _, tag := range tagList {
+		tags[tag.GetName()] = tag.GetValue()
+	}
+	return tags
+}
+
+func parseAttrs(tagsStr string) (map[string]string, error) {
 	if tagsStr == "" {
-		return nil, fmt.Errorf("tags string is empty")
+		return nil, nil
 	}
 
 	if len(tagsStr) < 2 || tagsStr[0] != '[' || tagsStr[len(tagsStr)-1] != ']' {

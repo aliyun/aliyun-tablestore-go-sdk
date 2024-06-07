@@ -3,11 +3,11 @@ package tablestore
 import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"math"
 	"math/rand"
-	"os"
 	"runtime"
 	"strconv"
 	"strings"
@@ -29,17 +29,17 @@ var timeseriesClient *TimeseriesClient
 var invalidTimeseriesClient *TimeseriesClient
 
 func (s *TimeseriesSuite) SetUpSuite(c *C) {
-	endPoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 
 	timeseriesTableNamePrefix = strings.Replace(runtime.Version(), ".", "", -1)
 	defaultTimeseriesTableName = timeseriesTableNamePrefix + defaultTimeseriesTableName
 
-	tableStoreClient = NewClient(endPoint, instanceName, accessKeyId, accessKeySecret)
-	timeseriesClient = NewTimeseriesClient(endPoint, instanceName, accessKeyId, accessKeySecret)
-	invalidTimeseriesClient = NewTimeseriesClient(endPoint, instanceName, accessKeyId, "invalidsecret")
+	tableStoreClient = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
+	timeseriesClient = NewTimeseriesClient(endpoint, instanceName, accessKeyId, accessKeySecret)
+	invalidTimeseriesClient = NewTimeseriesClient(endpoint, instanceName, accessKeyId, "invalidsecret")
 }
 
 func (s *TimeseriesSuite) TearDownSuite(c *C) {
@@ -50,6 +50,10 @@ func (s *TimeseriesSuite) TearDownSuite(c *C) {
 	s.deleteTimeseriesTable("test_create_and_delete_analytical_store2")
 	s.deleteTimeseriesTable("test_update_analytical_store")
 	s.deleteTimeseriesTable("test_describe_index_sync_phase")
+	s.deleteTimeseriesTable("test_custom_primary_keys")
+	s.deleteTimeseriesTable("test_custom_primary_keys_meta")
+	s.deleteTimeseriesTable("test_custom_primary_keys_tags")
+	s.deleteTimeseriesTable("test_lastpoint_index_create_delete")
 }
 
 func (s *TimeseriesSuite) deleteTimeseriesTable(tableName string) {
@@ -453,7 +457,15 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	queryTimeseriesMetaReq.SetCondition(tagMetaQueryCondition)
 	QueryTimeseriesMetaResp, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaReq)
 	c.Assert(err, Equals, nil)
-	c.Assert(len(QueryTimeseriesMetaResp.GetTimeseriesMetas()), Equals, 1)
+	metas := QueryTimeseriesMetaResp.GetTimeseriesMetas()
+	c.Assert(len(metas), Equals, 1)
+	key := metas[0].GetTimeseriesKey()
+	c.Assert(key.GetMeasurementName(), Equals, "CPU")
+	c.Assert(key.GetDataSource(), Equals, "127.0.0.1")
+	c.Assert(len(key.GetTags()), Equals, 3)
+	c.Assert(key.GetTags()["City"], Equals, "Hangzhou")
+	c.Assert(key.GetTags()["Region"], Equals, "YuHang")
+	c.Assert(key.GetTags()["Street"], Equals, "Zhuantang")
 
 	// 组合条件查询
 	measurementMetaQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
@@ -683,7 +695,7 @@ func (s *TimeseriesSuite) TestCreateAnalyticalStoreWithTimeseriesTable(c *C) {
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
 	createTimeseriesTableRequest.SetAnalyticalStores([]*TimeseriesAnalyticalStore{{
 		StoreName:  "custom_analytical_store",
-		TimeToLive: proto.Int32(888888),
+		TimeToLive: proto.Int32(2592000),
 		SyncOption: &syncType,
 	}})
 	_, err = timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
@@ -695,7 +707,7 @@ func (s *TimeseriesSuite) TestCreateAnalyticalStoreWithTimeseriesTable(c *C) {
 	analyticalStores = describeTimeseriesTableResponse.GetAnalyticalStores()
 	c.Assert(len(analyticalStores), Equals, 1)
 	c.Assert(analyticalStores[0].StoreName, Equals, "custom_analytical_store")
-	c.Assert(analyticalStores[0].TimeToLive, DeepEquals, proto.Int32(888888))
+	c.Assert(analyticalStores[0].TimeToLive, DeepEquals, proto.Int32(2592000))
 	c.Assert(*analyticalStores[0].SyncOption, Equals, SYNC_TYPE_FULL)
 }
 
@@ -741,7 +753,7 @@ func (s *TimeseriesSuite) TestCreateAndDeleteAnalyticalStore(c *C) {
 	// create incremental sync analytical store
 	analyticalStore = NewTimeseriesAnalyticalStore("incr_sync_analytical_store")
 	analyticalStore.SetSyncOption(SYNC_TYPE_INCR)
-	analyticalStore.SetTimeToLive(100000)
+	analyticalStore.SetTimeToLive(2592000)
 	createAnalyticalStoreRequest = NewCreateTimeseriesAnalyticalStoreRequest("test_create_and_delete_analytical_store2", analyticalStore)
 	_, err = timeseriesClient.CreateTimeseriesAnalyticalStore(createAnalyticalStoreRequest)
 	c.Assert(err, Equals, nil)
@@ -749,7 +761,7 @@ func (s *TimeseriesSuite) TestCreateAndDeleteAnalyticalStore(c *C) {
 	describeAnalyticalStoreResponse, err = timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "incr_sync_analytical_store")
-	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(100000))
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(2592000))
 	c.Assert(*describeAnalyticalStoreResponse.AnalyticalStore.SyncOption, Equals, SYNC_TYPE_INCR)
 	c.Assert(describeAnalyticalStoreResponse.SyncStat.SyncPhase, Equals, SYNC_TYPE_INCR)
 	c.Assert(describeAnalyticalStoreResponse.SyncStat.CurrentSyncTimestamp, Equals, int64(0))
@@ -802,7 +814,7 @@ func (s *TimeseriesSuite) TestUpdateAnalyticalStore(c *C) {
 
 	// update analytical store
 	analyticalStore := NewTimeseriesAnalyticalStore("default_analytical_store")
-	analyticalStore.SetTimeToLive(86400)
+	analyticalStore.SetTimeToLive(2592000)
 	updateAnalyticalStoreRequest := NewUpdateTimeseriesAnalyticalStoreRequest("test_update_analytical_store", analyticalStore)
 	_, err = timeseriesClient.UpdateTimeseriesAnalyticalStore(updateAnalyticalStoreRequest)
 	c.Assert(err, Equals, nil)
@@ -810,7 +822,7 @@ func (s *TimeseriesSuite) TestUpdateAnalyticalStore(c *C) {
 	describeAnalyticalStoreResponse, err = timeseriesClient.DescribeTimeseriesAnalyticalStore(describeAnalyticalStoreRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.StoreName, Equals, "default_analytical_store")
-	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(86400))
+	c.Assert(describeAnalyticalStoreResponse.AnalyticalStore.TimeToLive, DeepEquals, proto.Int32(2592000))
 }
 
 func (s *TimeseriesSuite) TestDescribeIndexSyncPhase(c *C) {
@@ -848,4 +860,255 @@ func (s *TimeseriesSuite) TestDescribeIndexSyncPhase(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(describeTableResponse.IndexMetas), Equals, 1)
 	c.Assert(*describeTableResponse.IndexMetas[0].IndexSyncPhase, Equals, SyncPhase_FULL)
+}
+
+func (s *TimeseriesSuite) TestCustomPrimaryKeys(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_custom_primary_keys")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	meta.AddTimeseriesKey("_m_name")
+	meta.AddTimeseriesKey("region")
+	meta.AddTimeseriesKey("_tags")
+	meta.AddFieldPrimaryKey("cores", PrimaryKeyType_INTEGER)
+	meta.AddFieldPrimaryKey("frequency", PrimaryKeyType_STRING)
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe table
+	describeTableRequest := NewDescribeTimeseriesTableRequset("test_custom_primary_keys")
+	describeTableResponse, err := timeseriesClient.DescribeTimeseriesTable(describeTableRequest)
+	c.Assert(err, Equals, nil)
+	pks := describeTableResponse.GetTimeseriesTableMeta().timeseriesKeys
+	c.Assert(len(pks), Equals, 3)
+	c.Assert(pks[0], Equals, "_m_name")
+	c.Assert(pks[1], Equals, "region")
+	c.Assert(pks[2], Equals, "_tags")
+	pkFields := describeTableResponse.GetTimeseriesTableMeta().fieldPrimaryKeys
+	c.Assert(len(pkFields), Equals, 2)
+	c.Assert(*pkFields[0].Name, Equals, "cores")
+	c.Assert(*pkFields[0].Type, Equals, PrimaryKeyType_INTEGER)
+	c.Assert(*pkFields[1].Name, Equals, "frequency")
+	c.Assert(*pkFields[1].Type, Equals, PrimaryKeyType_STRING)
+
+	// list table
+	listTableResponse, err := timeseriesClient.ListTimeseriesTable()
+	c.Assert(err, Equals, nil)
+	hasTestPrimaryKeyFieldsTable := false
+	for _, meta = range listTableResponse.GetTimeseriesTableMeta() {
+		if meta.GetTimeseriesTableName() == "test_custom_primary_keys" {
+			hasTestPrimaryKeyFieldsTable = true
+			pks = meta.timeseriesKeys
+			c.Assert(len(pks), Equals, 3)
+			c.Assert(pks[0], Equals, "_m_name")
+			c.Assert(pks[1], Equals, "region")
+			c.Assert(pks[2], Equals, "_tags")
+			pkFields = meta.fieldPrimaryKeys
+			c.Assert(len(pkFields), Equals, 2)
+			c.Assert(*pkFields[0].Name, Equals, "cores")
+			c.Assert(*pkFields[0].Type, Equals, PrimaryKeyType_INTEGER)
+			c.Assert(*pkFields[1].Name, Equals, "frequency")
+			c.Assert(*pkFields[1].Type, Equals, PrimaryKeyType_STRING)
+			break
+		}
+	}
+	c.Assert(hasTestPrimaryKeyFieldsTable, Equals, true)
+
+	// put data
+	putTimeseriesDataRequest := NewPutTimeseriesDataRequest("test_custom_primary_keys")
+	timeseriesKey := NewTimeseriesKey()
+	timeseriesKey.SetMeasurementName("cpu")
+	timeseriesKey.AddTag("region", "hangzhou")
+	timeseriesKey.AddTag("vendor", "intel")
+	for i := 0; i < 10; i++ {
+		timeseriesRow := NewTimeseriesRow(timeseriesKey)
+		timeseriesRow.SetTimeInus(time.Now().UnixNano() / 1000)
+		timeseriesRow.AddField("cores", NewColumnValue(ColumnType_INTEGER, 8))
+		timeseriesRow.AddField("frequency", NewColumnValue(ColumnType_STRING, fmt.Sprintf("%dGHz", i)))
+		timeseriesRow.AddField("temperature", NewColumnValue(ColumnType_DOUBLE, 98.5))
+		putTimeseriesDataRequest.AddTimeseriesRows(timeseriesRow)
+	}
+	putTimeseriesDataResponse, err := timeseriesClient.PutTimeseriesData(putTimeseriesDataRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(putTimeseriesDataResponse.GetFailedRowResults()), Equals, 0)
+
+	// get data
+	getTimeseriesDataRequest := NewGetTimeseriesDataRequest("test_custom_primary_keys")
+	getTimeseriesDataRequest.SetTimeseriesKey(timeseriesKey)
+	getTimeseriesDataRequest.SetTimeRange(0, time.Now().UnixNano()/1000)
+	getTimeseriesDataResponse, err := timeseriesClient.GetTimeseriesData(getTimeseriesDataRequest)
+	c.Assert(err, Equals, nil)
+	rows := getTimeseriesDataResponse.GetRows()
+	c.Assert(len(rows), Equals, 10)
+	for i := 0; i < 10; i++ {
+		pk := rows[i].GetTimeseriesKey()
+		c.Assert(pk.GetMeasurementName(), Equals, "cpu")
+		c.Assert(pk.GetDataSource(), Equals, "")
+		tags := pk.GetTags()
+		c.Assert(len(tags), Equals, 2)
+		c.Assert(tags["region"], Equals, "hangzhou")
+		c.Assert(tags["vendor"], Equals, "intel")
+		fields := rows[i].GetFieldsMap()
+		c.Assert(len(fields), Equals, 3)
+		c.Assert(fields["cores"].Value, Equals, int64(8))
+		c.Assert(fields["frequency"].Value, Equals, fmt.Sprintf("%dGHz", i))
+		c.Assert(fields["temperature"].Value, Equals, 98.5)
+	}
+}
+
+func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_custom_primary_keys_meta")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	meta.AddTimeseriesKey("_m_name")
+	meta.AddTimeseriesKey("region")
+	meta.AddTimeseriesKey("_tags")
+	meta.AddFieldPrimaryKey("cores", PrimaryKeyType_INTEGER)
+	meta.AddFieldPrimaryKey("frequency", PrimaryKeyType_STRING)
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// update meta
+	timeseriesKey := NewTimeseriesKey()
+	timeseriesKey.SetMeasurementName("cpu")
+	timeseriesKey.AddTag("region", "hangzhou")
+	timeseriesKey.AddTag("vendor", "intel")
+	timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
+	updateTimeseriesMetaRequest := NewUpdateTimeseriesMetaRequest("test_custom_primary_keys_meta")
+	updateTimeseriesMetaRequest.AddTimeseriesMetas(timeseriesMeta)
+	updateTimeseriesMetaResponse, err := timeseriesClient.UpdateTimeseriesMeta(updateTimeseriesMetaRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
+
+	// wait for meta sync
+	time.Sleep(30 * time.Second)
+
+	// query meta
+	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest("test_custom_primary_keys_meta")
+	queryTimeseriesMetaRequest.SetLimit(-1)
+	queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+	c.Assert(err, Equals, nil)
+	metas := queryTimeseriesMetaResponse.GetTimeseriesMetas()
+	c.Assert(len(metas), Equals, 1)
+	c.Assert(metas[0].GetTimeseriesKey().GetMeasurementName(), Equals, "cpu")
+	c.Assert(metas[0].GetTimeseriesKey().GetDataSource(), Equals, "")
+	tags := metas[0].GetTimeseriesKey().GetTags()
+	c.Assert(len(tags), Equals, 2)
+	c.Assert(tags["region"], Equals, "hangzhou")
+	c.Assert(tags["vendor"], Equals, "intel")
+
+	// delete meta
+	deleteTimeseriesMetaRequest := NewDeleteTimeseriesMetaRequest("test_custom_primary_keys_meta")
+	deleteTimeseriesMetaRequest.AddTimeseriesKeys(timeseriesKey)
+	deleteTimeseriesMetaResponse, err := timeseriesClient.DeleteTimeseriesMeta(deleteTimeseriesMetaRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(deleteTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
+	time.Sleep(30 * time.Second)
+	queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+	c.Assert(err, Equals, nil)
+	metas = queryTimeseriesMetaResponse.GetTimeseriesMetas()
+	c.Assert(len(metas), Equals, 0)
+}
+
+func (s *TimeseriesSuite) TestCustomPrimaryKeysTags(c *C) {
+	// create table
+	meta := NewTimeseriesTableMeta("test_custom_primary_keys_tags")
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	meta.AddTimeseriesKey("measurement")
+	meta.AddTimeseriesKey("vendor")
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// put data
+	putTimeseriesDataRequest := NewPutTimeseriesDataRequest("test_custom_primary_keys_tags")
+	timeseriesKey := NewTimeseriesKey()
+	timeseriesKey.AddTag("measurement", "cpu")
+	timeseriesKey.AddTag("vendor", "intel")
+	for i := 0; i < 10; i++ {
+		timeseriesRow := NewTimeseriesRow(timeseriesKey)
+		timeseriesRow.SetTimeInus(time.Now().UnixNano()/1000 + int64(i))
+		timeseriesRow.AddField("temperature", NewColumnValue(ColumnType_DOUBLE, 98.5))
+		putTimeseriesDataRequest.AddTimeseriesRows(timeseriesRow)
+	}
+	putTimeseriesDataResponse, err := timeseriesClient.PutTimeseriesData(putTimeseriesDataRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(len(putTimeseriesDataResponse.GetFailedRowResults()), Equals, 0)
+
+	// get data
+	getTimeseriesDataRequest := NewGetTimeseriesDataRequest("test_custom_primary_keys_tags")
+	getTimeseriesDataRequest.SetTimeseriesKey(timeseriesKey)
+	getTimeseriesDataRequest.SetTimeRange(0, time.Now().UnixNano()/1000)
+	getTimeseriesDataResponse, err := timeseriesClient.GetTimeseriesData(getTimeseriesDataRequest)
+	c.Assert(err, Equals, nil)
+	rows := getTimeseriesDataResponse.GetRows()
+	c.Assert(len(rows), Equals, 10)
+	for i := 0; i < 10; i++ {
+		pk := rows[i].GetTimeseriesKey()
+		tags := pk.GetTags()
+		c.Assert(len(tags), Equals, 2)
+		c.Assert(tags["measurement"], Equals, "cpu")
+		c.Assert(tags["vendor"], Equals, "intel")
+		fields := rows[i].GetFieldsMap()
+		c.Assert(len(fields), Equals, 1)
+		c.Assert(fields["temperature"].Value, Equals, 98.5)
+	}
+}
+
+func (s *TimeseriesSuite) TestLastpointIndexCreateAndDelete(c *C) {
+	tableName := "test_lastpoint_index_create_and_delete"
+	indexName := "test_lastpoint_index_index_table"
+	s.deleteTimeseriesTable(tableName)
+
+	// create table with index
+	meta := NewTimeseriesTableMeta(tableName)
+	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
+	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
+	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetLastpointIndexNames([]string{indexName})
+	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe timeseries table
+	describeTimeseriesTableRequest := NewDescribeTimeseriesTableRequset(tableName)
+	describeTimeseriesTableResponse, err := timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeTimeseriesTableResponse.GetLastpointIndexNames(), DeepEquals, []string{indexName})
+
+	// describe index table
+	describeTableRequest := &DescribeTableRequest{
+		TableName: indexName,
+	}
+	describeTableResponse, err := tableStoreClient.DescribeTable(describeTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeTableResponse.TableMeta.TableName, Equals, indexName)
+	c.Assert(len(describeTableResponse.TableMeta.SchemaEntry), Equals, 4)
+
+	// delete index
+	deleteLastpointIndexRequest := NewDeleteTimeseriesLastpointIndexRequest(tableName, indexName)
+	c.Assert(deleteLastpointIndexRequest.GetTimeseriesTableName(), Equals, tableName)
+	c.Assert(deleteLastpointIndexRequest.GetLastpointIndexTableName(), Equals, indexName)
+	_, err = timeseriesClient.DeleteTimeseriesLastpointIndex(deleteLastpointIndexRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe timeseries table
+	describeTimeseriesTableResponse, err = timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeTimeseriesTableResponse.GetLastpointIndexNames(), DeepEquals, []string(nil))
+
+	// create index table
+	createLastpointIndexRequest := NewCreateTimeseriesLastpointIndexRequest(tableName, indexName, true)
+	c.Assert(createLastpointIndexRequest.GetTimeseriesTableName(), Equals, tableName)
+	c.Assert(createLastpointIndexRequest.GetLastpointIndexTableName(), Equals, indexName)
+	_, err = timeseriesClient.CreateTimeseriesLastpointIndex(createLastpointIndexRequest)
+	c.Assert(err, Equals, nil)
+
+	// describe timeseries table
+	describeTimeseriesTableResponse, err = timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableRequest)
+	c.Assert(err, Equals, nil)
+	c.Assert(describeTimeseriesTableResponse.GetLastpointIndexNames(), DeepEquals, []string{indexName})
 }

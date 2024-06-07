@@ -2,9 +2,9 @@ package restore
 
 import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel"
 	. "gopkg.in/check.v1"
-	"os"
 	"reflect"
 	"runtime"
 	"strconv"
@@ -27,10 +27,10 @@ var _ = Suite(&BackupRestoreSuite{})
 var client *tablestore.TableStoreClient
 
 func (s *BackupRestoreSuite) SetUpSuite(c *C) {
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 
 	client = tablestore.NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 

@@ -622,6 +622,7 @@ enum GroupByType {
     GROUP_BY_HISTOGRAM = 5;
     GROUP_BY_DATE_HISTOGRAM = 6;
     GROUP_BY_GEO_GRID = 7;
+    GROUP_BY_COMPOSITE = 8;
 }
 
 // agg & group by
@@ -733,6 +734,29 @@ message GroupBySorter {
 
 message GroupBySort {
     repeated GroupBySorter sorters = 1;
+}
+
+message GroupByComposite {
+    optional GroupBys sources = 1;
+    optional int32 size = 2;
+    optional Aggregations sub_aggs = 4;
+    optional GroupBys sub_group_bys = 5;
+    optional string next_token = 6;
+    optional int32 suggested_size = 7;
+}
+
+message GroupByCompositeResultItem {
+    repeated string keys = 1;
+    repeated bool is_null_keys = 5;
+    optional int64 row_count = 2;
+    optional AggregationsResult sub_aggs_result = 3;
+    optional GroupBysResult sub_group_bys_result = 4;
+}
+
+message GroupByCompositeResult {
+    repeated GroupByCompositeResultItem group_by_composite_result_items = 1;
+    repeated string source_group_by_names = 2;
+    optional string next_token = 3;
 }
 
 message GroupByField {

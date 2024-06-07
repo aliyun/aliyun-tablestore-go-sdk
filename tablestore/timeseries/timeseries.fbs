@@ -14,12 +14,18 @@ table FieldValues {
     binary_values: [BytesValue];
 }
 
+table Tag {
+    name: string;
+    value: string;
+}
+
 table FlatBufferRowInGroup {
     data_source: string;
     tags: string;
     time: int64;
     field_values: FieldValues;
     meta_cache_update_time: uint32;
+    tag_list: [Tag];
 }
 
 table FlatBufferRowGroup {

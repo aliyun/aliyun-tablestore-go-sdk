@@ -1,22 +1,21 @@
 package main
 
 import (
-	"os"
-
 	"github.com/aliyun/aliyun-tablestore-go-sdk/sample"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 )
 
 func main() {
 	// Replace the endpoint info
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 	client := tablestore.NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
 	sample.UpdateRowWithIncrement(client, "sampletable")
-	//return
+	// return
 	// Table operation
 	sample.CreateTableSample(client, "sampletable")
 	sample.CreateTableKeyAutoIncrementSample(client)

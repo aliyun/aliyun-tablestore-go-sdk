@@ -4,6 +4,7 @@ import (
 	"fmt"
 	lruCache "github.com/hashicorp/golang-lru"
 	"reflect"
+	"sort"
 
 	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
 	flatbuffers "github.com/google/flatbuffers/go"
@@ -181,16 +182,22 @@ func buildTimeseriesRowToRowGroupOffset(row *TimeseriesRow, fbb *flatbuffers.Bui
 		source_keyOffset = fbb.CreateString(row.timeseriesKey.source)
 	}
 
-	var tags_Offset flatbuffers.UOffsetT
+	var tagListOffs []flatbuffers.UOffsetT
 	var err error
-
-	if row.timeseriesKey.tagsString == nil {
-		row.timeseriesKey.tagsString = new(string)
-		if *row.timeseriesKey.tagsString, err = BuildTagString(row.timeseriesKey.tags); err != nil {
-			return 0, fmt.Errorf("Build tags string failed with error: %s", err)
-		}
+	var names []string
+	for name := range row.timeseriesKey.tags {
+		names = append(names, name)
 	}
-	tags_Offset = fbb.CreateString(*row.timeseriesKey.tagsString)
+	sort.Strings(names)
+	for _, name := range names {
+		nameOffset := fbb.CreateString(name)
+		valueOffset := fbb.CreateString(row.timeseriesKey.tags[name])
+		Fieldvalues.TagStart(fbb)
+		Fieldvalues.TagAddName(fbb, nameOffset)
+		Fieldvalues.TagAddValue(fbb, valueOffset)
+		tagListOffs = append(tagListOffs, Fieldvalues.TagEnd(fbb))
+	}
+	tagListVecOff := createTagListVector(fbb, tagListOffs)
 
 	rowInGroupOffs := make([]flatbuffers.UOffsetT, 1)
 	if row.timeseriesMetaKey == nil {
@@ -210,7 +217,7 @@ func buildTimeseriesRowToRowGroupOffset(row *TimeseriesRow, fbb *flatbuffers.Bui
 	Fieldvalues.FlatBufferRowInGroupAddTime(fbb, row.timeInUs)
 	Fieldvalues.FlatBufferRowInGroupAddMetaCacheUpdateTime(fbb, updateTime)
 	Fieldvalues.FlatBufferRowInGroupAddFieldValues(fbb, fieldValueOff)
-	Fieldvalues.FlatBufferRowInGroupAddTags(fbb, tags_Offset)
+	Fieldvalues.FlatBufferRowInGroupAddTagList(fbb, tagListVecOff)
 	Fieldvalues.FlatBufferRowInGroupAddDataSource(fbb, source_keyOffset)
 	rowInGroupOffs[0] = Fieldvalues.FlatBufferRowInGroupEnd(fbb)
 
@@ -238,6 +245,14 @@ func CreateBytesValueVector(builder *flatbuffers.Builder, data []byte) flatbuffe
 	builder.StartVector(1, len(data), 1)
 	for i := len(data) - 1; i >= 0; i-- {
 		builder.PlaceByte(data[i])
+	}
+	return builder.EndVector(len(data))
+}
+
+func createTagListVector(builder *flatbuffers.Builder, data []flatbuffers.UOffsetT) flatbuffers.UOffsetT {
+	builder.StartVector(4, len(data), 4)
+	for i := len(data) - 1; i >= 0; i-- {
+		builder.PrependUOffsetT(data[i])
 	}
 	return builder.EndVector(len(data))
 }
@@ -300,13 +315,9 @@ func createFlatBufferRows(builder *flatbuffers.Builder, row_groupsOffset flatbuf
 func buildTimeseriesKey(curTimeseriesKey *TimeseriesKey) (*otsprotocol.TimeseriesKey, error) {
 	var err error
 	timeseriesKey := new(otsprotocol.TimeseriesKey)
-	if curTimeseriesKey.tagsString == nil {
-		curTimeseriesKey.tagsString = new(string)
-		if *curTimeseriesKey.tagsString, err = BuildTagString(curTimeseriesKey.tags); err != nil {
-			return nil, err
-		}
+	if timeseriesKey.TagList, err = BuildTags(curTimeseriesKey.tags); err != nil {
+		return nil, err
 	}
-	timeseriesKey.Tags = curTimeseriesKey.tagsString
 	timeseriesKey.Source = proto.String(curTimeseriesKey.source)
 	timeseriesKey.Measurement = proto.String(curTimeseriesKey.measurement)
 
@@ -318,12 +329,9 @@ func buildProtocolBufferRows(rows []*TimeseriesRow, timeseriesTableName string, 
 	pbRows.Rows = make([]*otsprotocol.TimeseriesRow, len(rows))
 	for i, row := range rows {
 		// build tag string
-		var err error
-		if row.timeseriesKey.tagsString == nil {
-			row.timeseriesKey.tagsString = new(string)
-			if *row.timeseriesKey.tagsString, err = BuildTagString(row.timeseriesKey.tags); err != nil {
-				return nil, fmt.Errorf("Build tags string failed with error: %s", err)
-			}
+		tagsPB, err := BuildTags(row.timeseriesKey.tags)
+		if err != nil {
+			return nil, fmt.Errorf("Build tags string failed with error: %s", err)
 		}
 		// build meta key
 		if row.timeseriesMetaKey == nil {
@@ -370,7 +378,7 @@ func buildProtocolBufferRows(rows []*TimeseriesRow, timeseriesTableName string, 
 			TimeseriesKey: &otsprotocol.TimeseriesKey{
 				Measurement: proto.String(row.GetTimeseriesKey().measurement),
 				Source:      proto.String(row.GetTimeseriesKey().GetDataSource()),
-				Tags:        row.timeseriesKey.tagsString,
+				TagList:     tagsPB,
 			},
 			Time:                proto.Int64(row.timeInUs),
 			Fields:              fields,

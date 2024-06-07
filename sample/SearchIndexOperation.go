@@ -8,6 +8,7 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
 	"github.com/golang/protobuf/proto"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 )
@@ -245,6 +246,7 @@ func CreateSearchIndexForVectorQuery(client *tablestore.TableStoreClient, tableN
 	}
 	createSearchIndex(client, tableName, indexName, []*tablestore.FieldSchema{field1, field2, field3})
 }
+
 // WriteDataForVectorQuery 为高亮查询测试插入数据
 func WriteDataForVectorQuery(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
@@ -360,7 +362,20 @@ func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClie
 		Index:            proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
 	}
-	schemas = append(schemas, field1, field2, field3, field4)
+	field5 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Double"),
+		FieldType:        tablestore.FieldType_DOUBLE,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field6 := &tablestore.FieldSchema{
+		FieldName:        proto.String("Col_Date"),
+		FieldType:        tablestore.FieldType_DATE,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+		DateFormats:      []string{"yyyy-MM-dd HH:mm:SS"},
+	}
+	schemas = append(schemas, field1, field2, field3, field4, field5, field6)
 
 	createSearchIndex(client, tableName, indexName, schemas)
 }
@@ -540,7 +555,7 @@ func SearchQuery(client *tablestore.TableStoreClient, tableName string, indexNam
 			fmt.Println("search query failed with err: ", err)
 		} else {
 			fmt.Println("RequestId: " + resp.RequestId)
-			fmt.Printf("except: 1000, actual: %d\n",  len(resp.SearchHits))
+			fmt.Printf("except: 1000, actual: %d\n", len(resp.SearchHits))
 		}
 
 		// search limit default
@@ -554,7 +569,7 @@ func SearchQuery(client *tablestore.TableStoreClient, tableName string, indexNam
 			fmt.Println("search query failed with err: ", err)
 		} else {
 			fmt.Println("RequestId: " + resp.RequestId)
-			fmt.Printf("except: 10, actual: %d\n",  len(resp.SearchHits))
+			fmt.Printf("except: 10, actual: %d\n", len(resp.SearchHits))
 		}
 	}
 
@@ -714,6 +729,10 @@ func WriteDataForAggregationAndGroupBy(client *tablestore.TableStoreClient, tabl
 		if i != 0 {
 			putRowChange.AddColumn("Col_Long", int64(i))
 		}
+		if i != 9 {
+			putRowChange.AddColumn("Col_Double", float64(i))
+		}
+		putRowChange.AddColumn("Col_Date", time.Now().AddDate(0, 0, i).Format("2006-01-02 15:04:05"))
 		putRowChange.AddColumn("Col_GeoPoint", geopoints[i])
 		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
 		putRowRequest.PutRowChange = putRowChange
@@ -723,6 +742,8 @@ func WriteDataForAggregationAndGroupBy(client *tablestore.TableStoreClient, tabl
 			fmt.Println("putrow failed with error:", err)
 		}
 	}
+
+	time.Sleep(20 * time.Second)
 }
 
 /**
@@ -1647,9 +1668,9 @@ func AvgAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-			Aggregation(search.NewAvgAggregation("avg_agg", "Col_Long")))           //计算Col_Long字段的平均值
+			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
+			SetLimit(100).                                                //限制返回前100行结果
+			Aggregation(search.NewAvgAggregation("avg_agg", "Col_Long"))) //计算Col_Long字段的平均值
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1691,9 +1712,9 @@ func DistinctAggregationSample(client *tablestore.TableStoreClient, tableName st
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewDistinctCountAggregation("distinct_count_agg", "Col_Long"))) //计算Col_Long字段不同取值的个数
+			SetQuery(&search.MatchAllQuery{}).                                                 //匹配所有行
+			SetLimit(100).                                                                     //限制返回前100行结果
+			Aggregation(search.NewDistinctCountAggregation("distinct_count_agg", "Col_Long"))) //计算Col_Long字段不同取值的个数
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1730,9 +1751,9 @@ func MaxAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewMaxAggregation("max_agg", "Col_Long")))           //计算Col_Long字段的最大值
+			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
+			SetLimit(100).                                                //限制返回前100行结果
+			Aggregation(search.NewMaxAggregation("max_agg", "Col_Long"))) //计算Col_Long字段的最大值
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1773,9 +1794,9 @@ func SumAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewSumAggregation("sum_agg", "Col_Long")))           //计算Col_Long字段的和
+			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
+			SetLimit(100).                                                //限制返回前100行结果
+			Aggregation(search.NewSumAggregation("sum_agg", "Col_Long"))) //计算Col_Long字段的和
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1812,9 +1833,9 @@ func CountAggregationSample(client *tablestore.TableStoreClient, tableName strin
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewCountAggregation("count_agg", "Col_Long")))         //计算存在Col_Long字段的行数
+			SetQuery(&search.MatchAllQuery{}).                                //匹配所有行
+			SetLimit(100).                                                    //限制返回前100行结果
+			Aggregation(search.NewCountAggregation("count_agg", "Col_Long"))) //计算存在Col_Long字段的行数
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1851,16 +1872,16 @@ func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName str
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewTopRowsAggregation("top_rows_agg").SetLimit(1).SetSort(&search.Sort{
-			Sorters: []search.Sorter{
-				&search.FieldSort{
-					FieldName: "Col_Long",
-					Order:     search.SortOrder_DESC.Enum(),
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100).                     //限制返回前100行结果
+			Aggregation(search.NewTopRowsAggregation("top_rows_agg").SetLimit(1).SetSort(&search.Sort{
+				Sorters: []search.Sorter{
+					&search.FieldSort{
+						FieldName: "Col_Long",
+						Order:     search.SortOrder_DESC.Enum(),
+					},
 				},
-			},
-		})))
+			})))
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
@@ -1905,9 +1926,9 @@ func PercentilesAggregationSample(client *tablestore.TableStoreClient, tableName
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-		Aggregation(search.NewPercentilesAggregation("percentiles_agg", "Col_Long").SetMissing(10).SetPercents(percentiles)))
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100).                     //限制返回前100行结果
+			Aggregation(search.NewPercentilesAggregation("percentiles_agg", "Col_Long").SetMissing(10).SetPercents(percentiles)))
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -2082,13 +2103,79 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) //打印返回的value
 	}
 
-	//group by geo grid
-	group7, err := groupByResults.GroupByGeoGrid("group7") //获取名字为"group7"的GroupBy结果，类型为GroupByGeoGrid
+	// group by date histogram
+	searchRequest = &tablestore.SearchRequest{}
+	searchRequest.
+		SetTableName(tableName).
+		SetIndexName(indexName).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).
+			SetLimit(100).
+			GroupBy(search.NewGroupByDateHistogram("group6", "Col_Date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
+											SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
+											SetMinDocCount(1).
+											SetFiledRange("2023-01-01 12:13:14", "2023-12-31 12:13:14").
+											SetMissing("2022-01-06 12:13:14")))
+	searchResponse, err = client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	groupByResults = searchResponse.GroupByResults
+	group6, err := groupByResults.GroupByDateHistogram("group6")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group6: ")
+	for _, item := range group6.Items {
+		fmt.Printf("\tTimeStamp: %v\tRowCount: %v\n", item.Timestamp, item.RowCount)
+	}
+
+	// group by composite
+	searchRequest = &tablestore.SearchRequest{}
+	searchRequest.
+		SetTableName(tableName).
+		SetIndexName(indexName).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100).
+			GroupBy(search.NewGroupByComposite("group7").
+				SourceGroupBy(search.NewGroupByField("groupByField", "Col_Keyword")).
+				SourceGroupBy(search.NewGroupByHistogram("groupByHistogram", "Col_Long").SetInterval(2)).
+				SourceGroupBy(search.NewGroupByDateHistogram("groupByDateHistogram", "Col_Date").SetInterval(model.DateTimeValue{Value: proto.Int32(1), Unit: model.DateTimeUnit_DAY.Enum()})).
+				SetSize(5).
+				SubAggregation(search.NewSumAggregation("sumAgg", "Col_Double"))))
+	searchResponse, err = client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+
+	groupByResults = searchResponse.GroupByResults
+	group7, err := groupByResults.GroupByComposite("group7")
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group7: ")
+	if group7.NextToken != nil {
+		fmt.Println("\tNextToken: ", *group7.NextToken)
+	}
+	fmt.Println("\tSourceGroupNames:\n\t" + strings.Join(group7.SourceGroupByNames, "\t"))
 	for _, item := range group7.Items {
+		keysAsStrings := make([]string, len(item.Keys))
+		for i, keyPtr := range item.Keys {
+			keysAsStrings[i] = *keyPtr
+		}
+		fmt.Printf("\t%v, RowCount: %v\n", strings.Join(keysAsStrings, "\t"), item.RowCount)
+	}
+	//group by geo grid
+	group8, err := groupByResults.GroupByGeoGrid("group8") //获取名字为"group7"的GroupBy结果，类型为GroupByGeoGrid
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println("group8: ")
+	for _, item := range group8.Items {
 		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) //打印返回的value
 	}
 }
@@ -2100,13 +2187,13 @@ func GroupByFieldSample(client *tablestore.TableStoreClient, tableName string, i
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}).                               //匹配所有行
+			SetLimit(100).                                                   //限制返回前100行结果
 			GroupBy(search.NewGroupByField("group_by_field", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
-				GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
-				Size(2).                                                           //仅返回前2个分桶
-				SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
-				SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2")))) //对每个分桶进行子聚合(GroupBy)
+												GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
+												Size(2).                                                           //仅返回前2个分桶
+												SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
+												SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2")))) //对每个分桶进行子聚合(GroupBy)
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -2168,12 +2255,12 @@ func GroupByRangeSample(client *tablestore.TableStoreClient, tableName string, i
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
-			GroupBy(search.NewGroupByRange("group_by_range", "Col_Long").    //对Col_Long字段做GroupByRange范围
-				Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
-				Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
-				Range(5, search.Inf)))   //第三个分桶包含Col_Long在[5, +∞)的索引行
+			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
+			SetLimit(100).                                                //限制返回前100行结果
+			GroupBy(search.NewGroupByRange("group_by_range", "Col_Long"). //对Col_Long字段做GroupByRange范围
+											Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
+											Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
+											Range(5, search.Inf)))   //第三个分桶包含Col_Long在[5, +∞)的索引行
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -2213,10 +2300,10 @@ func GroupByFilterSample(client *tablestore.TableStoreClient, tableName string, 
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
-			GroupBy(search.NewGroupByFilter("group_by_filter").               //做GroupByFilter过滤聚合
-				Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+			SetQuery(&search.MatchAllQuery{}).                  //匹配所有行
+			SetLimit(100).                                      //限制返回前100行结果
+			GroupBy(search.NewGroupByFilter("group_by_filter"). //做GroupByFilter过滤聚合
+										Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
 					FieldName: "Col_Keyword",
 					Term:      "hangzhou",
 				}).
@@ -2265,12 +2352,12 @@ func GroupByGeoDistanceSample(client *tablestore.TableStoreClient, tableName str
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}).                                                                                              //匹配所有行
+			SetLimit(100).                                                                                                                  //限制返回前100行结果
 			GroupBy(search.NewGroupByGeoDistance("group_by_geo_distance", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
-				Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
-				Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-				Range(15000, search.Inf)))   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+																			Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
+																			Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
+																			Range(15000, search.Inf)))   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -2310,8 +2397,8 @@ func GroupByHistogramSample(client *tablestore.TableStoreClient, tableName strin
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100).                     //限制返回前100行结果
 			GroupBy(search.NewGroupByHistogram("group_by_histogram", "Col_Long").
 				SetInterval(10).
 				SetMinDocCount(1).
@@ -2356,13 +2443,13 @@ func GroupByDateHistogramSample(client *tablestore.TableStoreClient, tableName s
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}).                                             //匹配所有行
+			SetLimit(100).                                                                 //限制返回前100行结果
 			GroupBy(search.NewGroupByDateHistogram("group_by_date_histogram", "Col_date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
-				SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
-				SetMinDocCount(1).
-				SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
-				SetMissing("2022-01-06 12:13:14")))
+													SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
+													SetMinDocCount(1).
+													SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
+													SetMissing("2022-01-06 12:13:14")))
 
 	// 设置返回所有列
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
@@ -2402,8 +2489,8 @@ func GroupByGeoGridSample(client *tablestore.TableStoreClient, tableName string,
 		SetTableName(tableName). //设置表名
 		SetIndexName(indexName). //设置多元索引名
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetLimit(100).                     //限制返回前100行结果
 			GroupBy(search.NewGroupByGeoGrid("group_by_geo_grid", "Col_geo").
 				SetPrecision(model.GHP_156KM_156KM_3).
 				SetSize(10)))

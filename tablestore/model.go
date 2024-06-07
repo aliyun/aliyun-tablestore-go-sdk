@@ -1,11 +1,14 @@
 package tablestore
 
 import (
+	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -709,8 +712,14 @@ type GetRangeResponse struct {
 }
 
 type SQLQueryRequest struct {
-	Query string
+	Query       string
+	SearchToken *string
 	ExtraRequestInfo
+}
+
+func (s *SQLQueryRequest) SetSearchToken(searchToken *string) *SQLQueryRequest {
+	s.SearchToken = searchToken
+	return s
 }
 
 type SearchConsumedCU struct {
@@ -734,6 +743,7 @@ type SQLQueryResponse struct {
 	StmtType         SQLStatementType
 	PayloadVersion   SQLPayloadVersion
 	SQLQueryConsumed *SQLQueryConsumed
+	NextSearchToken  *string
 	ResponseInfo
 }
 
@@ -1082,6 +1092,8 @@ func (timeseriesTableOptions *TimeseriesTableOptions) GetTimeToLive() int64 {
 type TimeseriesTableMeta struct {
 	timeseriesTableName    string
 	timeseriesTableOptions *TimeseriesTableOptions
+	timeseriesKeys         []string
+	fieldPrimaryKeys       []*PrimaryKeySchema
 }
 
 func NewTimeseriesTableMeta(timeseriesTableName string) *TimeseriesTableMeta {
@@ -1106,10 +1118,30 @@ func (timeseriesTableMeta *TimeseriesTableMeta) GetTimeseriesTableOPtions() *Tim
 	return timeseriesTableMeta.timeseriesTableOptions
 }
 
+func (timeseriesTableMeta *TimeseriesTableMeta) AddTimeseriesKey(name string) {
+	timeseriesTableMeta.timeseriesKeys = append(timeseriesTableMeta.timeseriesKeys, name)
+}
+
+func (timeseriesTableMeta *TimeseriesTableMeta) GetTimeseriesKeys() []string {
+	return timeseriesTableMeta.timeseriesKeys
+}
+
+func (timeseriesTableMeta *TimeseriesTableMeta) AddFieldPrimaryKey(name string, primaryKeyType PrimaryKeyType) {
+	timeseriesTableMeta.fieldPrimaryKeys = append(timeseriesTableMeta.fieldPrimaryKeys, &PrimaryKeySchema{
+		Name: &name,
+		Type: &primaryKeyType,
+	})
+}
+
+func (timeseriesTableMeta *TimeseriesTableMeta) GetFieldPrimaryKeys() []*PrimaryKeySchema {
+	return timeseriesTableMeta.fieldPrimaryKeys
+}
+
 type CreateTimeseriesTableRequest struct {
 	timeseriesTableMeta   *TimeseriesTableMeta
 	analyticalStores      []*TimeseriesAnalyticalStore
 	enableAnalyticalStore bool
+	lastpointIndexNames   []string
 	ExtraRequestInfo
 }
 
@@ -1141,6 +1173,14 @@ func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetEnableAnaly
 
 func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetEnableAnalyticalStore() bool {
 	return createTimeseriesTableRequest.enableAnalyticalStore
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetLastpointIndexNames(lastpointIndexNames []string) {
+	createTimeseriesTableRequest.lastpointIndexNames = lastpointIndexNames
+}
+
+func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) GetLastpointIndexNames() []string {
+	return createTimeseriesTableRequest.lastpointIndexNames
 }
 
 type CreateTimeseriesTableResponse struct {
@@ -1241,7 +1281,6 @@ type TimeseriesKey struct {
 	measurement string
 	source      string
 	tags        map[string]string
-	tagsString  *string
 }
 
 func NewTimeseriesKey() *TimeseriesKey {
@@ -1252,7 +1291,6 @@ func NewTimeseriesKey() *TimeseriesKey {
 
 func (timeseriesKey *TimeseriesKey) AddTag(tagName string, tagValue string) {
 	timeseriesKey.tags[tagName] = tagValue
-	timeseriesKey.tagsString = nil
 }
 
 func (timeseriesKey *TimeseriesKey) AddTags(tagsMap map[string]string) {
@@ -1262,7 +1300,6 @@ func (timeseriesKey *TimeseriesKey) AddTags(tagsMap map[string]string) {
 	for tagName, tagValue := range tagsMap {
 		timeseriesKey.tags[tagName] = tagValue
 	}
-	timeseriesKey.tagsString = nil
 }
 
 func (timeseriesKey *TimeseriesKey) GetTags() map[string]string {
@@ -1271,31 +1308,37 @@ func (timeseriesKey *TimeseriesKey) GetTags() map[string]string {
 
 func (timeseriesKey *TimeseriesKey) buildTimeseriesMetaKey(timeseriesTableName string) (string, error) {
 	var capacity int
-	var err error
+	var keys []string
 	capacity += len(timeseriesTableName)
 	capacity += len(timeseriesKey.measurement)
 	capacity += len(timeseriesKey.source)
-	if timeseriesKey.tagsString == nil {
-		timeseriesKey.tagsString = new(string)
-		if *timeseriesKey.tagsString, err = BuildTagString(timeseriesKey.tags); err != nil {
+	capacity += 4
+	for key, value := range timeseriesKey.tags {
+		capacity += len(value)
+		capacity += 2
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	buf := bytes.NewBuffer(nil)
+	buf.Grow(capacity)
+	buf.WriteString(timeseriesTableName)
+	if err := binary.Write(buf, binary.LittleEndian, int16(len(timeseriesKey.measurement))); err != nil {
+		return "", err
+	}
+	buf.WriteString(timeseriesKey.measurement)
+	if err := binary.Write(buf, binary.LittleEndian, int16(len(timeseriesKey.source))); err != nil {
+		return "", err
+	}
+	buf.WriteString(timeseriesKey.source)
+	for _, key := range keys {
+		value := timeseriesKey.tags[key]
+		if err := binary.Write(buf, binary.LittleEndian, int16(len(value))); err != nil {
 			return "", err
 		}
+		buf.WriteString(value)
 	}
-	capacity += len(*timeseriesKey.tagsString)
-	capacity += 3
-
-	sb := strings.Builder{}
-	sb.Grow(capacity)
-
-	sb.WriteString(timeseriesTableName)
-	sb.WriteString("\t")
-	sb.WriteString(timeseriesKey.measurement)
-	sb.WriteString("\t")
-	sb.WriteString(timeseriesKey.source)
-	sb.WriteString("\t")
-	sb.WriteString(*timeseriesKey.tagsString)
-
-	return sb.String(), nil
+	return buf.String(), nil
 }
 
 func (timeseriesKey *TimeseriesKey) SetMeasurementName(measurementName string) {
@@ -1458,6 +1501,7 @@ func (describeTimeseriesReq *DescribeTimeseriesTableRequest) GetTimeseriesTableN
 type DescribeTimeseriesTableResponse struct {
 	timeseriesTableMeta *TimeseriesTableMeta
 	analyticalStores    []TimeseriesAnalyticalStore
+	lastpointIndexNames []string
 	ResponseInfo
 }
 
@@ -1467,6 +1511,10 @@ func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetTimeserie
 
 func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetAnalyticalStores() []TimeseriesAnalyticalStore {
 	return describeTimeseriesTableResp.analyticalStores
+}
+
+func (describeTimeseriesTableResp *DescribeTimeseriesTableResponse) GetLastpointIndexNames() []string {
+	return describeTimeseriesTableResp.lastpointIndexNames
 }
 
 type ListTimeseriesTableRequest struct {
@@ -2447,4 +2495,63 @@ func (re *RequestExtension) SetPriority(priority Priority) {
 
 func (re *RequestExtension) SetTag(tag string) {
 	re.tag = &tag
+}
+
+type CreateTimeseriesLastpointIndexRequest struct {
+	timeseriesTableName     string
+	lastpointIndexTableName string
+	includeBaseData         bool
+	ExtraRequestInfo
+}
+
+func NewCreateTimeseriesLastpointIndexRequest(
+	timeseriesTableName string,
+	lastpointIndexTableName string,
+	includeBaseData bool) *CreateTimeseriesLastpointIndexRequest {
+	return &CreateTimeseriesLastpointIndexRequest{
+		timeseriesTableName:     timeseriesTableName,
+		lastpointIndexTableName: lastpointIndexTableName,
+		includeBaseData:         includeBaseData,
+	}
+}
+
+func (req *CreateTimeseriesLastpointIndexRequest) GetTimeseriesTableName() string {
+	return req.timeseriesTableName
+}
+
+func (req *CreateTimeseriesLastpointIndexRequest) GetLastpointIndexTableName() string {
+	return req.lastpointIndexTableName
+}
+
+func (req *CreateTimeseriesLastpointIndexRequest) GetIncludeBaseData() bool {
+	return req.includeBaseData
+}
+
+type CreateTimeseriesLastpointIndexResponse struct {
+	ResponseInfo
+}
+
+type DeleteTimeseriesLastpointIndexRequest struct {
+	timeseriesTableName     string
+	lastpointIndexTableName string
+	ExtraRequestInfo
+}
+
+func NewDeleteTimeseriesLastpointIndexRequest(timeseriesTableName string, lastpointIndexTableName string) *DeleteTimeseriesLastpointIndexRequest {
+	return &DeleteTimeseriesLastpointIndexRequest{
+		timeseriesTableName:     timeseriesTableName,
+		lastpointIndexTableName: lastpointIndexTableName,
+	}
+}
+
+func (req *DeleteTimeseriesLastpointIndexRequest) GetTimeseriesTableName() string {
+	return req.timeseriesTableName
+}
+
+func (req *DeleteTimeseriesLastpointIndexRequest) GetLastpointIndexTableName() string {
+	return req.lastpointIndexTableName
+}
+
+type DeleteTimeseriesLastpointIndexResponse struct {
+	ResponseInfo
 }

@@ -2,9 +2,9 @@ package writer
 
 import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/timeline/promise"
 	"math/rand"
-	"os"
 	"strings"
 	"testing"
 	"time"
@@ -87,10 +87,10 @@ func BenchmarkBatchWriter_BatchAdd_WriteSpread(b *testing.B) {
 }
 
 func initClientFromEnv() tablestore.TableStoreApi {
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 	return tablestore.NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 }
 

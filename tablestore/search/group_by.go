@@ -17,6 +17,7 @@ const (
 	GroupByHistogramType     GroupByType = 5
 	GroupByDateHistogramType GroupByType = 6
 	GroupByGeoGridType       GroupByType = 7
+	GroupByCompositeType     GroupByType = 8
 )
 
 func (g GroupByType) Enum() *GroupByType {
@@ -40,6 +41,8 @@ func (a GroupByType) String() string {
 		return "group_by_date_histogram"
 	case GroupByGeoGridType:
 		return "group_by_geo_grid"
+	case GroupByCompositeType:
+		return "group_by_composite"
 	default:
 		return "unknown"
 	}
@@ -61,6 +64,8 @@ func (g GroupByType) ToPB() *otsprotocol.GroupByType {
 		return otsprotocol.GroupByType_GROUP_BY_DATE_HISTOGRAM.Enum()
 	case GroupByGeoGridType:
 		return otsprotocol.GroupByType_GROUP_BY_GEO_GRID.Enum()
+	case GroupByCompositeType:
+		return otsprotocol.GroupByType_GROUP_BY_COMPOSITE.Enum()
 	default:
 		return nil
 	}

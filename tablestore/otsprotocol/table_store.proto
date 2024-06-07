@@ -718,6 +718,7 @@ message SQLQueryRequest {
     required string query = 1;
     optional SQLPayloadVersion version = 2;
     optional int64 sql_version = 3;
+    optional string search_token = 5;
 }
 
 message TableConsumedCapacity {
@@ -740,4 +741,5 @@ message SQLQueryResponse {
     optional SQLPayloadVersion version = 3;
     optional SQLStatementType type = 4;
     repeated SearchConsumedCapacity search_consumes = 5;
+    optional string next_search_token = 8;
 }

@@ -70,6 +70,8 @@ const (
 	adddefinedcolumnuri    = "/AddDefinedColumn"
 	deletedefinedcolumnuri = "/DeleteDefinedColumn"
 
+	timeseriesSupportedTableVersion = 1
+
 	createTimeseriesTable             = "/CreateTimeseriesTable"
 	putTimeseriesData                 = "/PutTimeseriesData"
 	getTimeseriesData                 = "/GetTimeseriesData"
@@ -84,6 +86,8 @@ const (
 	deleteTimeseriesAnalyticalStore   = "/DeleteTimeseriesAnalyticalStore"
 	describeTimeseriesAnalyticalStore = "/DescribeTimeseriesAnalyticalStore"
 	updateTimeseriesAnalyticalStore   = "/UpdateTimeseriesAnalyticalStore"
+	createTimeseriesLastpointIndex    = "/CreateTimeseriesLastpointIndex"
+	deleteTimeseriesLastpointIndex    = "/DeleteTimeseriesLastpointIndex"
 )
 
 // RowsSerializeType is used for tests only.
@@ -573,7 +577,7 @@ func (internalClient *internalClient) computeNewRetryInterval(lastInterval int64
 	}
 	// lock/unlock when accessing the rand from a goroutine
 	internalClient.mu.Lock()
-	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval) - 1) + 1
+	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval)-1) + 1
 	internalClient.mu.Unlock()
 	if value > int64(maxRetryInterval) {
 		value = int64(maxRetryInterval)
@@ -870,6 +874,15 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateT
 
 	req.TableMeta.TableOptions = new(otsprotocol.TimeseriesTableOptions)
 	req.TableMeta.TableOptions.TimeToLive = proto.Int32(int32(request.GetTimeseriesTableMeta().GetTimeseriesTableOPtions().GetTimeToLive()))
+	for _, primaryKey := range request.GetTimeseriesTableMeta().GetTimeseriesKeys() {
+		req.TableMeta.TimeseriesKeySchema = append(req.TableMeta.TimeseriesKeySchema, primaryKey)
+	}
+	for _, primaryKeyField := range request.GetTimeseriesTableMeta().GetFieldPrimaryKeys() {
+		req.TableMeta.FieldPrimaryKeySchema = append(req.TableMeta.FieldPrimaryKeySchema, &otsprotocol.PrimaryKeySchema{
+			Name: primaryKeyField.Name,
+			Type: (*otsprotocol.PrimaryKeyType)(primaryKeyField.Type),
+		})
+	}
 
 	for _, analyticalStore := range request.GetAnalyticalStores() {
 		req.AnalyticalStores = append(req.AnalyticalStores, &otsprotocol.TimeseriesAnalyticalStore{
@@ -879,7 +892,11 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateT
 		})
 	}
 	req.EnableAnalyticalStore = proto.Bool(request.GetEnableAnalyticalStore())
-
+	for _, lastpointIndexName := range request.GetLastpointIndexNames() {
+		req.LastpointIndexMetas = append(req.LastpointIndexMetas, &otsprotocol.LastpointIndexMetaForCreate{
+			IndexTableName: proto.String(lastpointIndexName),
+		})
+	}
 	resp := new(otsprotocol.CreateTimeseriesTableResponse)
 	response := &CreateTimeseriesTableResponse{}
 	if err := timeseriesClient.doRequestWithRetry(createTimeseriesTable, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
@@ -900,6 +917,7 @@ func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseri
 
 	var err error
 	req := new(otsprotocol.PutTimeseriesDataRequest)
+	req.SupportedTableVersion = proto.Int64(timeseriesSupportedTableVersion)
 	req.TableName = proto.String(request.timeseriesTableName)
 
 	req.RowsData = new(otsprotocol.TimeseriesRows)
@@ -980,6 +998,7 @@ func (timeseriesClient *TimeseriesClient) GetTimeseriesData(request *GetTimeseri
 
 	var err error
 	req := new(otsprotocol.GetTimeseriesDataRequest)
+	req.SupportedTableVersion = proto.Int64(timeseriesSupportedTableVersion)
 	req.TableName = proto.String(request.GetTimeseriesTableName())
 	req.BeginTime = proto.Int64(request.GetBeginTimeInUs())
 	req.EndTime = proto.Int64(request.GetEndTimeInUs())
@@ -1071,6 +1090,10 @@ func (timeseriesClient *TimeseriesClient) DescribeTimeseriesTable(request *Descr
 			SyncOption: (*AnalyticalStoreSyncType)(analyticalStore.SyncOption),
 		})
 	}
+	for _, lastpointIndex := range resp.GetLastpointIndexes() {
+		response.lastpointIndexNames = append(response.lastpointIndexNames,
+			lastpointIndex.GetIndexTableName())
+	}
 	return response, nil
 }
 
@@ -1136,6 +1159,7 @@ func (timeseriesClient *TimeseriesClient) QueryTimeseriesMeta(request *QueryTime
 		req.Token = request.GetNextToken()
 	}
 
+	req.SupportedTableVersion = proto.Int64(timeseriesSupportedTableVersion)
 	req.TableName = proto.String(request.timeseriesTableName)
 	req.GetTotalHit = proto.Bool(request.getTotalHits)
 
@@ -1147,7 +1171,7 @@ func (timeseriesClient *TimeseriesClient) QueryTimeseriesMeta(request *QueryTime
 	}
 
 	if request.GetLimit() > 0 {
-		req.Limit = proto.Int32(int32(request.GetLimit()))
+		req.Limit = proto.Int32(request.GetLimit())
 	}
 
 	resp := new(otsprotocol.QueryTimeseriesMetaResponse)
@@ -1210,6 +1234,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesMeta(request *UpdateTi
 	var err error
 
 	req := new(otsprotocol.UpdateTimeseriesMetaRequest)
+	req.SupportedTableVersion = proto.Int64(timeseriesSupportedTableVersion)
 	req.TableName = proto.String(request.GetTimeseriesTableName())
 	req.TimeseriesMeta = make([]*otsprotocol.TimeseriesMeta, 0, len(request.GetTimeseriesMetas()))
 	for i := 0; i < len(request.GetTimeseriesMetas()); i++ {
@@ -1273,6 +1298,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesMeta(request *DeleteTi
 	var err error
 
 	req := new(otsprotocol.DeleteTimeseriesMetaRequest)
+	req.SupportedTableVersion = proto.Int64(timeseriesSupportedTableVersion)
 	req.TableName = proto.String(request.GetTimeseriesTableName())
 	req.TimeseriesKey = make([]*otsprotocol.TimeseriesKey, 0, len(request.GetTimeseriesKeys()))
 	for i := 0; i < len(request.GetTimeseriesKeys()); i++ {
@@ -1417,6 +1443,47 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesAnalyticalStore(reques
 		return nil, err
 	}
 
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) CreateTimeseriesLastpointIndex(
+	request *CreateTimeseriesLastpointIndexRequest) (*CreateTimeseriesLastpointIndexResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.lastpointIndexTableName == "" {
+		return nil, fmt.Errorf("not set timeseries lastpoint index name")
+	}
+	req := new(otsprotocol.CreateTimeseriesLastpointIndexRequest)
+	req.MainTableName = proto.String(request.timeseriesTableName)
+	req.IndexTableName = proto.String(request.lastpointIndexTableName)
+	req.IncludeBaseData = proto.Bool(request.includeBaseData)
+	resp := new(otsprotocol.CreateTimeseriesLastpointIndexResponse)
+	response := new(CreateTimeseriesLastpointIndexResponse)
+	if err := timeseriesClient.doRequestWithRetry(
+		createTimeseriesLastpointIndex, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
+		return nil, err
+	}
+	return response, nil
+}
+
+func (timeseriesClient *TimeseriesClient) DeleteTimeseriesLastpointIndex(
+	request *DeleteTimeseriesLastpointIndexRequest) (*DeleteTimeseriesLastpointIndexResponse, error) {
+	if request.timeseriesTableName == "" {
+		return nil, fmt.Errorf("not set timeseries table name")
+	}
+	if request.lastpointIndexTableName == "" {
+		return nil, fmt.Errorf("not set timeseries lastpoint index name")
+	}
+	req := new(otsprotocol.DeleteTimeseriesLastpointIndexRequest)
+	req.MainTableName = proto.String(request.timeseriesTableName)
+	req.IndexTableName = proto.String(request.lastpointIndexTableName)
+	resp := new(otsprotocol.DeleteTimeseriesLastpointIndexResponse)
+	response := new(DeleteTimeseriesLastpointIndexResponse)
+	if err := timeseriesClient.doRequestWithRetry(
+		deleteTimeseriesLastpointIndex, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
+		return nil, err
+	}
 	return response, nil
 }
 
@@ -2260,6 +2327,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 	// create request
 	pbReq := &otsprotocol.SQLQueryRequest{}
 	pbReq.Query = &req.Query
+	pbReq.SearchToken = req.SearchToken
 	pbReq.Version = otsprotocol.SQLPayloadVersion_SQL_FLAT_BUFFERS.Enum()
 	pbReq.SqlVersion = proto.Int64(1)
 
@@ -2315,6 +2383,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 		searchConsumes = append(searchConsumes, searchConsume)
 	}
 	response.SQLQueryConsumed.SearchConsumes = searchConsumes
+	response.NextSearchToken = pbResp.NextSearchToken
 
 	return response, nil
 }
@@ -2561,7 +2630,11 @@ func (client TableStoreClient) ComputeSplitPointsBySize(req *ComputeSplitPointsB
 
 		nowPk = &PrimaryKey{}
 		for _, pk := range plainRows[0].primaryKey {
-			nowPk.AddPrimaryKeyColumn(string(pk.cellName), pk.cellValue.Value)
+			if pk.isInfMax {
+				nowPk.AddPrimaryKeyColumnWithMaxValue(string(pk.cellName))
+			} else {
+				nowPk.AddPrimaryKeyColumn(string(pk.cellName), pk.cellValue.Value)
+			}
 		}
 
 		for i := len(plainRows[0].primaryKey); i < len(pbResp.GetSchema()); i++ {

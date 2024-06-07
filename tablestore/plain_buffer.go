@@ -162,6 +162,7 @@ type PlainBufferCell struct {
 	ignoreValue      bool
 	hasCellTimestamp bool
 	hasCellType      bool
+	isInfMax         bool
 }
 
 func (cell *PlainBufferCell) writeCell(w io.Writer) {
@@ -300,7 +301,7 @@ func readBytes(r *bytes.Reader, size int32) []byte {
 	return v
 }
 
-func ReadCellValue(r *bytes.Reader) *ColumnValue {
+func ReadCellValue(r *bytes.Reader) (colValue *ColumnValue, isInfMax bool) {
 	value := new(ColumnValue)
 	readRawLittleEndian32(r)
 	tp := readRawByte(r)
@@ -320,8 +321,10 @@ func ReadCellValue(r *bytes.Reader) *ColumnValue {
 	case VT_BLOB:
 		value.Type = ColumnType_BINARY
 		value.Value = []byte(readBytes(r, readRawLittleEndian32(r)))
+	case VT_INF_MAX:
+		return nil, true
 	}
-	return value
+	return value, false
 }
 
 func readCell(r *bytes.Reader) *PlainBufferCell {
@@ -335,7 +338,7 @@ func readCell(r *bytes.Reader) *PlainBufferCell {
 	tag = readTag(r)
 
 	if tag == TAG_CELL_VALUE {
-		cell.cellValue = ReadCellValue(r)
+		cell.cellValue, cell.isInfMax = ReadCellValue(r)
 		tag = readTag(r)
 	}
 	if tag == TAG_CELL_TYPE {

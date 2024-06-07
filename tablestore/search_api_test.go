@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
 	"math"
-	"os"
 	"sort"
 	"strings"
 	"sync"
@@ -466,15 +466,15 @@ func createSearchIndex1(c *C) {
 	schemas = append(schemas, field18)
 
 	// nested highlight column
-	field19 := &FieldSchema {
+	field19 := &FieldSchema{
 		FieldName: proto.String("Col_Nested_Highlight"),
 		FieldType: FieldType_NESTED,
 		FieldSchemas: []*FieldSchema{
 			{
-				FieldName: proto.String("Level1_Text"),
-				FieldType: FieldType_TEXT,
-				Index: proto.Bool(true),
-				Store: proto.Bool(true),
+				FieldName:          proto.String("Level1_Text"),
+				FieldType:          FieldType_TEXT,
+				Index:              proto.Bool(true),
+				Store:              proto.Bool(true),
 				EnableHighlighting: proto.Bool(true),
 			},
 			{
@@ -482,10 +482,10 @@ func createSearchIndex1(c *C) {
 				FieldType: FieldType_NESTED,
 				FieldSchemas: []*FieldSchema{
 					{
-						FieldName: proto.String("Level2_Text"),
-						FieldType: FieldType_TEXT,
-						Index: proto.Bool(true),
-						Store: proto.Bool(true),
+						FieldName:          proto.String("Level2_Text"),
+						FieldType:          FieldType_TEXT,
+						Index:              proto.Bool(true),
+						Store:              proto.Bool(true),
 						EnableHighlighting: proto.Bool(true),
 					},
 				},
@@ -681,7 +681,7 @@ func writeData1(c *C) {
 		keywordValue := strs[i%len(strs)]
 		geoPointValue := geopoints[i]
 		textValue := strs[i%len(strs)]
-		highlightTextValue := highlightText[i % len(highlightText)]
+		highlightTextValue := highlightText[i%len(highlightText)]
 		nestedHighlightValue := fmt.Sprintf("[{\"Level1_Text\":\"%v\",\"Level1_Nested\":[{\"Level2_Text\":\"%v\"}]}]", highlightTextValue, highlightTextValue)
 		dateValue := date[i]
 		dateEpochValue := dataEpoch[i]
@@ -785,10 +785,10 @@ func writeData2(c *C) {
 }
 
 func (s *SearchSuite) SetUpSuite(c *C) {
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 
@@ -2161,76 +2161,76 @@ func (s *SearchSuite) TestSearchQueryWithNestedHighlight(c *C) {
 		},
 
 		SearchQuery: search.NewSearchQuery().
-				SetLimit(5).
-				SetQuery(&search.NestedQuery{
-					Path:      "Col_Nested_Highlight",
-					ScoreMode: search.ScoreMode_Min,
-					InnerHits: &search.InnerHits{
-						Limit:  proto.Int32(2),
-						Offset: proto.Int32(0),
-						Sort: &search.Sort{
-							Sorters: []search.Sorter{
-								&search.DocSort{
-									SortOrder: search.SortOrder_ASC.Enum(),
-								},
-							},
-						},
-						Highlight: &search.Highlight{
-							FieldHighlightParameters: map[string]*search.HighlightParameter{
-								"Col_Nested_Highlight.Level1_Text": {
-									PreTag:  proto.String("<b>"),
-									PostTag: proto.String("</b>"),
-								},
+			SetLimit(5).
+			SetQuery(&search.NestedQuery{
+				Path:      "Col_Nested_Highlight",
+				ScoreMode: search.ScoreMode_Min,
+				InnerHits: &search.InnerHits{
+					Limit:  proto.Int32(2),
+					Offset: proto.Int32(0),
+					Sort: &search.Sort{
+						Sorters: []search.Sorter{
+							&search.DocSort{
+								SortOrder: search.SortOrder_ASC.Enum(),
 							},
 						},
 					},
-					Query: &search.BoolQuery{
-						ShouldQueries: []search.Query{
-							&search.MatchQuery{
-								FieldName: "Col_Nested_Highlight.Level1_Text",
+					Highlight: &search.Highlight{
+						FieldHighlightParameters: map[string]*search.HighlightParameter{
+							"Col_Nested_Highlight.Level1_Text": {
+								PreTag:  proto.String("<b>"),
+								PostTag: proto.String("</b>"),
+							},
+						},
+					},
+				},
+				Query: &search.BoolQuery{
+					ShouldQueries: []search.Query{
+						&search.MatchQuery{
+							FieldName: "Col_Nested_Highlight.Level1_Text",
+							Text:      "xihu dengcai",
+						},
+						&search.NestedQuery{
+							Path:      "Col_Nested_Highlight.Level1_Nested",
+							ScoreMode: search.ScoreMode_Min,
+							InnerHits: &search.InnerHits{
+								Limit:  proto.Int32(2),
+								Offset: proto.Int32(0),
+								Sort: &search.Sort{
+									Sorters: []search.Sorter{
+										&search.ScoreSort{
+											Order: search.SortOrder_DESC.Enum(),
+										},
+									},
+								},
+								Highlight: &search.Highlight{
+									FieldHighlightParameters: map[string]*search.HighlightParameter{
+										"Col_Nested_Highlight.Level1_Nested.Level2_Text": {
+											PreTag:  proto.String("<b1>"),
+											PostTag: proto.String("</b1>"),
+										},
+									},
+								},
+							},
+							Query: &search.MatchQuery{
+								FieldName: "Col_Nested_Highlight.Level1_Nested.Level2_Text",
 								Text:      "xihu dengcai",
 							},
-							&search.NestedQuery{
-								Path:      "Col_Nested_Highlight.Level1_Nested",
-								ScoreMode: search.ScoreMode_Min,
-								InnerHits: &search.InnerHits{
-									Limit:  proto.Int32(2),
-									Offset: proto.Int32(0),
-									Sort: &search.Sort{
-										Sorters: []search.Sorter{
-											&search.ScoreSort{
-												Order: search.SortOrder_DESC.Enum(),
-											},
-										},
-									},
-									Highlight: &search.Highlight{
-										FieldHighlightParameters: map[string]*search.HighlightParameter{
-											"Col_Nested_Highlight.Level1_Nested.Level2_Text": {
-												PreTag:  proto.String("<b1>"),
-												PostTag: proto.String("</b1>"),
-											},
-										},
-									},
-								},
-								Query: &search.MatchQuery{
-									FieldName: "Col_Nested_Highlight.Level1_Nested.Level2_Text",
-									Text:      "xihu dengcai",
-								},
-							},
 						},
 					},
-				}),
+				},
+			}),
 	}
 	resp, err := client.Search(searchRequest)
 	c.Check(err, Equals, nil)
 	c.Check(len(resp.SearchHits), Equals, 5)
-	highlightLevel1 := map[string]bool {
+	highlightLevel1 := map[string]bool{
 		"<b>dengcai</b> <em>street</em>": true,
-		"<b>xihu</b> district": true,
+		"<b>xihu</b> district":           true,
 	}
-	highlightLevel2 := map[string]bool {
+	highlightLevel2 := map[string]bool{
 		"<b1>dengcai</b1> <em>street</em>": true,
-		"<b1>xihu</b1> district": true,
+		"<b1>xihu</b1> district":           true,
 	}
 	for _, searchHit := range resp.SearchHits {
 		for _, searchInnerHit := range searchHit.SearchInnerHits {
@@ -2246,6 +2246,57 @@ func (s *SearchSuite) TestSearchQueryWithNestedHighlight(c *C) {
 			}
 		}
 	}
+}
+
+func (s *SearchSuite) TestGroupByGroupByComposite(c *C) {
+	searchRequest := &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName2).
+		SetIndexName(searchAPITestIndexName2).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).
+			SetLimit(1).
+			GroupBy(search.NewGroupByComposite("group_by_composite").
+				SetSize(2000).
+				SourceGroupBy(search.NewGroupByField("group_by_col_long", "Col_Long")).
+				SourceGroupBy(search.NewGroupByField("group_by_col_double", "Col_Double"))))
+
+	searchResponse, err := client.Search(searchRequest)
+	c.Check(err, Equals, nil)
+	groupByResult, err := searchResponse.GroupByResults.GroupByComposite("group_by_composite")
+	c.Check(err, Equals, nil)
+	c.Check(len(groupByResult.Items), Equals, 4)
+
+	searchRequest = &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName2).
+		SetIndexName(searchAPITestIndexName2).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).
+			SetLimit(1).
+			GroupBy(search.NewGroupByComposite("group_by_composite").
+				SetSize(3000).
+				SourceGroupBy(search.NewGroupByField("group_by_col_long", "Col_Long")).
+				SourceGroupBy(search.NewGroupByField("group_by_col_double", "Col_Double"))))
+	_, err = client.Search(searchRequest)
+	c.Check(err, NotNil)
+
+	searchRequest = &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName2).
+		SetIndexName(searchAPITestIndexName2).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchAllQuery{}).
+			SetLimit(1).
+			GroupBy(search.NewGroupByComposite("group_by_composite").
+				SetSuggestedSize(3000).
+				SourceGroupBy(search.NewGroupByField("group_by_col_long", "Col_Long")).
+				SourceGroupBy(search.NewGroupByField("group_by_col_double", "Col_Double"))))
+	searchResponse, err = client.Search(searchRequest)
+	c.Check(err, Equals, nil)
+	groupByResult, err = searchResponse.GroupByResults.GroupByComposite("group_by_composite")
+	c.Check(err, Equals, nil)
+	c.Check(len(groupByResult.Items), Equals, 4)
 }
 
 func (s *SearchSuite) TestGroupByGroupByGeoGrid(c *C) {
@@ -2270,7 +2321,7 @@ func (s *SearchSuite) TestGroupByGroupByGeoGrid(c *C) {
 
 	c.Check(len(groupByResult.Items), Equals, 1)
 
-	c.Check(int64(4), Equals, groupByResult.Items[0].RowCount)
+	c.Check(int64(10), Equals, groupByResult.Items[0].RowCount)
 	c.Check("wtm", Equals, groupByResult.Items[0].Key)
 	c.Check(float64(30.9375), Equals, groupByResult.Items[0].GeoGrid.TopLeft.Lat)
 	c.Check(float64(119.53125), Equals, groupByResult.Items[0].GeoGrid.TopLeft.Lon)

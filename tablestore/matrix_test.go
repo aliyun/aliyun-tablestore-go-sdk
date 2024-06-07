@@ -3,8 +3,8 @@ package tablestore
 import (
 	"fmt"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
-	"os"
 	"testing"
 )
 
@@ -13,12 +13,12 @@ var (
 	plainBuffer []byte
 )
 
-func init() {
+func Test_WriteAndReadOtsData(t *testing.T) {
 	fmt.Println("begin init")
-	endpoint := os.Getenv("OTS_TEST_ENDPOINT")
-	instanceName := os.Getenv("OTS_TEST_INSTANCENAME")
-	accessKeyId := os.Getenv("OTS_TEST_KEYID")
-	accessKeySecret := os.Getenv("OTS_TEST_SECRET")
+	endpoint := testConfig.OtsEndpoint
+	instanceName := testConfig.InstanceName
+	accessKeyId := testConfig.OtsAccessId
+	accessKeySecret := testConfig.OtsAccessKey
 	// init the global client
 	client = NewClient(endpoint, instanceName, accessKeyId, accessKeySecret)
 

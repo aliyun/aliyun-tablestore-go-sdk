@@ -9,7 +9,6 @@ type KnnVectorQuery struct {
 	FieldName          string
 	TopK               *int32
 	Float32QueryVector []float32
-	Int8QueryVector    []int8
 	Filter             Query
 }
 

@@ -1088,6 +1088,25 @@ func CheckTagKeyOrValue(s string) error {
 	return nil
 }
 
+func BuildTags(tags map[string]string) ([]*otsprotocol.TimeseriesTag, error) {
+	var tagsPB []*otsprotocol.TimeseriesTag
+	for key, value := range tags {
+		err := CheckTagKeyOrValue(key)
+		if err != nil {
+			return nil, err
+		}
+		err = CheckTagKeyOrValue(value)
+		if err != nil {
+			return nil, err
+		}
+		tagsPB = append(tagsPB, &otsprotocol.TimeseriesTag{Name: proto.String(key), Value: proto.String(value)})
+	}
+	sort.Slice(tagsPB, func(i, j int) bool {
+		return tagsPB[i].GetName() < tagsPB[j].GetName()
+	})
+	return tagsPB, nil
+}
+
 func BuildTagString(tags map[string]string) (string, error) {
 	var capacity int = 2
 	n := len(tags)

@@ -6,8 +6,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"math"
 	"math/rand"
+	"strings"
 	"testing"
+	"time"
 )
+
+var compositeResult []string
 
 func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 	pbGroupBysResults := otsprotocol.GroupBysResult{}
@@ -187,6 +191,29 @@ func genPBGroupBysResult() *otsprotocol.GroupBysResult {
 		}
 		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
 	}
+	{
+		var rowCount int64 = 5
+		var keys []string
+		var isNullKeys []bool
+		keys, isNullKeys, compositeResult = generateKeywordWithNull()
+		items := []*otsprotocol.GroupByCompositeResultItem{
+			{
+				Keys:       keys,
+				IsNullKeys: isNullKeys,
+				RowCount:   &rowCount,
+			},
+		}
+
+		groupByBodyBytes, _ := proto.Marshal(&otsprotocol.GroupByCompositeResult{
+			GroupByCompositeResultItems: items,
+		})
+		groupByResult := otsprotocol.GroupByResult{
+			Name: proto.String("group_by8"),
+			Type: otsprotocol.GroupByType_GROUP_BY_COMPOSITE.Enum(),
+			GroupByResult: groupByBodyBytes,
+		}
+		pbGroupBysResults.GroupByResults = append(pbGroupBysResults.GroupByResults, &groupByResult)
+	}
 
 	return &pbGroupBysResults
 }
@@ -195,7 +222,7 @@ func TestParseGroupByResultsFromPB(t *testing.T) {
 	pbGroupBysResult := genPBGroupBysResult()
 	groupByResults, err := ParseGroupByResultsFromPB(pbGroupBysResult.GroupByResults)
 	assert.Nil(t, err)
-	assert.Equal(t, 7, len(groupByResults.resultMap))
+	assert.Equal(t, 8, len(groupByResults.resultMap))
 	assert.Equal(t, false, groupByResults.Empty())
 
 	{
@@ -280,4 +307,41 @@ func TestParseGroupByResultsFromPB(t *testing.T) {
 		assert.Equal(t, int64(30), groupByResult.Items[2].RowCount)
 		assert.Equal(t, GeoGrid{TopLeft: GeoPoint{Lat: float64(90), Lon: float64(-135)}, BottomRight: GeoPoint{Lat: float64(45), Lon: float64(-90)}}, groupByResult.Items[2].GeoGrid)
 	}
+	{
+		groupByResult, err := groupByResults.GroupByComposite("group_by8")
+		assert.Nil(t, err)
+		assert.Equal(t, 1, len(groupByResult.Items))
+
+		var keys []string
+		for _, key := range groupByResult.Items[0].Keys {
+			if key != nil {
+				keys = append(keys, *key)
+			}
+		}
+
+		assert.Equal(t, int64(5), groupByResult.Items[0].RowCount)
+		assert.Equal(t, strings.Join(compositeResult, ","), strings.Join(keys, ","))
+	}
+}
+
+func generateKeywordWithNull() (keys []string, isNullKeys []bool, result []string) {
+	rand.Seed(time.Now().Unix())
+
+	strs := []string{"", "\n", "null", "NULL"}
+	round := rand.Intn(100) + 10
+	for i := 0; i < round; i++ {
+		isNullKeys = append(isNullKeys, rand.Intn(2) == 0)
+		keys = append(keys, strs[rand.Intn(len(strs))])
+		if !isNullKeys[len(isNullKeys)-1] {
+			result = append(result, keys[len(keys)-1])
+		}
+	}
+
+	// isNullKeys = nil, which mean the server is old version.
+	if rand.Intn(100) < 50 {
+		isNullKeys = nil
+		result = keys
+	}
+
+	return
 }

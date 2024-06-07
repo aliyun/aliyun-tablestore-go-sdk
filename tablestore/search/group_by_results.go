@@ -32,6 +32,17 @@ func (g *GroupByResults) Put(name string, result GroupByResult) {
 	g.resultMap[name] = result
 }
 
+func (g GroupByResults) GroupByComposite(name string) (*GroupByCompositeResult, error) {
+	if result, ok := g.resultMap[name]; ok {
+		if result.GetType() != GroupByCompositeType {
+			return nil, errors.New(fmt.Sprintf("wrong group by type: [%v] needed, [%v] provided", result.GetType().String(), GroupByCompositeType.String()))
+		}
+		return result.(*GroupByCompositeResult), nil
+	}
+
+	return nil, errors.New(fmt.Sprintf("group by [%v] not found", name))
+}
+
 func (g GroupByResults) GroupByField(name string) (*GroupByFieldResult, error) {
 	if result, ok := g.resultMap[name]; ok {
 		if result.GetType() != GroupByFieldType {
@@ -392,6 +403,56 @@ func ParseGroupByGeoGridResultFromPB(pbGroupByResult *otsprotocol.GroupByResult)
 	return groupByResult, nil
 }
 
+func ParseGroupByCompositeResultFromPB(pbGroupByResult *otsprotocol.GroupByResult) (*GroupByCompositeResult, error) {
+	groupByCompositeResult := new(GroupByCompositeResult)
+	groupByCompositeResult.Name = *pbGroupByResult.Name
+
+	pbGroupByResultBody := new(otsprotocol.GroupByCompositeResult)
+	if err := proto.Unmarshal(pbGroupByResult.GroupByResult, pbGroupByResultBody); err != nil {
+		return nil, errors.New(fmt.Sprintf("failed to parse group by body: %v", err.Error()))
+	}
+	pbItems := pbGroupByResultBody.GetGroupByCompositeResultItems()
+
+	for _, pbItem := range pbItems {
+		item := GroupByCompositeResultItem{}
+
+		item.Keys = make([]*string, len(pbItem.GetKeys()))
+		for idx, key := range pbItem.Keys {
+			if len(pbItem.IsNullKeys) != len(pbItem.Keys) || !pbItem.IsNullKeys[idx] {
+				keyCopy := key
+				item.Keys[idx] = &keyCopy
+			}
+		}
+
+		item.RowCount = pbItem.GetRowCount()
+		if pbItem.SubAggsResult != nil && len(pbItem.SubAggsResult.AggResults) > 0 {
+			subAggResults, err := ParseAggregationResultsFromPB(pbItem.SubAggsResult.AggResults)
+			if err != nil {
+				return nil, err
+			}
+			item.SubAggregations = *subAggResults
+		}
+		if pbItem.SubGroupBysResult != nil && len(pbItem.SubGroupBysResult.GroupByResults) > 0 {
+			subGroupByResults, err := ParseGroupByResultsFromPB(pbItem.SubGroupBysResult.GroupByResults)
+			if err != nil {
+				return nil, err
+			}
+			item.SubGroupBys = *subGroupByResults
+		}
+		groupByCompositeResult.Items = append(groupByCompositeResult.Items, item)
+	}
+
+	if pbGroupByResultBody.NextToken != nil {
+		groupByCompositeResult.NextToken = pbGroupByResultBody.NextToken
+	}
+
+	if pbGroupByResultBody.SourceGroupByNames != nil {
+		groupByCompositeResult.SourceGroupByNames = pbGroupByResultBody.SourceGroupByNames
+	}
+
+	return groupByCompositeResult, nil
+}
+
 func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*GroupByResults, error) {
 	groupByResults := GroupByResults{}
 	for _, pbGroupByResult := range pbGroupByResults {
@@ -442,6 +503,13 @@ func ParseGroupByResultsFromPB(pbGroupByResults []*otsprotocol.GroupByResult) (*
 			groupByResult, err := ParseGroupByGeoGridResultFromPB(pbGroupByResult)
 			if err != nil {
 				return nil, err
+			}
+			groupByResults.Put(groupByResult.Name, groupByResult)
+			break
+		case otsprotocol.GroupByType_GROUP_BY_COMPOSITE:
+			groupByResult, err := ParseGroupByCompositeResultFromPB(pbGroupByResult)
+			if err != nil {
+				return nil ,err
 			}
 			groupByResults.Put(groupByResult.Name, groupByResult)
 			break
