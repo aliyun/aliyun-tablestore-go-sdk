@@ -319,6 +319,7 @@ message Sorter {
 
 message Sort {
     repeated Sorter sorter = 1;
+    optional bool disable_default_pk_sorter = 2;
 }
 
 message SearchQuery {

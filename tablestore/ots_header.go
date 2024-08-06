@@ -23,6 +23,8 @@ const (
 	xOtsHeaderSDKTraceID        = "x-ots-sdk-traceid"
 	xOtsHeaderRequestPriority   = "x-ots-request-priority"
 	xOtsHeaderRequestTag        = "x-ots-request-tag"
+	xOtsHeaderSourceIp          = "x-ots-sourceip"
+	xOtsHeaderIsSecureTransport = "x-ots-issecuretransport"
 	xOtsHeaderTunnelType        = "x-ots-tunnel-type"
 	xOtsHeaderPlayerAccountId   = "x-ots-playeraccountid"
 	XOtsHeaderAdminTaskType     = "x-ots-admin-task-type"
@@ -63,6 +65,8 @@ func createOtsHeaders(accessKey string) *otsHeaders {
 		&otsHeader{name: xOtsHeaderSDKTraceID, must: false},
 		&otsHeader{name: xOtsHeaderRequestPriority, must: false},
 		&otsHeader{name: xOtsHeaderRequestTag, must: false},
+		&otsHeader{name: xOtsHeaderSourceIp, must: false},
+		&otsHeader{name: xOtsHeaderIsSecureTransport, must: false},
 	}
 
 	sort.Sort(h)

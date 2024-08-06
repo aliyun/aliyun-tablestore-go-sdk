@@ -6,9 +6,11 @@ import (
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/assert"
 	. "gopkg.in/check.v1"
 	"math"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -20,13 +22,17 @@ type SearchSuite struct{}
 
 var _ = Suite(&SearchSuite{})
 
-//for aggregation
+// for aggregation
 var searchAPITestTableName1 = "search_api_test_table1"
 var searchAPITestIndexName1 = "search_api_test_index1"
 
-//for group by
+// for group by
 var searchAPITestTableName2 = "search_api_test_table2"
 var searchAPITestIndexName2 = "search_api_test_index2"
+
+// without nested
+var searchAPITestTableNameWithoutNested = "search_api_test_table_without_nested"
+var searchAPITestIndexNameWithoutNested = "search_api_test_index_without_nested"
 
 func DeleteTable(c *C, client TableStoreApi, tableName string) {
 	req := new(DeleteTableRequest)
@@ -266,6 +272,31 @@ func createTable2(c *C) {
 
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = searchAPITestTableName2
+	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+	tableOption := new(TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+
+	_, err := client.CreateTable(createTableRequest)
+	if err != nil {
+		c.Fatal("Failed to create table with error: ", err)
+	} else {
+		fmt.Println("Create table finished")
+	}
+}
+
+func createTableWithoutNested(c *C) {
+	fmt.Println("Begin to create table:", searchAPITestTableName2)
+	createTableRequest := new(CreateTableRequest)
+
+	tableMeta := new(TableMeta)
+	tableMeta.TableName = searchAPITestTableNameWithoutNested
 	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
 	tableOption := new(TableOption)
 	tableOption.TimeToAlive = -1
@@ -617,6 +648,67 @@ func createSearchIndex2(c *C) {
 	}
 }
 
+func createSearchIndexWithoutNested(c *C) {
+	fmt.Println("Begin to create index:", searchAPITestIndexNameWithoutNested)
+	request := &CreateSearchIndexRequest{}
+	request.TableName = searchAPITestTableNameWithoutNested
+	request.IndexName = searchAPITestIndexNameWithoutNested
+
+	var schemas []*FieldSchema
+	field1 := &FieldSchema{
+		FieldName:        proto.String("Col_Long"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field2 := &FieldSchema{
+		FieldName:        proto.String("Col_Double"),
+		FieldType:        FieldType_DOUBLE,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field3 := &FieldSchema{
+		FieldName:        proto.String("Col_Boolean"),
+		FieldType:        FieldType_BOOLEAN,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field4 := &FieldSchema{
+		FieldName:        proto.String("Col_Keyword"),
+		FieldType:        FieldType_KEYWORD,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field5 := &FieldSchema{
+		FieldName:        proto.String("Col_GeoPoint"),
+		FieldType:        FieldType_GEO_POINT,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field6 := &FieldSchema{
+		FieldName: proto.String("Col_Text"),
+		FieldType: FieldType_TEXT,
+		Index:     proto.Bool(true),
+	}
+	field7 := &FieldSchema{
+		FieldName:        proto.String("Col_Keyword_Overlap"),
+		FieldType:        FieldType_KEYWORD,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	schemas = append(schemas, field1, field2, field3, field4, field5, field6, field7)
+
+	request.IndexSchema = &IndexSchema{
+		FieldSchemas: schemas,
+	}
+	_, err := client.CreateSearchIndex(request)
+	if err != nil {
+		c.Fatal("Failed to create search index with error: ", err)
+	} else {
+		fmt.Println("Create search index finished")
+	}
+}
+
 func deleteSearchIndex(tableName string, indexName string) {
 	deleteIndexRequest := new(DeleteSearchIndexRequest)
 	deleteIndexRequest.TableName = tableName
@@ -784,6 +876,64 @@ func writeData2(c *C) {
 	}
 }
 
+func writeDataWithoutNested(c *C) {
+	longs := []int64{1, 2, 2, 3, 3, 3, 4, 4, 4, 4}
+	doubles := []float64{1.1, 2.1, 2.1, 3.1, 3.1, 3.1, 4.1, 4.1, 4.1, 4.1}
+	bools := []bool{false, false, false, false, true, true, true, true, true, true}
+	strs := []string{"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
+	geopoints := []string{
+		"30.137817,120.08681",  //飞天园区
+		"30.135131,120.088355", //中大银座
+		"30.181877,120.152818", //中医药地铁站
+		"30.20223,120.13787",   //六和塔
+		"30.216961,120.157633", //八卦田
+		"30.231566,120.148578", //太子湾
+		"30.26058,120.170712",  //龙翔桥
+		"30.269501,120.169347", //凤起路
+		"30.28073,120.168843",  //运河
+		"30.296946,120.21958",  //杭州东站
+	}
+
+	for i := 0; i < 10; i++ { //0, 1, ..., 9
+		putRowRequest := new(PutRowRequest)
+		putRowChange := new(PutRowChange)
+		putRowChange.TableName = searchAPITestTableNameWithoutNested
+		putPk := new(PrimaryKey)
+		putPk.AddPrimaryKeyColumn("pk1", fmt.Sprintf("pk_%d", i))
+
+		longValue := longs[i]
+		doubleValue := doubles[i]
+		boolValue := bools[i]
+		keywordValue := strs[i]
+		geoPointValue := geopoints[i]
+		textValue := strs[i]
+
+		putRowChange.PrimaryKey = putPk
+		putRowChange.AddColumn("Col_Long", longValue)
+		putRowChange.AddColumn("Col_Double", doubleValue)
+		putRowChange.AddColumn("Col_Boolean", boolValue)
+		putRowChange.AddColumn("Col_Keyword", keywordValue)
+		putRowChange.AddColumn("Col_GeoPoint", geoPointValue)
+		putRowChange.AddColumn("Col_Text", textValue)
+		putRowChange.AddColumn("Col_Keyword_Overlap", strconv.Itoa(6))
+
+		if i >= 5 { //leave out the first 5 rows
+			putRowChange.AddColumn("Col_Long_Missing", longValue)
+			putRowChange.AddColumn("Col_Double_Missing", doubleValue)
+			putRowChange.AddColumn("Col_Boolean_Missing", boolValue)
+			putRowChange.AddColumn("Col_Keyword_Missing", keywordValue)
+			putRowChange.AddColumn("Col_GeoPoint_Missing", geoPointValue)
+			putRowChange.AddColumn("Col_Text_Missing", textValue)
+		}
+
+		putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
+		putRowRequest.PutRowChange = putRowChange
+		if _, err := client.PutRow(putRowRequest); err != nil {
+			c.Fatal("putRow failed with error: ", err)
+		}
+	}
+}
+
 func (s *SearchSuite) SetUpSuite(c *C) {
 	endpoint := testConfig.OtsEndpoint
 	instanceName := testConfig.InstanceName
@@ -799,6 +949,9 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 	deleteSearchIndex(searchAPITestTableName2, searchAPITestIndexName2)
 	deleteTable(searchAPITestTableName2)
 
+	deleteSearchIndex(searchAPITestTableNameWithoutNested, searchAPITestIndexNameWithoutNested)
+	deleteTable(searchAPITestTableNameWithoutNested)
+
 	//init new environment
 	createTable1(c)
 	createSearchIndex1(c)
@@ -806,15 +959,110 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 	createTable2(c)
 	createSearchIndex2(c)
 
+	createTableWithoutNested(c)
+	createSearchIndexWithoutNested(c)
+
 	writeData1(c)
 	writeData2(c)
+	writeDataWithoutNested(c)
 
-	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName1, searchAPITestIndexName1, 40)
-	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName2, searchAPITestIndexName2, 40)
+	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName1, searchAPITestIndexName1, 60)
+	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName2, searchAPITestIndexName2, 60)
+	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableNameWithoutNested, searchAPITestIndexNameWithoutNested, 60)
+}
+
+func (s *SearchSuite) TestQuerySortDisableDefaultPkSorter(c *C) {
+	{
+		sort := &search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName: "Col_Keyword_Overlap",
+				},
+			},
+			DisableDefaultPkSorter: proto.Bool(true),
+		}
+
+		searchRequest := &SearchRequest{
+			TableName: searchAPITestTableNameWithoutNested,
+			IndexName: searchAPITestIndexNameWithoutNested,
+			SearchQuery: search.NewSearchQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetLimit(6).
+				SetSort(sort),
+			ColumnsToGet: &ColumnsToGet{
+				ReturnAllFromIndex: true,
+			},
+		}
+		response, err := client.Search(searchRequest)
+		c.Check(err, IsNil)
+		totalCount := len(response.Rows)
+
+		for len(response.NextToken) != 0 {
+			searchRequest = &SearchRequest{
+				TableName: searchAPITestTableNameWithoutNested,
+				IndexName: searchAPITestIndexNameWithoutNested,
+				SearchQuery: search.NewSearchQuery().
+					SetQuery(&search.MatchAllQuery{}).
+					SetLimit(6).
+					SetToken(response.NextToken),
+				ColumnsToGet: &ColumnsToGet{
+					ReturnAllFromIndex: true,
+				},
+			}
+			response, err = client.Search(searchRequest)
+			c.Check(err, IsNil)
+			totalCount += len(response.Rows)
+		}
+
+		assert.Less(c, totalCount, 10)
+	}
+	{
+		sort := &search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName: "Col_Keyword_Overlap",
+				},
+			},
+			DisableDefaultPkSorter: proto.Bool(false),
+		}
+
+		searchRequest := &SearchRequest{
+			TableName: searchAPITestTableNameWithoutNested,
+			IndexName: searchAPITestIndexNameWithoutNested,
+			SearchQuery: search.NewSearchQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetLimit(6).
+				SetSort(sort),
+			ColumnsToGet: &ColumnsToGet{
+				ReturnAllFromIndex: true,
+			},
+		}
+		response, err := client.Search(searchRequest)
+		c.Check(err, IsNil)
+		totalCount := len(response.Rows)
+
+		for len(response.NextToken) != 0 {
+			searchRequest = &SearchRequest{
+				TableName: searchAPITestTableNameWithoutNested,
+				IndexName: searchAPITestIndexNameWithoutNested,
+				SearchQuery: search.NewSearchQuery().
+					SetQuery(&search.MatchAllQuery{}).
+					SetLimit(6).
+					SetToken(response.NextToken),
+				ColumnsToGet: &ColumnsToGet{
+					ReturnAllFromIndex: true,
+				},
+			}
+			response, err = client.Search(searchRequest)
+			c.Check(err, IsNil)
+			totalCount += len(response.Rows)
+		}
+
+		c.Check(totalCount, Equals, 10)
+	}
 }
 
 /* avg agg */
-
 func (s *SearchSuite) TestAggregationAvgAggregationEmptyAggName(c *C) {
 	searchRequest := &SearchRequest{}
 	searchRequest.

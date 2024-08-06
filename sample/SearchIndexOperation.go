@@ -1101,7 +1101,7 @@ func RangeQuery(client *tablestore.TableStoreClient, tableName string, indexName
 	searchQuery.SetQuery(rangeQuery)
 	// 设置按照Col_Long这一列逆序排序
 	searchQuery.SetSort(&search.Sort{
-		[]search.Sorter{
+		Sorters: []search.Sorter{
 			&search.FieldSort{
 				FieldName: "Col_Long",
 				Order:     search.SortOrder_DESC.Enum(),
