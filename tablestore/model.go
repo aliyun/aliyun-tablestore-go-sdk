@@ -172,6 +172,7 @@ type TableOption struct {
 	TimeToAlive, MaxVersion   int
 	DeviationCellVersionInSec int64
 	AllowUpdate               *bool
+	UpdateFullRow             *bool // generally, this option can not be updated
 }
 
 type ReservedThroughput struct {

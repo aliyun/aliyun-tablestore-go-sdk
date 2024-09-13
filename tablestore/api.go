@@ -796,6 +796,9 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 	if request.TableOption.AllowUpdate != nil {
 		req.TableOptions.AllowUpdate = proto.Bool(*request.TableOption.AllowUpdate)
 	}
+	if request.TableOption.UpdateFullRow != nil {
+		req.TableOptions.UpdateFullRow = proto.Bool(*request.TableOption.UpdateFullRow)
+	}
 
 	if request.TableOption.DeviationCellVersionInSec > 0 {
 		req.TableOptions.DeviationCellVersionInSec = proto.Int64(request.TableOption.DeviationCellVersionInSec)
@@ -1597,12 +1600,17 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 	if resp.TableOptions.AllowUpdate != nil {
 		allowUpdate = *resp.TableOptions.AllowUpdate
 	}
+	updateFullRow := false
+	if resp.TableOptions.UpdateFullRow != nil {
+		updateFullRow = *resp.TableOptions.UpdateFullRow
+	}
 
 	response.TableOption = &TableOption{
 		TimeToAlive:               int(*resp.TableOptions.TimeToLive),
 		MaxVersion:                int(*resp.TableOptions.MaxVersions),
 		DeviationCellVersionInSec: *resp.TableOptions.DeviationCellVersionInSec,
 		AllowUpdate:               &allowUpdate,
+		UpdateFullRow:             &updateFullRow,
 	}
 
 	if resp.StreamDetails != nil && *resp.StreamDetails.EnableStream {
@@ -1673,6 +1681,9 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		req.TableOptions.MaxVersions = proto.Int32(int32(request.TableOption.MaxVersion))
 		if request.TableOption.AllowUpdate != nil {
 			req.TableOptions.AllowUpdate = proto.Bool(*request.TableOption.AllowUpdate)
+		}
+		if request.TableOption.UpdateFullRow != nil {
+			req.TableOptions.UpdateFullRow = proto.Bool(*request.TableOption.UpdateFullRow)
 		}
 
 		if request.TableOption.DeviationCellVersionInSec > 0 {

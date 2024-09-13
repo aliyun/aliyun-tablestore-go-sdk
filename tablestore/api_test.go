@@ -21,7 +21,7 @@ import (
 )
 
 // Hook up gocheck into the "go test" runner.
-func Test(t *testing.T) {
+func TestApi(t *testing.T) {
 	TestingT(t)
 }
 
@@ -43,6 +43,12 @@ var (
 	fuzzyMetaPk2   = "pkBlob"
 	fuzzyMetaPk3   = "pkInt"
 	fuzzyMetaAttr  = []string{"string", "integer", "boolean", "double", "blob"}
+)
+
+const (
+	defaultDeviationCellVersionInSec = int64(86400)
+	defaultAllowUpdate               = true
+	defaultUpdateFullRow             = false
 )
 
 // Todo: use config
@@ -108,7 +114,9 @@ func PrepareFuzzyTable(tableName string) error {
 }
 
 func PrepareTable(tableName string) error {
-	createtableRequest := new(CreateTableRequest)
+	checkAndDeleteTable(tableName)
+
+	createTableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
@@ -118,15 +126,17 @@ func PrepareTable(tableName string) error {
 	reservedThroughput := new(ReservedThroughput)
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
-	_, error := client.CreateTable(createtableRequest)
-	return error
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	_, err := client.CreateTable(createTableRequest)
+	return err
 }
 
 func PrepareTable2(tableName string) error {
-	createtableRequest := new(CreateTableRequest)
+	checkAndDeleteTable(tableName)
+
+	createTableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
@@ -137,15 +147,15 @@ func PrepareTable2(tableName string) error {
 	reservedThroughput := new(ReservedThroughput)
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
-	_, error := client.CreateTable(createtableRequest)
-	return error
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	_, err := client.CreateTable(createTableRequest)
+	return err
 }
 
 func PrepareSQLTable(tableName string) {
-	createtableRequest := new(CreateTableRequest)
+	createTableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("a", PrimaryKeyType_INTEGER)
@@ -155,10 +165,10 @@ func PrepareSQLTable(tableName string) {
 	reservedThroughput := new(ReservedThroughput)
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
-	_, _ = client.CreateTable(createtableRequest)
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
+	_, _ = client.CreateTable(createTableRequest)
 
 	time.Sleep(2 * time.Second)
 	batchReq := new(BatchWriteRowRequest)
@@ -255,34 +265,117 @@ func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
 	}
 }
 
+func checkTableExist(tableName string) bool {
+	listTables, err := client.ListTable()
+	if err != nil {
+		log.Println("failed to list table with error: ", err.Error())
+		return false
+	}
+
+	for _, table := range listTables.TableNames {
+		if table == tableName {
+			return true
+		}
+	}
+	return false
+}
+
+func checkAndDeleteTable(tableName string) {
+	if checkTableExist(tableName) {
+		deleteTable(tableName)
+	}
+}
+
 func (s *TableStoreSuite) TestCreateTable(c *C) {
-	tableName := tableNamePrefix + "testcreatetable1"
+	tableName := tableNamePrefix + "testCreateTable1"
 
-	deleteReq := new(DeleteTableRequest)
-	deleteReq.TableName = tableName
-	client.DeleteTable(deleteReq)
+	for i := 0; i < 10; i++ {
+		checkAndDeleteTable(tableName)
+		createTableRequest := new(CreateTableRequest)
 
-	createtableRequest := new(CreateTableRequest)
+		tableMeta := new(TableMeta)
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
 
-	tableMeta := new(TableMeta)
-	tableMeta.TableName = tableName
-	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+		tableOption := new(TableOption)
+		if i == 0 {
+			tableOption.TimeToAlive = -1
+		} else {
+			tableOption.TimeToAlive = 86400 + i
+		}
+		tableOption.MaxVersion = i + 1
+		tableOption.DeviationCellVersionInSec = int64(i * 100000)
+		tableOption.AllowUpdate = proto.Bool(i%2 == 0)
+		tableOption.UpdateFullRow = proto.Bool(i%3 == 0)
 
-	tableOption := new(TableOption)
+		reservedThroughput := new(ReservedThroughput)
+		reservedThroughput.Readcap = 0
+		reservedThroughput.Writecap = 0
 
-	tableOption.TimeToAlive = -1
-	tableOption.MaxVersion = 3
+		createTableRequest.TableMeta = tableMeta
+		createTableRequest.TableOption = tableOption
+		createTableRequest.ReservedThroughput = reservedThroughput
 
-	reservedThroughput := new(ReservedThroughput)
-	reservedThroughput.Readcap = 0
-	reservedThroughput.Writecap = 0
+		_, err1 := client.CreateTable(createTableRequest)
+		c.Check(err1, Equals, nil)
 
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
+		descTableRequest := &DescribeTableRequest{
+			TableName: tableName,
+		}
+		descResp, err := client.DescribeTable(descTableRequest)
+		c.Check(err, Equals, nil)
+		c.Check(descResp.TableMeta.TableName, Equals, tableName)
+		c.Check(descResp.TableOption.TimeToAlive, Equals, tableOption.TimeToAlive)
+		c.Check(descResp.TableOption.MaxVersion, Equals, tableOption.MaxVersion)
+		if i != 0 {
+			c.Check(descResp.TableOption.DeviationCellVersionInSec, Equals, tableOption.DeviationCellVersionInSec)
+		} else {
+			// i = 0, then DeviationCellVersionInSec is 0.
+			// We can't set DeviationCellVersionInSec to 0, so sdk won't set it.
+			// And it will return default value.
+			c.Check(descResp.TableOption.DeviationCellVersionInSec, Equals, defaultDeviationCellVersionInSec)
+		}
+		c.Check(*descResp.TableOption.AllowUpdate, Equals, *tableOption.AllowUpdate)
+		c.Check(*descResp.TableOption.UpdateFullRow, Equals, *tableOption.UpdateFullRow)
+		c.Check(descResp.ReservedThroughput.Readcap, Equals, reservedThroughput.Readcap)
+		c.Check(descResp.ReservedThroughput.Writecap, Equals, reservedThroughput.Writecap)
 
-	_, error := client.CreateTable(createtableRequest)
-	c.Check(error, Equals, nil)
+		checkAndDeleteTable(tableName)
+	}
+
+	// test default value
+	{
+		checkAndDeleteTable(tableName)
+		createTableRequest := new(CreateTableRequest)
+		tableMeta := new(TableMeta)
+		tableMeta.TableName = tableName
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+
+		tableOption := new(TableOption)
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 1
+
+		reservedThroughput := new(ReservedThroughput)
+		reservedThroughput.Readcap = 0
+		reservedThroughput.Writecap = 0
+
+		createTableRequest.TableMeta = tableMeta
+		createTableRequest.TableOption = tableOption
+		createTableRequest.ReservedThroughput = reservedThroughput
+
+		_, err1 := client.CreateTable(createTableRequest)
+		c.Check(err1, Equals, nil)
+		descTableRequest := &DescribeTableRequest{
+			TableName: tableName,
+		}
+		descResp, err := client.DescribeTable(descTableRequest)
+		c.Check(err, Equals, nil)
+		c.Check(descResp.TableOption.TimeToAlive, Equals, tableOption.TimeToAlive)
+		c.Check(descResp.TableOption.MaxVersion, Equals, tableOption.MaxVersion)
+		c.Check(descResp.TableOption.DeviationCellVersionInSec, Equals, defaultDeviationCellVersionInSec)
+		c.Check(*descResp.TableOption.AllowUpdate, Equals, defaultAllowUpdate)
+		c.Check(*descResp.TableOption.UpdateFullRow, Equals, defaultUpdateFullRow)
+	}
 	log.Println("TestCreateTable finished")
 }
 
@@ -340,7 +433,7 @@ func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
 	deleteReq.TableName = tableName
 	client.DeleteTable(deleteReq)
 
-	createtableRequest := new(CreateTableRequest)
+	createTableRequest := new(CreateTableRequest)
 
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
@@ -355,19 +448,19 @@ func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
 
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
 
-	_, error := client.CreateTable(createtableRequest)
-	c.Check(error, Equals, nil)
+	_, err := client.CreateTable(createTableRequest)
+	c.Check(err, Equals, nil)
 
 	//time.Sleep(500 * time.Millisecond)
-	_, error = client.DeleteTable(deleteReq)
-	c.Check(error, Equals, nil)
+	_, err = client.DeleteTable(deleteReq)
+	c.Check(err, Equals, nil)
 
-	_, error = client.CreateTable(createtableRequest)
-	c.Check(error, Equals, nil)
+	_, err = client.CreateTable(createTableRequest)
+	c.Check(err, Equals, nil)
 
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
@@ -383,17 +476,17 @@ func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
 	putRowChange.AddColumn("col6", int64(60))
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
-	_, error = client.PutRow(putRowRequest)
-	c.Check(error, Equals, nil)
+	_, err = client.PutRow(putRowRequest)
+	c.Check(err, Equals, nil)
 
 	log.Println("TestReCreateTableAndPutRow finished")
 }
 
 func (s *TableStoreSuite) TestListTable(c *C) {
-	listtables, error := client.ListTable()
-	c.Check(error, Equals, nil)
+	listTables, err := client.ListTable()
+	c.Check(err, Equals, nil)
 	defaultTableExist := false
-	for _, table := range listtables.TableNames {
+	for _, table := range listTables.TableNames {
 		log.Println(table)
 		if table == defaultTableName {
 			defaultTableExist = true
@@ -406,44 +499,60 @@ func (s *TableStoreSuite) TestListTable(c *C) {
 
 func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 	log.Println("TestUpdateAndDescribeTable started")
-	updateTableReq := new(UpdateTableRequest)
-	updateTableReq.TableName = defaultTableName
-	updateTableReq.TableOption = new(TableOption)
-	updateTableReq.TableOption.TimeToAlive = -1
-	updateTableReq.TableOption.MaxVersion = 5
-	updateTableReq.StreamSpec = new(StreamSpecification)
-	updateTableReq.StreamSpec.EnableStream = true
-	updateTableReq.StreamSpec.ExpirationTime = 168
-	updateTableReq.StreamSpec.OriginColumnsToGet = []string{"col1", "col2"}
+	{
+		updateTableReq := new(UpdateTableRequest)
+		updateTableReq.TableName = defaultTableName
+		updateTableReq.TableOption = new(TableOption)
+		updateTableReq.TableOption.TimeToAlive = -1
+		updateTableReq.TableOption.MaxVersion = 5
+		updateTableReq.StreamSpec = new(StreamSpecification)
+		updateTableReq.StreamSpec.EnableStream = true
+		updateTableReq.StreamSpec.ExpirationTime = 168
+		updateTableReq.StreamSpec.OriginColumnsToGet = []string{"col1", "col2"}
 
-	updateTableResp, error := client.UpdateTable(updateTableReq)
-	c.Assert(error, Equals, nil)
-	c.Assert(updateTableResp, NotNil)
-	c.Assert(updateTableResp.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
-	c.Assert(updateTableResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
-	c.Assert(updateTableResp.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
-	c.Assert(updateTableResp.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
+		updateTableResp, err := client.UpdateTable(updateTableReq)
+		c.Assert(err, Equals, nil)
+		c.Assert(updateTableResp, NotNil)
+		c.Assert(updateTableResp.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
+		c.Assert(updateTableResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
+		c.Assert(updateTableResp.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
+		c.Assert(updateTableResp.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
 
-	describeTableReq := new(DescribeTableRequest)
-	describeTableReq.TableName = defaultTableName
-	describ, error := client.DescribeTable(describeTableReq)
-	c.Assert(error, Equals, nil)
+		describeTableReq := new(DescribeTableRequest)
+		describeTableReq.TableName = defaultTableName
+		descResp, descErr := client.DescribeTable(describeTableReq)
+		c.Assert(descErr, Equals, nil)
 
-	c.Assert(describ, NotNil)
-	c.Assert(describ.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
-	c.Assert(describ.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
-	c.Assert(describ.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
-	c.Assert(describ.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
-	c.Assert(len(describ.StreamDetails.OriginColumnsToGet), Equals, len(updateTableReq.StreamSpec.OriginColumnsToGet))
-	for i, s := range describ.StreamDetails.OriginColumnsToGet {
-		c.Assert(s, Equals, updateTableReq.StreamSpec.OriginColumnsToGet[i])
+		c.Assert(descResp, NotNil)
+		c.Assert(descResp.TableOption.TimeToAlive, Equals, updateTableReq.TableOption.TimeToAlive)
+		c.Assert(descResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
+		c.Assert(descResp.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
+		c.Assert(descResp.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
+		c.Assert(len(descResp.StreamDetails.OriginColumnsToGet), Equals, len(updateTableReq.StreamSpec.OriginColumnsToGet))
+		for i, col := range descResp.StreamDetails.OriginColumnsToGet {
+			c.Assert(col, Equals, updateTableReq.StreamSpec.OriginColumnsToGet[i])
+		}
+	}
+
+	// test update table option fail
+	for i := 0; i < 2; i++ {
+		updateTableReq := new(UpdateTableRequest)
+		updateTableReq.TableName = defaultTableName
+		updateTableReq.TableOption = new(TableOption)
+		updateTableReq.TableOption.TimeToAlive = -1
+		updateTableReq.TableOption.MaxVersion = 5
+		updateTableReq.TableOption.UpdateFullRow = proto.Bool(i == 0)
+
+		_, err := client.UpdateTable(updateTableReq)
+		c.Assert(err, NotNil)
+		c.Assert(strings.Contains(err.Error(), "contain updateFullRow"), Equals, true)
 	}
 	log.Println("TestUpdateAndDescribeTable finished")
 }
 
 func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 	tableName := tableNamePrefix + "incrementtable"
-	createtableRequest := new(CreateTableRequest)
+	createTableRequest := new(CreateTableRequest)
 
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName
@@ -458,11 +567,11 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 	reservedThroughput.Readcap = 0
 	reservedThroughput.Writecap = 0
 
-	createtableRequest.TableMeta = tableMeta
-	createtableRequest.TableOption = tableOption
-	createtableRequest.ReservedThroughput = reservedThroughput
+	createTableRequest.TableMeta = tableMeta
+	createTableRequest.TableOption = tableOption
+	createTableRequest.ReservedThroughput = reservedThroughput
 
-	client.CreateTable(createtableRequest)
+	client.CreateTable(createTableRequest)
 	rowCount := 100
 	for i := 0; i < rowCount; i++ {
 		putRowRequest := new(PutRowRequest)
@@ -477,8 +586,8 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 		putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 		putRowRequest.PutRowChange = putRowChange
 		putRowRequest.PutRowChange.SetReturnPk()
-		response, error := client.PutRow(putRowRequest)
-		c.Check(error, Equals, nil)
+		response, err := client.PutRow(putRowRequest)
+		c.Check(err, Equals, nil)
 		c.Check(len(response.PrimaryKey.PrimaryKeys), Equals, 2)
 		c.Check(response.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
 		c.Check(response.PrimaryKey.PrimaryKeys[0].Value, Equals, "key"+strconv.Itoa(i))
@@ -490,8 +599,8 @@ func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
 
 	describeTableReq := new(DescribeTableRequest)
 	describeTableReq.TableName = tableName
-	_, error := client.DescribeTable(describeTableReq)
-	c.Check(error, IsNil)
+	_, err := client.DescribeTable(describeTableReq)
+	c.Check(err, IsNil)
 }
 
 func (s *TableStoreSuite) TestPutGetRow(c *C) {
@@ -512,8 +621,8 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	putRowChange.AddColumn("col8", false)
 	putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
 	putRowRequest.PutRowChange = putRowChange
-	_, error := client.PutRow(putRowRequest)
-	c.Check(error, Equals, nil)
+	_, putErr := client.PutRow(putRowRequest)
+	c.Check(putErr, Equals, nil)
 
 	getRowRequest := new(GetRowRequest)
 	criteria := new(SingleRowQueryCriteria)
@@ -521,8 +630,8 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
-	getResp, error := client.GetRow(getRowRequest)
-	c.Check(error, Equals, nil)
+	getResp, getErr := client.GetRow(getRowRequest)
+	c.Check(getErr, Equals, nil)
 	c.Check(getResp, NotNil)
 	c.Check(len(getResp.PrimaryKey.PrimaryKeys), Equals, 1)
 	c.Check(getResp.PrimaryKey.PrimaryKeys[0].ColumnName, Equals, "pk1")
@@ -549,8 +658,8 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	c.Check(mapData.Columns["col5"][0].Value, Equals, int64(50))
 	c.Check(mapData.Columns["col6"][0].Value, Equals, int64(60))
 
-	sortedColumn, error := mapData.GetRange(2, 2)
-	c.Check(error, Equals, nil)
+	sortedColumn, err := mapData.GetRange(2, 2)
+	c.Check(err, Equals, nil)
 	c.Check(len(sortedColumn), Equals, 2)
 	c.Check(sortedColumn[0], Equals, mapData.Columns["col3"][0])
 	c.Check(sortedColumn[1], Equals, mapData.Columns["col4"][0])
@@ -558,8 +667,8 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	mapData2 := getResp.GetColumnMap()
 	c.Check(mapData2.Columns["col1"][0].Value, Equals, "col1data1")
 
-	_, error = mapData.GetRange(2, 10)
-	c.Check(error, NotNil)
+	_, err = mapData.GetRange(2, 10)
+	c.Check(err, NotNil)
 	// Test add column to get
 	getRowRequest = new(GetRowRequest)
 	criteria = new(SingleRowQueryCriteria)
@@ -570,22 +679,22 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col1")
 	getRowRequest.SingleRowQueryCriteria.AddColumnToGet("col2")
 
-	getResp, error = client.GetRow(getRowRequest)
+	getResp, err = client.GetRow(getRowRequest)
 
-	c.Check(error, Equals, nil)
+	c.Check(err, Equals, nil)
 	c.Check(getResp, NotNil)
 	c.Check(len(getResp.Columns), Equals, 2)
 
-	_, error = invalidClient.GetRow(getRowRequest)
-	c.Check(error, NotNil)
+	_, err = invalidClient.GetRow(getRowRequest)
+	c.Check(err, NotNil)
 
 	getRowRequest = new(GetRowRequest)
 	criteria = new(SingleRowQueryCriteria)
 	criteria.PrimaryKey = putPk
 	getRowRequest.SingleRowQueryCriteria = criteria
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
-	_, error = client.GetRow(getRowRequest)
-	c.Check(error, NotNil)
+	_, err = client.GetRow(getRowRequest)
+	c.Check(err, NotNil)
 
 	notExistPk := new(PrimaryKey)
 	notExistPk.AddPrimaryKeyColumn("pk1", "notexistpk")
@@ -597,12 +706,12 @@ func (s *TableStoreSuite) TestPutGetRow(c *C) {
 	getRowRequest.SingleRowQueryCriteria.TableName = defaultTableName
 	getRowRequest.SingleRowQueryCriteria.MaxVersion = 1
 
-	getResp, error = client.GetRow(getRowRequest)
-	c.Check(error, IsNil)
+	getResp, err = client.GetRow(getRowRequest)
+	c.Check(err, IsNil)
 	c.Check(getResp, NotNil)
 
-	colmap := getResp.GetColumnMap()
-	c.Check(colmap, NotNil)
+	colMap := getResp.GetColumnMap()
+	c.Check(colMap, NotNil)
 
 	log.Println("TestPutGetRow finished")
 }
@@ -858,7 +967,7 @@ func (s *TableStoreSuite) TestPutGetRowWithFilter(c *C) {
 
 func (s *TableStoreSuite) TestPutUpdateDeleteRow(c *C) {
 	log.Println("TestPutUpdateDeleteRow started")
-	keyToUpdate := "pk1toupdate"
+	keyToUpdate := "pk1ToUpdate"
 	putRowRequest := new(PutRowRequest)
 	putRowChange := new(PutRowChange)
 	putRowChange.TableName = defaultTableName
@@ -1679,9 +1788,9 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	createtableRequest.TableMeta = tableMeta
 	createtableRequest.TableOption = tableOption
 	createtableRequest.ReservedThroughput = reservedThroughput
-	_, error := client.CreateTable(createtableRequest)
-	c.Check(error, NotNil)
-	c.Check(error.Error(), Equals, errTableNameTooLong(tableName).Error())
+	_, err := client.CreateTable(createtableRequest)
+	c.Check(err, NotNil)
+	c.Check(err.Error(), Equals, errTableNameTooLong(tableName).Error())
 
 	createtableRequest = new(CreateTableRequest)
 	tableMeta = new(TableMeta)
@@ -1696,9 +1805,9 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	createtableRequest.TableMeta = tableMeta
 	createtableRequest.TableOption = tableOption
 	createtableRequest.ReservedThroughput = reservedThroughput
-	_, error = client.CreateTable(createtableRequest)
-	c.Check(error, NotNil)
-	c.Check(error.Error(), Equals, errCreateTableNoPrimaryKey.Error())
+	_, err = client.CreateTable(createtableRequest)
+	c.Check(err, NotNil)
+	c.Check(err.Error(), Equals, errCreateTableNoPrimaryKey.Error())
 
 	tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
 	tableMeta.AddPrimaryKeyColumn("pk2", PrimaryKeyType_STRING)
@@ -1712,18 +1821,18 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	tableMeta.AddPrimaryKeyColumn("pk10", PrimaryKeyType_STRING)
 	tableMeta.AddPrimaryKeyColumn("pk11", PrimaryKeyType_STRING)
 
-	_, error = client.CreateTable(createtableRequest)
-	c.Check(error, NotNil)
-	c.Check(error.Error(), Equals, errPrimaryKeyTooMuch.Error())
+	_, err = client.CreateTable(createtableRequest)
+	c.Check(err, NotNil)
+	c.Check(err.Error(), Equals, errPrimaryKeyTooMuch.Error())
 
 	request := &PutRowRequest{}
-	_, error = client.PutRow(request)
-	c.Check(error, IsNil)
+	_, err = client.PutRow(request)
+	c.Check(err, IsNil)
 
-	_, error = client.PutRow(nil)
-	c.Check(error, IsNil)
+	_, err = client.PutRow(nil)
+	c.Check(err, IsNil)
 
-	_, err := invalidClient.ListTable()
+	_, err = invalidClient.ListTable()
 	c.Check(err, NotNil)
 
 	tableName = tableNamePrefix + "tablenotexist"
@@ -1743,13 +1852,13 @@ func (s *TableStoreSuite) TestFailureCase(c *C) {
 	updateTableReq.ReservedThroughput = &ReservedThroughput{}
 	updateTableReq.ReservedThroughput.Readcap = 0
 
-	_, error = invalidClient.UpdateTable(updateTableReq)
-	c.Assert(error, NotNil)
+	_, err = invalidClient.UpdateTable(updateTableReq)
+	c.Assert(err, NotNil)
 
 	describeTableReq := new(DescribeTableRequest)
 	describeTableReq.TableName = defaultTableName
-	_, error = invalidClient.DescribeTable(describeTableReq)
-	c.Assert(error, NotNil)
+	_, err = invalidClient.DescribeTable(describeTableReq)
+	c.Assert(err, NotNil)
 }
 
 func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {

@@ -22,11 +22,11 @@ type SearchSuite struct{}
 
 var _ = Suite(&SearchSuite{})
 
-// for aggregation
+//for aggregation
 var searchAPITestTableName1 = "search_api_test_table1"
 var searchAPITestIndexName1 = "search_api_test_index1"
 
-// for group by
+//for group by
 var searchAPITestTableName2 = "search_api_test_table2"
 var searchAPITestIndexName2 = "search_api_test_index2"
 
@@ -2357,7 +2357,7 @@ func (s *SearchSuite) TestQueryFunctionsScore_2(c *C) {
 					SetFieldValueFactorFunction(search.NewFieldValueFactorFunction().
 						SetFieldName("Col_Double").
 						SetFactor(1.1).
-						SetFunctionModifier(search.LN).
+						SetFunctionModifier(search.LN1P).
 						SetMissing(1.0))).
 				SetMaxScore(1000).
 				SetMinScore(0).

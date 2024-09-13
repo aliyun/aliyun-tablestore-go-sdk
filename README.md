@@ -28,3 +28,7 @@
 
 ### 扫码加入TableStore讨论群，和我们直接交流讨论
 钉钉群号：23307953
+
+## 运行测试
+1. 修改`testConfig/config.go`中的配置信息，包括访问阿里云TableStore服务的地址、访问凭证等。
+2. 运行单个suite：```go test -test.v -timeout 60m github.com/aliyun/aliyun-tablestore-go-sdk/tablestore -check.f TableStoreSuite```

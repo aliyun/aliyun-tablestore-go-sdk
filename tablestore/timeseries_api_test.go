@@ -75,8 +75,6 @@ func PrepareTimeseriesTable(timeseriesTableName string) error {
 func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 	fmt.Println("[Info]: TestDeleteAndCreateTimeseriesTable start !")
 
-	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
-
 	// 列出并删除所有时序表(注意：会删除所有已建立的时序表)
 	listTimeseriesTables, err := timeseriesClient.ListTimeseriesTable()
 	c.Check(err, Equals, nil)
@@ -88,6 +86,7 @@ func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 		fmt.Println("	[Info]: Delete timeseries ", timeseriesTable, " succeed !")
 	}
 
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
 	// 删除不存在表格：返回table not exist错误。
 	deleteTimeseriesReq := NewDeleteTimeseriesTableRequest(curTimeseriesTableName)
 	_, err = timeseriesClient.DeleteTimeseriesTable(deleteTimeseriesReq)
@@ -1006,10 +1005,15 @@ func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
 	deleteTimeseriesMetaResponse, err := timeseriesClient.DeleteTimeseriesMeta(deleteTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(deleteTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
-	time.Sleep(30 * time.Second)
-	queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
-	c.Assert(err, Equals, nil)
-	metas = queryTimeseriesMetaResponse.GetTimeseriesMetas()
+	for i := 0; i < 5; i++ { // wait for meta sync
+		time.Sleep(30 * time.Second)
+		queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		metas = queryTimeseriesMetaResponse.GetTimeseriesMetas()
+		if len(metas) == 0 {
+			break
+		}
+	}
 	c.Assert(len(metas), Equals, 0)
 }
 
