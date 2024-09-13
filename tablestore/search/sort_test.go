@@ -85,7 +85,7 @@ func TestSort_ProtoBuffer(t *testing.T) {
 	}
 	{
 		sort := &Sort{
-			Sorters:                make([]Sorter, 0),
+			Sorters: make([]Sorter, 0),
 			DisableDefaultPkSorter: proto.Bool(true),
 		}
 		pbSort, err := sort.ProtoBuffer()
@@ -95,7 +95,7 @@ func TestSort_ProtoBuffer(t *testing.T) {
 	}
 	{
 		sort := &Sort{
-			Sorters:                make([]Sorter, 0),
+			Sorters: make([]Sorter, 0),
 			DisableDefaultPkSorter: proto.Bool(false),
 		}
 		pbSort, err := sort.ProtoBuffer()

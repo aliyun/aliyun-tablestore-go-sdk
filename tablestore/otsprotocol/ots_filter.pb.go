@@ -25,7 +25,7 @@ type VariantType int32
 const (
 	VariantType_VT_INTEGER VariantType = 0
 	VariantType_VT_DOUBLE  VariantType = 1
-	// VT_BOOLEAN = 2;
+	//VT_BOOLEAN = 2;
 	VariantType_VT_STRING VariantType = 3
 	VariantType_VT_NULL   VariantType = 6
 	VariantType_VT_BLOB   VariantType = 7
