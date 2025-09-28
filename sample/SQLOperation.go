@@ -47,7 +47,7 @@ func SQLDropMappingTableSample(client *tablestore.TableStoreClient) {
 	println("END SQLDropMappingTableSample")
 }
 
-// SQLCreateTableSample 目前Create Table创建的是mapping映射表
+// SQLCreateTableSample Currently, the Create Table creates a mapping table.
 func SQLCreateTableSample(client *tablestore.TableStoreClient) {
 	println("BEGIN SQLCreateTableSample")
 	request := new(tablestore.SQLQueryRequest)

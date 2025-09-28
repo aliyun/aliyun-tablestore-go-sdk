@@ -37,7 +37,7 @@ func main() {
 	groupMembers := []string{"user_A", "user_B", "user_C"}
 	msg := &timeline.StreamMessage{
 		Id:        "client@1",
-		Content:   "阿里云的NoSQL数据库是哪个?",
+		Content:   "NoSQL数据库是哪个?",
 		Timestamp: time.Now().UnixNano(),
 		Attr: map[string]interface{}{
 			"From": "user_A",

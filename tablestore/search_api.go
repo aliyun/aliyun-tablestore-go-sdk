@@ -86,6 +86,7 @@ func (tableStoreClient *TableStoreClient) DescribeSearchIndex(request *DescribeS
 	req := new(otsprotocol.DescribeSearchIndexRequest)
 	req.TableName = proto.String(request.TableName)
 	req.IndexName = proto.String(request.IndexName)
+	req.IncludeSyncStat = request.IncludeSyncStat
 
 	resp := new(otsprotocol.DescribeSearchIndexResponse)
 	response := &DescribeSearchIndexResponse{}

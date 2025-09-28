@@ -382,7 +382,7 @@ func (pk *PrimaryKey) Build(isDelete bool) []byte {
 		writeRawByte(&b, cellChecksum)
 	}
 
-	// 没有deleteMarker, 要与0x0做crc.
+	// No deleteMarker, need to perform CRC with 0x0.
 	if isDelete {
 		writeTag(&b, TAG_DELETE_ROW_MARKER)
 		rowChecksum = crc8Byte(rowChecksum, byte(0x1))

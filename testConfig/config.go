@@ -5,4 +5,5 @@ var (
 	InstanceName = "gosdk-gate"
 	OtsAccessId  = ""
 	OtsAccessKey = ""
+	Region       = ""
 )

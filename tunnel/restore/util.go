@@ -10,8 +10,8 @@ import (
 )
 
 /*
-	when a batch of records contains the same primary key record, that record will be moved to
-	the next batch for processing, for example, abacc will be split into abc and ac.
+when a batch of records contains the same primary key record, that record will be moved to
+the next batch for processing, for example, abacc will be split into abc and ac.
 */
 func recordReplay(records []*tunnel.Record, param *recordReplayParam) (ResponseInfo, bool, int, error) {
 	var err error
@@ -29,7 +29,7 @@ func recordReplay(records []*tunnel.Record, param *recordReplayParam) (ResponseI
 			hasTimeoutRecord = true
 			break
 		}
-		cnt = processPreviousBatch(cnt, currentBatch, nextBatch, replayRecords, recordMap)
+		cnt, nextBatch, replayRecords = processPreviousBatch(cnt, currentBatch, nextBatch, replayRecords, recordMap)
 		pkString := convertPkToString(record.PrimaryKey)
 		if _, ok := recordMap[pkString]; ok {
 			nextBatch = append(nextBatch, record)
@@ -81,7 +81,7 @@ func convertPkToString(pks *tunnel.PrimaryKey) string {
 	return key
 }
 
-func processPreviousBatch(cnt int, currentBatch, nextBatch, replayRecords []*tunnel.Record, recordMap map[string]bool) int {
+func processPreviousBatch(cnt int, currentBatch, nextBatch, replayRecords []*tunnel.Record, recordMap map[string]bool) (int, []*tunnel.Record, []*tunnel.Record) {
 	if cnt == 0 {
 		for _, rec := range currentBatch {
 			pkString := convertPkToString(rec.PrimaryKey)
@@ -94,7 +94,7 @@ func processPreviousBatch(cnt int, currentBatch, nextBatch, replayRecords []*tun
 			}
 		}
 	}
-	return cnt
+	return cnt, nextBatch, replayRecords
 }
 
 func processLastBatch(replayRecords []*tunnel.Record, currentBatch []*tunnel.Record, param *recordReplayParam, info ResponseInfo) (ResponseInfo, int, error) {

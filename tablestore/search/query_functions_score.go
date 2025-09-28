@@ -249,25 +249,25 @@ func (f *FieldValueFactorFunction) ProtoBuffer() (*otsprotocol.FieldValueFactorF
 type FunctionModifier int32
 
 const (
-	// NONE 不做额外运算
+	// NONE: No additional computation
 	NONE FunctionModifier = iota
-	// LOG 取10为底对数运算
+	// LOG takes the logarithm with base 10
 	LOG
-	// LOG1P 对真数加1后取10为底对数，防止真数为0
+	// LOG1P takes the base-10 logarithm after adding 1 to the logarithm, preventing the logarithm from being zero.
 	LOG1P
-	// LOG2P 对真数加2后取10为底对数，防止真数为0
+	// LOG2P Add 2 to the logarithm and take the base 10 logarithm to prevent the logarithm from being 0
 	LOG2P
-	// LN 取e为底对数运算
+	// LN takes the natural logarithm with base e
 	LN
-	// LN1P 对真数加1后取e为底对数，防止真数为0
+	// LN1P Add 1 to the logarithm and then take the natural logarithm with base e to prevent the logarithm from being zero.
 	LN1P
-	// LN2P 对真数加2后取e为底对数，防止真数为0
+	// LN2P Add 2 to the logarithm and then take the natural logarithm with base e to prevent the logarithm from being 0
 	LN2P
-	// SQUARE 平方运算
+	// SQUARE Square operation
 	SQUARE
-	// SQRT 开方运算
+	// SQRT Square root operation
 	SQRT
-	// RECIPROCAL 倒数运算
+	// RECIPROCAL Reciprocal operation
 	RECIPROCAL
 )
 

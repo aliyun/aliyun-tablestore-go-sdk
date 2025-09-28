@@ -262,29 +262,29 @@ message TimeseriesPBRows {
 }
 
 enum AnalyticalStoreSyncType {
-  SYNC_TYPE_FULL = 1;	// 全量构建
-  SYNC_TYPE_INCR = 2;	// 增量构建
+  SYNC_TYPE_FULL = 1;	// Full build
+  SYNC_TYPE_INCR = 2;	// Incremental build
 }
 
 message TimeseriesAnalyticalStore {
-  optional string store_name = 1;	      // 存储名称
-  optional int32 time_to_live = 2;    // 存储数据TTL
-  optional AnalyticalStoreSyncType sync_option = 3;	// 全量或者增量构建
+  optional string store_name = 1;	      // The name of the storage
+  optional int32 time_to_live = 2;    // Data storage TTL
+  optional AnalyticalStoreSyncType sync_option = 3;	// Full or incremental build
 }
 
 message AnalyticalStoreSyncStat {
-  optional AnalyticalStoreSyncType sync_phase = 1;				// 构建状态
-  optional int64 current_sync_timestamp = 2;// 最新同步时间
+  optional AnalyticalStoreSyncType sync_phase = 1;				// Build status
+  optional int64 current_sync_timestamp = 2;// Latest sync time
 }
 
 message AnalyticalStoreStorageSize {
-  optional int64 size = 1;			// 分析存储占用存储大小
-  optional int64 timestamp = 2;	// 统计时间
+  optional int64 size = 1;			// Analyze the storage size usage
+  optional int64 timestamp = 2;	// Counting time
 }
 
 message CreateTimeseriesAnalyticalStoreRequest {
   required string table_name = 1;
-  optional TimeseriesAnalyticalStore analytical_store = 2;	// 需要创建的时序分析存储
+  optional TimeseriesAnalyticalStore analytical_store = 2;	// The time-series analysis storage that needs to be created.
 }
 
 message CreateTimeseriesAnalyticalStoreResponse {}

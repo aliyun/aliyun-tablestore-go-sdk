@@ -3,18 +3,19 @@ package sample
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
-	"github.com/golang/protobuf/proto"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search/model"
+	"github.com/golang/protobuf/proto"
 )
 
 /**
- *创建一个SearchIndex，包含Col_Keyword和Col_Long两列，类型分别设置为字符串(KEYWORD)和整型(LONG)。
+ * Create a SearchIndex containing two columns: Col_Keyword and Col_Long, with types set to string (KEYWORD) and integer (LONG), respectively.
  */
 func CreateSearchIndex(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to create table:", tableName)
@@ -42,15 +43,15 @@ func CreateSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
 
 	schemas := []*tablestore.FieldSchema{}
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable index
+		EnableSortAndAgg: proto.Bool(true),             // Enable the sorting and statistics feature
 	}
 	field2 := &tablestore.FieldSchema{
 		FieldName:        proto.String("Col_Long"),
@@ -61,9 +62,9 @@ func CreateSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 	schemas = append(schemas, field1, field2)
 
 	request.IndexSchema = &tablestore.IndexSchema{
-		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+		FieldSchemas: schemas, // Set the fields included in the SearchIndex
 	}
-	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
 		return
@@ -72,9 +73,9 @@ func CreateSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 }
 
 /**
- *创建一个含虚拟列SearchIndex
- *包含Col_Keyword和Col_Long两个基础列，类型分别设置为字符串(KEYWORD)和整型(LONG)。
- *Col_long_str 为虚拟列，类型为字符串（KEYWORD）映射原始列为Col_long
+ * Create a table with a virtual column SearchIndex
+ * It includes two base columns, Col_Keyword and Col_Long, which are set to the types string (KEYWORD) and integer (LONG), respectively.
+ * Col_long_str is a virtual column of type string (KEYWORD) that maps to the original column Col_long.
  */
 func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to create table:", tableName)
@@ -102,15 +103,15 @@ func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tabl
 
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
 
 	schemas := []*tablestore.FieldSchema{}
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable indexing
+		EnableSortAndAgg: proto.Bool(true),             // Set to enable the sorting and statistics feature
 	}
 	field2 := &tablestore.FieldSchema{
 		FieldName:        proto.String("Col_Long"),
@@ -123,15 +124,15 @@ func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tabl
 		FieldType:        tablestore.FieldType_KEYWORD,
 		Index:            proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
-		IsVirtualField:   proto.Bool(true),     //设置字段类型为虚拟列
-		SourceFieldNames: []string{"Col_Long"}, //设置虚拟列映射的原始列
+		IsVirtualField:   proto.Bool(true),     // Set the field type to virtual column
+		SourceFieldNames: []string{"Col_Long"}, // Set the original column for virtual column mapping
 	}
 	schemas = append(schemas, field1, field2, field3)
 
 	request.IndexSchema = &tablestore.IndexSchema{
-		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+		FieldSchemas: schemas, // Set the fields included in the SearchIndex
 	}
-	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
 		return
@@ -140,20 +141,20 @@ func CreateSearchIndexWithVirtualField(client *tablestore.TableStoreClient, tabl
 }
 
 /**
- *创建一个SearchIndex，包含Col_Keyword和Col_Long两列，类型分别设置为字符串(KEYWORD)和整型(LONG)，设置按照Col_Long这一列预先排序。
+ * Create a SearchIndex that includes two columns: Col_Keyword and Col_Long. Their types are set to string (KEYWORD) and integer (LONG), respectively. Set the pre-sorting based on the Col_Long column.
  */
 func CreateSearchIndexWithIndexSort(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
 
 	schemas := []*tablestore.FieldSchema{}
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable index
+		EnableSortAndAgg: proto.Bool(true),             // Set to enable sorting and statistics functionality
 	}
 	field2 := &tablestore.FieldSchema{
 		FieldName:        proto.String("Col_Long"),
@@ -164,8 +165,8 @@ func CreateSearchIndexWithIndexSort(client *tablestore.TableStoreClient, tableNa
 	schemas = append(schemas, field1, field2)
 
 	request.IndexSchema = &tablestore.IndexSchema{
-		FieldSchemas: schemas, // 设置SearchIndex包含的字段
-		IndexSort: &search.Sort{ // 设置indexsort，按照Col_Long的值逆序排序
+		FieldSchemas: schemas, // Set the fields included in the SearchIndex
+		IndexSort: &search.Sort{ // Set the index sort, reverse sort by the value of Col_Long.
 			Sorters: []search.Sorter{
 				&search.FieldSort{
 					FieldName: "Col_Long",
@@ -174,7 +175,7 @@ func CreateSearchIndexWithIndexSort(client *tablestore.TableStoreClient, tableNa
 			},
 		},
 	}
-	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
 		return
@@ -182,14 +183,14 @@ func CreateSearchIndexWithIndexSort(client *tablestore.TableStoreClient, tableNa
 	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
 }
 
-// 创建一个SearchIndex，为查询高亮Demo做正准备
+// Create a SearchIndex to prepare for the query highlighting demo.
 func CreateSearchIndexForQueryHighlighting(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	var schemas []*tablestore.FieldSchema
 	field1 := &tablestore.FieldSchema{
-		FieldName:          proto.String("Col_Text"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:          tablestore.FieldType_TEXT, // 设置字段类型
-		Index:              proto.Bool(true),          // 设置开启索引
-		EnableHighlighting: proto.Bool(true),          // 设置开启字段高亮
+		FieldName:          proto.String("Col_Text"),  // Set the field name, use proto.String to get a string pointer.
+		FieldType:          tablestore.FieldType_TEXT, // Set the field type
+		Index:              proto.Bool(true),          // Set to enable indexing
+		EnableHighlighting: proto.Bool(true),          // Set to enable field highlighting
 	}
 	field2 := &tablestore.FieldSchema{
 		FieldName: proto.String("Col_Nested"),
@@ -247,7 +248,7 @@ func CreateSearchIndexForVectorQuery(client *tablestore.TableStoreClient, tableN
 	createSearchIndex(client, tableName, indexName, []*tablestore.FieldSchema{field1, field2, field3})
 }
 
-// WriteDataForVectorQuery 为高亮查询测试插入数据
+// WriteDataForVectorQuery inserts data for highlight query testing.
 func WriteDataForVectorQuery(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
 	keyword := []string{"tablestore", "searchindex", "vectorquery"}
@@ -275,8 +276,8 @@ func VectorQuerySample(client *tablestore.TableStoreClient, tableName string, in
 	fmt.Println("Begin to run vector query")
 	searchQuery := search.NewSearchQuery()
 	float32VectorQuery := &search.KnnVectorQuery{
-		FieldName: "col_vector",
-		TopK:      proto.Int32(10),
+		FieldName:     "col_vector",
+		NumCandidates: proto.Int32(15),
 		Filter: &search.BoolQuery{
 			ShouldQueries: []search.Query{
 				&search.TermQuery{
@@ -290,6 +291,8 @@ func VectorQuerySample(client *tablestore.TableStoreClient, tableName string, in
 			},
 		},
 		Float32QueryVector: []float32{1.5, -1.5, 5.5, -5.5, 10.5, -10.5, 20.5, -20.5},
+		TopK:               proto.Int32(10),
+		MinScore:           proto.Float32(0.5),
 	}
 	searchQuery.Query = float32VectorQuery
 	searchQuery.Sort = &search.Sort{
@@ -322,10 +325,10 @@ func VectorQuerySample(client *tablestore.TableStoreClient, tableName string, in
 func CreateSearchIndexForSearchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	var schemas []*tablestore.FieldSchema
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer.
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable indexing
+		EnableSortAndAgg: proto.Bool(true),             // Set to enable the sorting and statistics feature
 	}
 
 	schemas = append(schemas, field1)
@@ -334,21 +337,21 @@ func CreateSearchIndexForSearchQuery(client *tablestore.TableStoreClient, tableN
 }
 
 /**
- *创建一个SearchIndex，为Aggregation和GroupBy的demo做准备
+ * Create a SearchIndex to prepare for the Aggregation and GroupBy demo.
  */
 func CreateSearchIndexForAggregationAndGroupBy(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	var schemas []*tablestore.FieldSchema
 	field1 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable indexing
+		EnableSortAndAgg: proto.Bool(true),             // Enable the sorting and statistics feature
 	}
 	field2 := &tablestore.FieldSchema{
-		FieldName:        proto.String("Col_Keyword2"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-		Index:            proto.Bool(true),             // 设置开启索引
-		EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+		FieldName:        proto.String("Col_Keyword2"), // Set the field name, use proto.String to get a string pointer
+		FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+		Index:            proto.Bool(true),             // Set to enable index
+		EnableSortAndAgg: proto.Bool(true),             // Set to enable sorting and statistics functionality
 	}
 	field3 := &tablestore.FieldSchema{
 		FieldName:        proto.String("Col_Long"),
@@ -407,13 +410,13 @@ func createSearchIndex(client *tablestore.TableStoreClient, tableName string, in
 	// create search index
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
 	request.IndexSchema = &tablestore.IndexSchema{
 		FieldSchemas: fieldSchemas,
 	}
 
-	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
 		return
@@ -439,6 +442,11 @@ func DescribeSearchIndex(client *tablestore.TableStoreClient, tableName string, 
 	request := &tablestore.DescribeSearchIndexRequest{}
 	request.TableName = tableName
 	request.IndexName = indexName
+
+	// If includeSyncStat is set to false, the returned result will not contain SyncStat information. Not setting it or setting it to true will both return SyncStat normally.
+	//FalseBoolean := false
+	//request.IncludeSyncStat = &FalseBoolean
+
 	resp, err := client.DescribeSearchIndex(request)
 	if err != nil {
 		fmt.Println("error: ", err)
@@ -513,7 +521,7 @@ func WriteDateForSearchQuery(client *tablestore.TableStoreClient, tableName stri
 	fmt.Println("Write data finished.")
 }
 
-// WriteDataForQueryHighlighting 为高亮查询测试插入数据
+// WriteDataForQueryHighlighting inserts data for highlighting query testing.
 func WriteDataForQueryHighlighting(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
 	texts := []string{"When the world is dark and dreary", "And the night is long and weary,", "Look up to the stars above,", "And find the light of hope and love."}
@@ -576,7 +584,7 @@ func SearchQuery(client *tablestore.TableStoreClient, tableName string, indexNam
 	fmt.Println("search query finished")
 }
 
-// QueryHighlightingSample 查询高亮示例
+// QueryHighlightingSample Query highlighting example
 func QueryHighlightingSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to run highlight query")
 	searchRequest := &tablestore.SearchRequest{}
@@ -697,23 +705,23 @@ func printSearchHit(searchHits []*tablestore.SearchHit, padding string) {
 }
 
 /**
- * 为Aggregation和GroupBy测试插入数据
+ * Insert data for Aggregation and GroupBy testing
  */
 func WriteDataForAggregationAndGroupBy(client *tablestore.TableStoreClient, tableName string) {
 	fmt.Println("Begin to write data")
 	keywords := []string{"hangzhou", "tablestore", "ots"}
 	keywords2 := []string{"red", "blue"}
 	geopoints := []string{
-		"30.137817,120.08681",  //飞天园区
-		"30.135131,120.088355", //中大银座
-		"30.181877,120.152818", //中医药地铁站
-		"30.20223,120.13787",   //六和塔
-		"30.216961,120.157633", //八卦田
+		"30.137817,120.08681",  // Flying Heaven Park
+		"30.135131,120.088355", // Grand Silver Center
+		"30.181877,120.152818", // Traditional Chinese Medicine subway station
+		"30.20223,120.13787",   // Liuhe Pagoda
+		"30.216961,120.157633", // Eight-Trigram Field
 		"30.231566,120.148578", //太子湾
-		"30.26058,120.170712",  //龙翔桥
-		"30.269501,120.169347", //凤起路
-		"30.28073,120.168843",  //运河
-		"30.296946,120.21958",  //杭州东站
+		"30.26058,120.170712",  // Longxiang Bridge
+		"30.269501,120.169347", // Fengqilu
+		"30.28073,120.168843",  // Canal
+		"30.296946,120.21958",  // Hangzhou East Railway Station
 	}
 
 	for i := 0; i < 10; i++ {
@@ -747,9 +755,9 @@ func WriteDataForAggregationAndGroupBy(client *tablestore.TableStoreClient, tabl
 }
 
 /**
- * 使用Token进行翻页读取。
- * 如果SearchResponse返回了NextToken，可以使用这个Token发起下一次查询，
- * 直到NextToken为空(nil)，此时代表所有符合条件的数据已经读完。
+ * Use Token for paginated reading.
+ * If NextToken is returned in SearchResponse, you can use this Token to initiate the next query,
+ * until NextToken is empty (nil), which indicates that all data meeting the conditions has been read.
  */
 func QueryRowsWithToken(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	querys := []search.Query{
@@ -803,9 +811,9 @@ func MatchAllQuery(client *tablestore.TableStoreClient, tableName string, indexN
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchQuery.SetLimit(0)
-	searchQuery.SetGetTotalCount(true) // 设置GetTotalCount为true后才会返回总条数
+	searchQuery.SetGetTotalCount(true) // Setting GetTotalCount to true will return the total count.
 	searchRequest.SetSearchQuery(searchQuery)
-	searchRequest.SetTimeoutMs(30000) //可以显示设置请求超时时间
+	searchRequest.SetTimeoutMs(30000) // You can explicitly set the request timeout.
 	searchResponse, err := client.Search(searchRequest)
 	if err != nil {
 		fmt.Printf("%#v", err)
@@ -827,15 +835,15 @@ func FieldSort_missingField(client *tablestore.TableStoreClient, tableName strin
 			&search.FieldSort{
 				FieldName:    "Col_Long",
 				Order:        search.SortOrder_ASC.Enum(),
-				MissingField: proto.String("Col_Long_Sec"), //如果排序字段Col_Long缺失的时候用Col_Long_Sec替换
-				MissingValue: 50,                           // 如果排序字段及替换字段都缺失情况下用missingValue替换
-				//MissingValue: search.FirstWhenMissing, // 如果missingValue设置为FirstWhenMissing，当排序字段值缺省时候排在最前面
+				MissingField: proto.String("Col_Long_Sec"), // If the sorting field Col_Long is missing, replace it with Col_Long_Sec.
+				MissingValue: 50,                           // Replace with missingValue if both the sort field and the replacement field are missing.
+				// MissingValue: search.FirstWhenMissing, // If missingValue is set to FirstWhenMissing, the entries with missing sort field values will be placed at the front.
 			},
 		},
 	})
 	searchQuery.SetLimit(10)
 	searchRequest.SetSearchQuery(searchQuery)
-	searchRequest.SetTimeoutMs(30000) //可以显示设置请求超时时间
+	searchRequest.SetTimeoutMs(30000) // You can explicitly set the request timeout.
 	searchResponse, err := client.Search(searchRequest)
 	if err != nil {
 		fmt.Printf("%#v", err)
@@ -852,36 +860,36 @@ func FieldSort_missingField(client *tablestore.TableStoreClient, tableName strin
 }
 
 /**
- *  查询表中Col_Keyword这一列的值能够匹配"hangzhou"的数据，返回匹配到的总行数和一些匹配成功的行。
+ * Query the values in the Col_Keyword column of the table that match "hangzhou", and return the total number of matching rows and some successfully matched rows.
  */
 func MatchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.MatchQuery{}   // 设置查询类型为MatchQuery
-	query.FieldName = "Col_Keyword" // 设置要匹配的字段
-	query.Text = "hangzhou"         // 设置要匹配的值
+	query := &search.MatchQuery{}   // Set the query type to MatchQuery
+	query.FieldName = "Col_Keyword" // Set the field to match
+	query.Text = "hangzhou"         // Set the value to match
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
-	searchQuery.SetOffset(0) // 设置offset为0
-	searchQuery.SetLimit(20) // 设置limit为20，表示最多返回20条数据
+	searchQuery.SetOffset(0) // Set the offset to 0
+	searchQuery.SetLimit(20) // Set the limit to 20, which means a maximum of 20 data entries will be returned.
 	searchRequest.SetSearchQuery(searchQuery)
 	searchResponse, err := client.Search(searchRequest)
-	if err != nil { // 判断异常
+	if err != nil { // Judge the exception
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
-	fmt.Println("TotalCount: ", searchResponse.TotalCount)     // 匹配的总行数
-	fmt.Println("RowCount: ", len(searchResponse.Rows))        // 返回的行数
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the return result is complete
+	fmt.Println("TotalCount: ", searchResponse.TotalCount)     // Total number of matched rows
+	fmt.Println("RowCount: ", len(searchResponse.Rows))        // The number of rows returned
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
 		if err != nil {
 			panic(err)
 		}
-		fmt.Println("Row: ", string(jsonBody)) // 不设置columnsToGet，默认只返回主键
+		fmt.Println("Row: ", string(jsonBody)) // If columnsToGet is not set, only the primary key will be returned by default.
 	}
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -890,7 +898,7 @@ func MatchQuery(client *tablestore.TableStoreClient, tableName string, indexName
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -902,26 +910,26 @@ func MatchQuery(client *tablestore.TableStoreClient, tableName string, indexName
 }
 
 /**
- * 查询表中Col_Text这一列的值能够匹配"hangzhou shanghai"的数据，匹配条件为短语匹配(要求短语完整的按照顺序匹配)，返回匹配到的总行数和一些匹配成功的行。
+ * Query the values in the Col_Text column of the table that match "hangzhou shanghai", with the matching condition being phrase matching (requires the phrase to be matched in full and in order), and return the total number of rows matched and some successfully matched rows.
  */
 func MatchPhraseQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.MatchPhraseQuery{} // 设置查询类型为MatchPhraseQuery
-	query.FieldName = "Col_Text"        // 设置要匹配的字段
-	query.Text = "hangzhou shanghai"    // 设置要匹配的值
+	query := &search.MatchPhraseQuery{} // Set the query type to MatchPhraseQuery
+	query.FieldName = "Col_Text"        // Set the field to match
+	query.Text = "hangzhou shanghai"    // Set the value to match
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
-	searchQuery.SetOffset(0) // 设置offset为0
-	searchQuery.SetLimit(20) // 设置limit为20，表示最多返回20条数据
+	searchQuery.SetOffset(0) // Set the offset to 0
+	searchQuery.SetLimit(20) // Set the limit to 20, which means a maximum of 20 data entries will be returned.
 	searchRequest.SetSearchQuery(searchQuery)
 	searchResponse, err := client.Search(searchRequest)
 	if err != nil {
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -930,7 +938,7 @@ func MatchPhraseQuery(client *tablestore.TableStoreClient, tableName string, ind
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -939,7 +947,7 @@ func MatchPhraseQuery(client *tablestore.TableStoreClient, tableName string, ind
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -951,20 +959,20 @@ func MatchPhraseQuery(client *tablestore.TableStoreClient, tableName string, ind
 }
 
 /**
- * 查询表中Col_Keyword这一列精确匹配"hangzhou"的数据。
+ * Query the data in the Col_Keyword column of the table that exactly matches "hangzhou".
  */
 func TermQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.TermQuery{}    // 设置查询类型为TermQuery
-	query.FieldName = "Col_Keyword" // 设置要匹配的字段
-	query.Term = "hangzhou"         // 设置要匹配的值
+	query := &search.TermQuery{}    // Set the query type to TermQuery
+	query.FieldName = "Col_Keyword" // Set the field to match
+	query.Term = "hangzhou"         // Set the value to match
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchQuery.SetLimit(100)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -973,7 +981,7 @@ func TermQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -985,23 +993,23 @@ func TermQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 }
 
 /**
- * 查询表中Col_Keyword这一列精确匹配"hangzhou"或"tablestore"的数据。
+ * Query the data in the Col_Keyword column of the table that exactly matches "hangzhou" or "tablestore".
  */
 func TermsQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.TermsQuery{}   // 设置查询类型为TermQuery
-	query.FieldName = "Col_Keyword" // 设置要匹配的字段
+	query := &search.TermsQuery{}   // Set the query type to TermQuery
+	query.FieldName = "Col_Keyword" // Set the field to match
 	terms := make([]interface{}, 0)
 	terms = append(terms, "hangzhou")
 	terms = append(terms, "tablestore")
-	query.Terms = terms // 设置要匹配的值
+	query.Terms = terms // Set the value to match
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchQuery.SetLimit(100)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1010,7 +1018,7 @@ func TermsQuery(client *tablestore.TableStoreClient, tableName string, indexName
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1022,19 +1030,19 @@ func TermsQuery(client *tablestore.TableStoreClient, tableName string, indexName
 }
 
 /**
- * 查询表中Col_Keyword这一列前缀为"hangzhou"的数据。
+ * Query the data in the Col_Keyword column of the table where the prefix is "hangzhou".
  */
 func PrefixQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.PrefixQuery{}  // 设置查询类型为PrefixQuery
-	query.FieldName = "Col_Keyword" // 设置要匹配的字段
-	query.Prefix = "hangzhou"       // 设置前缀
+	query := &search.PrefixQuery{}  // Set the query type to PrefixQuery
+	query.FieldName = "Col_Keyword" // Set the field to match
+	query.Prefix = "hangzhou"       // Set prefix
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1043,7 +1051,7 @@ func PrefixQuery(client *tablestore.TableStoreClient, tableName string, indexNam
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1055,19 +1063,19 @@ func PrefixQuery(client *tablestore.TableStoreClient, tableName string, indexNam
 }
 
 /**
- * 使用通配符查询，查询表中Col_Keyword这一列的值匹配"hang*u"的数据
+ * Use wildcard query to search for data where the value of the Col_Keyword column in the table matches "hang*u".
  */
 func WildcardQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.WildcardQuery{} // 设置查询类型为WildcardQuery
+	query := &search.WildcardQuery{} // Set the query type to WildcardQuery
 	query.FieldName = "Col_Keyword"
 	query.Value = "hang*u"
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1076,7 +1084,7 @@ func WildcardQuery(client *tablestore.TableStoreClient, tableName string, indexN
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1088,18 +1096,18 @@ func WildcardQuery(client *tablestore.TableStoreClient, tableName string, indexN
 }
 
 /**
- * 查询表中Col_Long这一列大于3的数据，结果按照Col_Long这一列的值逆序排序。
+ * Query the data where the Col_Long column is greater than 3 in the table, and sort the results in descending order by the value of the Col_Long column.
  */
 func RangeQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
 	searchQuery := search.NewSearchQuery()
-	rangeQuery := &search.RangeQuery{} // 设置查询类型为RangeQuery
-	rangeQuery.FieldName = "Col_Long"  // 设置针对哪个字段
-	rangeQuery.GT(3)                   // 设置该字段的范围条件，大于3
+	rangeQuery := &search.RangeQuery{} // Set the query type to RangeQuery
+	rangeQuery.FieldName = "Col_Long"  // Set the target field
+	rangeQuery.GT(3)                   // Set the range condition for this field to be greater than 3.
 	searchQuery.SetQuery(rangeQuery)
-	// 设置按照Col_Long这一列逆序排序
+	// Set reverse order sorting by the Col_Long column
 	searchQuery.SetSort(&search.Sort{
 		Sorters: []search.Sorter{
 			&search.FieldSort{
@@ -1117,7 +1125,7 @@ func RangeQuery(client *tablestore.TableStoreClient, tableName string, indexName
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1129,20 +1137,20 @@ func RangeQuery(client *tablestore.TableStoreClient, tableName string, indexName
 }
 
 /**
- * Col_GeoPoint是GeoPoint类型，查询表中Col_GeoPoint这一列的值在左上角为"10,0", 右下角为"0,10"的矩形范围内的数据。
+ * Col_GeoPoint is of GeoPoint type. This query retrieves data within the rectangular range defined by the top-left corner at "10,0" and the bottom-right corner at "0,10" for the Col_GeoPoint column in the table.
  */
 func GeoBoundingBoxQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.GeoBoundingBoxQuery{} // 设置查询类型为GeoBoundingBoxQuery
-	query.FieldName = "Col_GeoPoint"       // 设置比较哪个字段的值
-	query.TopLeft = "10,0"                 // 设置矩形左上角
-	query.BottomRight = "0,10"             // 设置矩形右下角
+	query := &search.GeoBoundingBoxQuery{} // Set the query type to GeoBoundingBoxQuery
+	query.FieldName = "Col_GeoPoint"       // Set which field's value to compare
+	query.TopLeft = "10,0"                 // Set the top-left corner of the rectangle
+	query.BottomRight = "0,10"             // Set the bottom-right corner of the rectangle
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1151,7 +1159,7 @@ func GeoBoundingBoxQuery(client *tablestore.TableStoreClient, tableName string, 
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1163,20 +1171,20 @@ func GeoBoundingBoxQuery(client *tablestore.TableStoreClient, tableName string, 
 }
 
 /**
- * 查询表中Col_GeoPoint这一列的值距离中心点不超过一定距离的数据。
+ * Query the data where the values in the Col_GeoPoint column of the table are within a certain distance from the center point.
  */
 func GeoDistanceQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.GeoDistanceQuery{} // 设置查询类型为GeoDistanceQuery
+	query := &search.GeoDistanceQuery{} // Set the query type to GeoDistanceQuery
 	query.FieldName = "Col_GeoPoint"
-	query.CenterPoint = "5,5"       // 设置中心点
-	query.DistanceInMeter = 10000.0 // 设置到中心点的距离条件，不超过10000米
+	query.CenterPoint = "5,5"       // Set the center point
+	query.DistanceInMeter = 10000.0 // Set the distance condition to the center point, not exceeding 10,000 meters
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1185,7 +1193,7 @@ func GeoDistanceQuery(client *tablestore.TableStoreClient, tableName string, ind
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1197,19 +1205,19 @@ func GeoDistanceQuery(client *tablestore.TableStoreClient, tableName string, ind
 }
 
 /**
- * 查询表中Col_GeoPoint这一列的值在一个给定多边形范围内的数据。
+ * Query the data where the values of the Col_GeoPoint column in the table are within a given polygon range.
  */
 func GeoPolygonQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.GeoPolygonQuery{} // 设置查询类型为GeoDistanceQuery
+	query := &search.GeoPolygonQuery{} // Set the query type to GeoDistanceQuery
 	query.FieldName = "Col_GeoPoint"
-	query.Points = []string{"0,0", "5,5", "5,0"} // 设置多边形的顶点
+	query.Points = []string{"0,0", "5,5", "5,0"} // Set the vertices of the polygon
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchRequest.SetSearchQuery(searchQuery)
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -1218,7 +1226,7 @@ func GeoPolygonQuery(client *tablestore.TableStoreClient, tableName string, inde
 		fmt.Printf("%#v", err)
 		return
 	}
-	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 	fmt.Println("RowCount: ", len(searchResponse.Rows))
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
@@ -1230,7 +1238,7 @@ func GeoPolygonQuery(client *tablestore.TableStoreClient, tableName string, inde
 }
 
 /**
- * 通过BoolQuery进行复合条件查询。
+ * Perform composite condition queries through BoolQuery.
  */
 func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
@@ -1238,14 +1246,14 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 	searchRequest.SetIndexName(indexName)
 
 	/**
-	 * 查询条件一：RangeQuery，Col_Long这一列的值要大于3
+	 * Query condition one: RangeQuery, the value of the Col_Long column must be greater than 3.
 	 */
 	rangeQuery := &search.RangeQuery{}
 	rangeQuery.FieldName = "Col_Long"
 	rangeQuery.GT(3)
 
 	/**
-	 * 查询条件二：MatchQuery，Col_Keyword这一列的值要匹配"hangzhou"
+	 * Query condition two: MatchQuery, the value of the Col_Keyword column should match "hangzhou"
 	 */
 	matchQuery := &search.MatchQuery{}
 	matchQuery.FieldName = "Col_Keyword"
@@ -1253,7 +1261,7 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 
 	{
 		/**
-		 * 构造一个BoolQuery，设置查询条件是必须同时满足"条件一"和"条件二"
+		 * Constructs a BoolQuery, setting the query condition to require both "Condition One" and "Condition Two" to be met simultaneously.
 		 */
 		boolQuery := &search.BoolQuery{
 			MustQueries: []search.Query{
@@ -1269,12 +1277,12 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the return result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 	}
 	{
 		/**
-		 * 构造一个BoolQuery，设置查询条件是至少满足"条件一"和"条件二"中的一个
+		 * Construct a BoolQuery, setting the query condition to satisfy at least one of "condition one" or "condition two".
 		 */
 		boolQuery := &search.BoolQuery{
 			ShouldQueries: []search.Query{
@@ -1291,13 +1299,13 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the return result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 	}
 }
 
 /**
- * 创建一个SearchIndex，为TEXT类型索引列自定义分词器
+ * Create a SearchIndex and customize a tokenizer for the TEXT type index column.
  */
 func Analysis(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to create table:", tableName)
@@ -1325,8 +1333,8 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 
 	fmt.Println("Begin to create index:", indexName)
 	request := &tablestore.CreateSearchIndexRequest{}
-	request.TableName = tableName // 设置表名
-	request.IndexName = indexName // 设置索引名
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
 
 	schemas := []*tablestore.FieldSchema{}
 
@@ -1336,37 +1344,37 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		DelimitWord:   proto.Bool(true),
 	}
 	field1 := &tablestore.FieldSchema{
-		FieldName:         proto.String("Col_SingleWord"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:         tablestore.FieldType_TEXT,      // 设置字段类型
-		Index:             proto.Bool(true),               // 设置开启索引
-		Analyzer:          &analyzer1,                     // 设置分词器
-		AnalyzerParameter: analyzerParam1,                 // 设置分词器参数(可选)
+		FieldName:         proto.String("Col_SingleWord"), // Set the field name, use proto.String to get a string pointer
+		FieldType:         tablestore.FieldType_TEXT,      // Set the field type
+		Index:             proto.Bool(true),               // Set to enable indexing
+		Analyzer:          &analyzer1,                     // Set the tokenizer
+		AnalyzerParameter: analyzerParam1,                 // Set the tokenizer parameters (optional)
 	}
 
 	analyzer2 := tablestore.Analyzer_MaxWord
 	field2 := &tablestore.FieldSchema{
-		FieldName: proto.String("Col_MaxWord"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType: tablestore.FieldType_TEXT,   // 设置字段类型
-		Index:     proto.Bool(true),            // 设置开启索引
-		Analyzer:  &analyzer2,                  // 设置分词器
+		FieldName: proto.String("Col_MaxWord"), // Set the field name, use proto.String to get a string pointer
+		FieldType: tablestore.FieldType_TEXT,   // Set the field type
+		Index:     proto.Bool(true),            // Set to enable index
+		Analyzer:  &analyzer2,                  // Set the tokenizer
 	}
 
 	analyzer3 := tablestore.Analyzer_MinWord
 	field3 := &tablestore.FieldSchema{
-		FieldName: proto.String("Col_MinWord"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType: tablestore.FieldType_TEXT,   // 设置字段类型
-		Index:     proto.Bool(true),            // 设置开启索引
-		Analyzer:  &analyzer3,                  // 设置分词器
+		FieldName: proto.String("Col_MinWord"), // Set the field name, use proto.String to get a string pointer.
+		FieldType: tablestore.FieldType_TEXT,   // Set the field type
+		Index:     proto.Bool(true),            // Set to enable index
+		Analyzer:  &analyzer3,                  // Set the tokenizer
 	}
 
 	analyzer4 := tablestore.Analyzer_Split
 	analyzerParam4 := tablestore.SplitAnalyzerParameter{Delimiter: proto.String("-")}
 	field4 := &tablestore.FieldSchema{
-		FieldName:         proto.String("Col_Split"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:         tablestore.FieldType_TEXT, // 设置字段类型
-		Index:             proto.Bool(true),          // 设置开启索引
-		Analyzer:          &analyzer4,                // 设置分词器
-		AnalyzerParameter: analyzerParam4,            // 设置分词器参数(可选)
+		FieldName:         proto.String("Col_Split"), // Set the field name, use proto.String to get a string pointer.
+		FieldType:         tablestore.FieldType_TEXT, // Set the field type
+		Index:             proto.Bool(true),          // Set to enable indexing
+		Analyzer:          &analyzer4,                // Set the tokenizer
+		AnalyzerParameter: analyzerParam4,            // Set the tokenizer parameters (optional)
 	}
 
 	analyzer5 := tablestore.Analyzer_Fuzzy
@@ -1375,19 +1383,19 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		MaxChars: 4,
 	}
 	field5 := &tablestore.FieldSchema{
-		FieldName:         proto.String("Col_Fuzzy"), // 设置字段名，使用proto.String用于获取字符串指针
-		FieldType:         tablestore.FieldType_TEXT, // 设置字段类型
-		Index:             proto.Bool(true),          // 设置开启索引
-		Analyzer:          &analyzer5,                // 设置分词器
-		AnalyzerParameter: analyzerParam5,            // 设置分词器参数(可选)
+		FieldName:         proto.String("Col_Fuzzy"), // Set the field name, use proto.String to get a string pointer
+		FieldType:         tablestore.FieldType_TEXT, // Set the field type
+		Index:             proto.Bool(true),          // Set to enable index
+		Analyzer:          &analyzer5,                // Set the tokenizer
+		AnalyzerParameter: analyzerParam5,            // Set the tokenizer parameters (optional)
 	}
 
 	schemas = append(schemas, field1, field2, field3, field4, field5)
 
 	request.IndexSchema = &tablestore.IndexSchema{
-		FieldSchemas: schemas, // 设置SearchIndex包含的字段
+		FieldSchemas: schemas, // Set the fields included in the SearchIndex
 	}
-	resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 	if err != nil {
 		fmt.Println("error :", err)
 		return
@@ -1423,14 +1431,14 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{}      // 设置查询类型为MatchQuery
-		query.FieldName = "Col_SingleWord" // 设置要匹配的字段
-		query.Text = "歌"                   // 设置要匹配的值
+		query := &search.MatchQuery{}      // Set the query type to MatchQuery
+		query.FieldName = "Col_SingleWord" // Set the field to match
+		query.Text = "歌"                   // Set the value to match
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
 
-		// 设置返回所有列
+		// Set to return all columns
 		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 			ReturnAll: true,
 		})
@@ -1439,7 +1447,7 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 		for _, row := range searchResponse.Rows {
 			jsonBody, err := json.Marshal(row)
@@ -1454,14 +1462,14 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{}   // 设置查询类型为MatchQuery
-		query.FieldName = "Col_MaxWord" // 设置要匹配的字段
-		query.Text = "中华人民共和国"          // 设置要匹配的值
+		query := &search.MatchQuery{}   // Set the query type to MatchQuery
+		query.FieldName = "Col_MaxWord" // Set the field to match
+		query.Text = "中华人民共和国"          // Set the value to match
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
 
-		// 设置返回所有列
+		// Set to return all columns
 		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 			ReturnAll: true,
 		})
@@ -1470,7 +1478,7 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 		for _, row := range searchResponse.Rows {
 			jsonBody, err := json.Marshal(row)
@@ -1485,14 +1493,14 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{} // 设置查询类型为MatchQuery
-		query.FieldName = "Col_Split" // 设置要匹配的字段
-		query.Text = "2019"           // 设置要匹配的值
+		query := &search.MatchQuery{} // Set the query type to MatchQuery
+		query.FieldName = "Col_Split" // Set the field to match
+		query.Text = "2019"           // Set the value to match
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
 
-		// 设置返回所有列
+		// Set to return all columns
 		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 			ReturnAll: true,
 		})
@@ -1501,7 +1509,7 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 		for _, row := range searchResponse.Rows {
 			jsonBody, err := json.Marshal(row)
@@ -1516,14 +1524,14 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 		searchRequest := &tablestore.SearchRequest{}
 		searchRequest.SetTableName(tableName)
 		searchRequest.SetIndexName(indexName)
-		query := &search.MatchQuery{} // 设置查询类型为MatchQuery
-		query.FieldName = "Col_Fuzzy" // 设置要匹配的字段
-		query.Text = "程"              // 设置要匹配的值
+		query := &search.MatchQuery{} // Set the query type to MatchQuery
+		query.FieldName = "Col_Fuzzy" // Set the field to match
+		query.Text = "程"              // Set the value to match
 		searchQuery := search.NewSearchQuery()
 		searchQuery.SetQuery(query)
 		searchRequest.SetSearchQuery(searchQuery)
 
-		// 设置返回所有列
+		// Set to return all columns
 		searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 			ReturnAll: true,
 		})
@@ -1532,7 +1540,7 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 			fmt.Printf("%#v", err)
 			return
 		}
-		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // 查看返回结果是否完整
+		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 		for _, row := range searchResponse.Rows {
 			jsonBody, err := json.Marshal(row)
@@ -1545,7 +1553,7 @@ func Analysis(client *tablestore.TableStoreClient, tableName string, indexName s
 }
 
 /**
- * Aggregation示例
+ * Aggregation example
  */
 func AggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
@@ -1555,16 +1563,16 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 	percentiles[2] = 100.0
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                   //匹配所有行
-			SetLimit(100).                                                       //限制返回前100行结果
-			Aggregation(search.NewAvgAggregation("agg1", "Col_Long")).           //计算Col_Long字段的平均值
-			Aggregation(search.NewDistinctCountAggregation("agg2", "Col_Long")). //计算Col_Long字段不同取值的个数
-			Aggregation(search.NewMaxAggregation("agg3", "Col_Long")).           //计算Col_Long字段的最大值
-			Aggregation(search.NewSumAggregation("agg4", "Col_Long")).           //计算Col_Long字段的和
-			Aggregation(search.NewCountAggregation("agg5", "Col_Long")).         //计算存在Col_Long字段的行数
+			SetQuery(&search.MatchAllQuery{}).                                   // Match all rows
+			SetLimit(100).                                                       // Limit to returning the first 100 rows of results
+			Aggregation(search.NewAvgAggregation("agg1", "Col_Long")).           // Calculate the average value of the Col_Long field
+			Aggregation(search.NewDistinctCountAggregation("agg2", "Col_Long")). // Calculate the number of different values for the Col_Long field.
+			Aggregation(search.NewMaxAggregation("agg3", "Col_Long")).           // Calculate the maximum value of the Col_Long field.
+			Aggregation(search.NewSumAggregation("agg4", "Col_Long")).           // Calculate the sum of the Col_Long field
+			Aggregation(search.NewCountAggregation("agg5", "Col_Long")).         // Calculate the number of rows where the Col_Long field exists.
 			Aggregation(search.NewTopRowsAggregation("agg6").SetLimit(1).SetSort(&search.Sort{
 				Sorters: []search.Sorter{
 					&search.FieldSort{
@@ -1575,7 +1583,7 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 			})).
 			Aggregation(search.NewPercentilesAggregation("agg7", "Col_Long").SetMissing(10).SetPercents(percentiles)))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1595,53 +1603,53 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
 	//avg agg
-	agg1, err := aggResults.Avg("agg1") //获取名字为"agg1"的Aggregation结果，类型为Avg
+	agg1, err := aggResults.Avg("agg1") // Get the Aggregation result named "agg1", the type is Avg
 	if err != nil {
 		panic(err)
 	}
-	if agg1.HasValue() { //名字为"agg1"的Aggregation结果 是否Value值
-		fmt.Println("(avg) agg1: ", agg1.Value) //打印Col_Long字段平均值
+	if agg1.HasValue() { // Whether the Value of the Aggregation result named "agg1" is valid
+		fmt.Println("(avg) agg1: ", agg1.Value) // Print the average value of the Col_Long field
 	} else {
-		fmt.Println("(avg) agg1: no value") //所有行都不存在Col_Long字段
+		fmt.Println("(avg) agg1: no value") // The Col_Long field does not exist in any row.
 	}
 
 	//distinct count agg
-	agg2, err := aggResults.DistinctCount("agg2") //获取名字为"agg2"的Aggregation结果，类型为DistinctCount
+	agg2, err := aggResults.DistinctCount("agg2") // Get the Aggregation result named "agg2", the type is DistinctCount.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(distinct) agg2: ", agg2.Value) //打印Col_Long字段不同取值的个数
+	fmt.Println("(distinct) agg2: ", agg2.Value) // Print the number of different values of the Col_Long field
 
 	//max agg
-	agg3, err := aggResults.Max("agg3") //获取名字为"agg3"的Aggregation结果，类型为Max
+	agg3, err := aggResults.Max("agg3") // Get the Aggregation result named "agg3", the type is Max.
 	if err != nil {
 		panic(err)
 	}
 	if agg3.HasValue() {
-		fmt.Println("(max) agg3: ", agg3.Value) //打印Col_Long字段最大值
+		fmt.Println("(max) agg3: ", agg3.Value) // Print the maximum value of the Col_Long field
 	} else {
-		fmt.Println("(max) agg3: no value") //所有行都不存在Col_Long字段
+		fmt.Println("(max) agg3: no value") // The Col_Long field does not exist in any row.
 	}
 
 	//sum agg
-	agg4, err := aggResults.Sum("agg4") //获取名字为"agg4"的Aggregation结果，类型为Sum
+	agg4, err := aggResults.Sum("agg4") // Get the Aggregation result named "agg4", the type is Sum.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(sum) agg4: ", agg4.Value) //打印Col_Long字段的和
+	fmt.Println("(sum) agg4: ", agg4.Value) // Print the sum of the Col_Long field
 
 	//count agg
-	agg5, err := aggResults.Count("agg5") //获取名字为"agg5"的Aggregation结果，类型为Count
+	agg5, err := aggResults.Count("agg5") // Get the Aggregation result named "agg5", the type is Count.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("(count) agg5: ", agg5.Value) //打印存在Col_Long字段的个数
+	fmt.Println("(count) agg5: ", agg5.Value) // Print the number of existing Col_Long fields
 
 	//topRows agg
-	agg6, err := aggResults.TopRows("agg6") //获取名字为"agg6"的Aggregation结果，类型为TopRows
+	agg6, err := aggResults.TopRows("agg6") // Get the Aggregation result named "agg6", the type is TopRows.
 	if err != nil {
 		panic(err)
 	}
@@ -1649,15 +1657,15 @@ func AggregationSample(client *tablestore.TableStoreClient, tableName string, in
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("TowRow: ", string(jsonBody)) //打印返回的row
+	fmt.Println("TowRow: ", string(jsonBody)) // Print the returned row
 
 	//percentiles agg
-	agg7, err := aggResults.Percentiles("agg7") //获取名字为"agg7"的Aggregation结果，类型为Percentiles
+	agg7, err := aggResults.Percentiles("agg7") // Get the Aggregation result named "agg7", with the type of Percentiles.
 	if err != nil {
 		panic(err)
 	}
 	for _, item := range agg7.PercentilesAggregationItems {
-		fmt.Println("\t(percentiles)key: ", item.Key, ", value: ", item.Value.Value) //打印返回的value
+		fmt.Println("\t(percentiles)key: ", item.Key, ", value: ", item.Value.Value) // Print the returned value
 	}
 }
 
@@ -1665,13 +1673,13 @@ func AvgAggregationSample(client *tablestore.TableStoreClient, tableName string,
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
-			SetLimit(100).                                                //限制返回前100行结果
-			Aggregation(search.NewAvgAggregation("avg_agg", "Col_Long"))) //计算Col_Long字段的平均值
-	// 设置返回所有列
+			SetQuery(&search.MatchAllQuery{}).                            // Match all rows
+			SetLimit(100).                                                // Limit to returning the first 100 rows of results
+			Aggregation(search.NewAvgAggregation("avg_agg", "Col_Long"))) // Calculate the average value of the Col_Long field
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1691,17 +1699,17 @@ func AvgAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
 	//avg agg
-	aggregationResult, err := aggResults.Avg("avg_agg") //获取名字为"avg_agg"的Aggregation结果，类型为Avg
+	aggregationResult, err := aggResults.Avg("avg_agg") // Get the Aggregation result named "avg_agg", the type is Avg
 	if err != nil {
 		panic(err)
 	}
 	if aggregationResult.HasValue() {
-		fmt.Println("avg_agg: ", aggregationResult.Value) //打印Col_Long字段平均值
+		fmt.Println("avg_agg: ", aggregationResult.Value) // Print the average value of the Col_Long field
 	} else {
-		fmt.Println("avg_agg: no value") //所有行都不存在Col_Long字段
+		fmt.Println("avg_agg: no value") // The Col_Long field does not exist in any row.
 	}
 }
 
@@ -1709,13 +1717,13 @@ func DistinctAggregationSample(client *tablestore.TableStoreClient, tableName st
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                                 //匹配所有行
-			SetLimit(100).                                                                     //限制返回前100行结果
-			Aggregation(search.NewDistinctCountAggregation("distinct_count_agg", "Col_Long"))) //计算Col_Long字段不同取值的个数
-	// 设置返回所有列
+			SetQuery(&search.MatchAllQuery{}).                                                 // Match all rows
+			SetLimit(100).                                                                     // Limit to returning the first 100 rows of results
+			Aggregation(search.NewDistinctCountAggregation("distinct_count_agg", "Col_Long"))) // Calculate the number of different values for the Col_Long field.
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1735,26 +1743,26 @@ func DistinctAggregationSample(client *tablestore.TableStoreClient, tableName st
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.DistinctCount("distinct_count_agg") //获取名字为"distinct_count_agg"的Aggregation结果，类型为DistinctCount
+	aggregationResult, err := aggResults.DistinctCount("distinct_count_agg") // Get the Aggregation result named "distinct_count_agg", the type is DistinctCount.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("distinct_count_agg: ", aggregationResult.Value) //打印Col_Long字段不同取值的个数
+	fmt.Println("distinct_count_agg: ", aggregationResult.Value) // Print the number of different values of the Col_Long field
 }
 
 func MaxAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
-			SetLimit(100).                                                //限制返回前100行结果
-			Aggregation(search.NewMaxAggregation("max_agg", "Col_Long"))) //计算Col_Long字段的最大值
-	// 设置返回所有列
+			SetQuery(&search.MatchAllQuery{}).                            // Match all rows
+			SetLimit(100).                                                // Limit to returning the first 100 rows of results
+			Aggregation(search.NewMaxAggregation("max_agg", "Col_Long"))) // Calculate the maximum value of the Col_Long field
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1774,16 +1782,16 @@ func MaxAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.Max("max_agg") //获取名字为"max_agg"的Aggregation结果，类型为Max
+	aggregationResult, err := aggResults.Max("max_agg") // Get the Aggregation result named "max_agg", the type is Max.
 	if err != nil {
 		panic(err)
 	}
 	if aggregationResult.HasValue() {
-		fmt.Println("max_agg: ", aggregationResult.Value) //打印Col_Long字段最大值
+		fmt.Println("max_agg: ", aggregationResult.Value) // Print the maximum value of the Col_Long field
 	} else {
-		fmt.Println("max_agg: no value") //所有行都不存在Col_Long字段
+		fmt.Println("max_agg: no value") // The Col_Long field does not exist in any row.
 	}
 }
 
@@ -1791,13 +1799,13 @@ func SumAggregationSample(client *tablestore.TableStoreClient, tableName string,
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
-			SetLimit(100).                                                //限制返回前100行结果
-			Aggregation(search.NewSumAggregation("sum_agg", "Col_Long"))) //计算Col_Long字段的和
-	// 设置返回所有列
+			SetQuery(&search.MatchAllQuery{}).                            // Match all rows
+			SetLimit(100).                                                // Limit to returning the first 100 rows of results
+			Aggregation(search.NewSumAggregation("sum_agg", "Col_Long"))) // Calculate the sum of the Col_Long field
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1817,26 +1825,26 @@ func SumAggregationSample(client *tablestore.TableStoreClient, tableName string,
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.Sum("sum_agg") //获取名字为"sum_agg"的Aggregation结果，类型为Sum
+	aggregationResult, err := aggResults.Sum("sum_agg") // Get the Aggregation result named "sum_agg", the type is Sum.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("sum_agg: ", aggregationResult.Value) //打印Col_Long字段的和
+	fmt.Println("sum_agg: ", aggregationResult.Value) // Print the sum of the Col_Long field
 }
 
 func CountAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                //匹配所有行
-			SetLimit(100).                                                    //限制返回前100行结果
-			Aggregation(search.NewCountAggregation("count_agg", "Col_Long"))) //计算存在Col_Long字段的行数
-	// 设置返回所有列
+			SetQuery(&search.MatchAllQuery{}).                                // Match all rows
+			SetLimit(100).                                                    // Limit to returning the first 100 rows of results
+			Aggregation(search.NewCountAggregation("count_agg", "Col_Long"))) // Calculate the number of rows where the Col_Long field exists.
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1856,24 +1864,24 @@ func CountAggregationSample(client *tablestore.TableStoreClient, tableName strin
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.Count("count_agg") //获取名字为"count_agg"的Aggregation结果，类型为Count
+	aggregationResult, err := aggResults.Count("count_agg") // Get the Aggregation result named "count_agg", the type is Count.
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("count_agg: ", aggregationResult.Value) //打印存在Col_Long字段的个数
+	fmt.Println("count_agg: ", aggregationResult.Value) // Print the number of existing Col_Long fields
 }
 
 func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
-			SetLimit(100).                     //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). // Match all rows
+			SetLimit(100).                     // Limit to returning the first 100 rows of results
 			Aggregation(search.NewTopRowsAggregation("top_rows_agg").SetLimit(1).SetSort(&search.Sort{
 				Sorters: []search.Sorter{
 					&search.FieldSort{
@@ -1882,7 +1890,7 @@ func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName str
 					},
 				},
 			})))
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1902,9 +1910,9 @@ func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName str
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.TopRows("top_rows_agg") //获取名字为"top_rows_agg"的Aggregation结果，类型为TopRows
+	aggregationResult, err := aggResults.TopRows("top_rows_agg") // Get the Aggregation result named "top_rows_agg", the type is TopRows.
 	if err != nil {
 		panic(err)
 	}
@@ -1912,7 +1920,7 @@ func TopRowsAggregationSample(client *tablestore.TableStoreClient, tableName str
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println("top_rows_agg: ", string(jsonBody)) //打印返回的row
+	fmt.Println("top_rows_agg: ", string(jsonBody)) // Print the returned row
 }
 
 func PercentilesAggregationSample(client *tablestore.TableStoreClient, tableName string, indexName string) {
@@ -1923,14 +1931,14 @@ func PercentilesAggregationSample(client *tablestore.TableStoreClient, tableName
 	percentiles[2] = 100.0
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
-			SetLimit(100).                     //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). // Match all rows
+			SetLimit(100).                     // Limit to returning the first 100 rows of results
 			Aggregation(search.NewPercentilesAggregation("percentiles_agg", "Col_Long").SetMissing(10).SetPercents(percentiles)))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll:          false,
 		ReturnAllFromIndex: true,
@@ -1950,53 +1958,53 @@ func PercentilesAggregationSample(client *tablestore.TableStoreClient, tableName
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	aggResults := searchResponse.AggregationResults //获取所有统计结果
+	aggResults := searchResponse.AggregationResults // Get all statistical results
 
-	aggregationResult, err := aggResults.Percentiles("percentiles_agg") //获取名字为"percentiles_agg"的Aggregation结果，类型为Percentiles
+	aggregationResult, err := aggResults.Percentiles("percentiles_agg") // Get the Aggregation result named "percentiles_agg", the type is Percentiles.
 	if err != nil {
 		panic(err)
 	}
 	for _, item := range aggregationResult.PercentilesAggregationItems {
-		fmt.Println("\tkey: ", item.Key, ", value: ", item.Value.Value) //打印返回的value
+		fmt.Println("\tkey: ", item.Key, ", value: ", item.Value.Value) // Print the returned value
 	}
 }
 
 /**
- * GroupBy示例
+ * GroupBy example
  */
 func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                       //匹配所有行
-			SetLimit(100).                                           //限制返回前100行结果
-			GroupBy(search.NewGroupByField("group1", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
-											GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
-											Size(2).                                                           //仅返回前2个分桶
-											SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
-											SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))). //对每个分桶进行子聚合(GroupBy)
-			GroupBy(search.NewGroupByRange("group2", "Col_Long").    //对Col_Long字段做GroupByRange范围
-											Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
-											Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
-											Range(5, search.Inf)).   //第三个分桶包含Col_Long在[5, +∞)的索引行
-			GroupBy(search.NewGroupByFilter("group3").               //做GroupByFilter过滤聚合
-											Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+			SetQuery(&search.MatchAllQuery{}).                       // Match all rows
+			SetLimit(100).                                           // Limit to returning the first 100 rows of results
+			GroupBy(search.NewGroupByField("group1", "Col_Keyword"). // Perform value aggregation on the Col_Keyword field using GroupByField.
+											GroupBySorters([]search.GroupBySorter{}).                          // You can specify the order of the buckets for the returned results.
+											Size(2).                                                           // Return only the first 2 split buckets.
+											SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  // Perform sub-statistics (Aggregation) on each bucket.
+											SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2"))). // Perform sub-aggregation (GroupBy) on each bucket.
+			GroupBy(search.NewGroupByRange("group2", "Col_Long").    // Perform GroupByRange on the Col_Long field
+											Range(search.NegInf, 3). // The first bucket contains index rows where Col_Long is in (-∞, 3).
+											Range(3, 5).             // The second bucket contains index rows with Col_Long in [3, 5).
+											Range(5, search.Inf)).   // The third bucket contains index rows with Col_Long in [5, +∞).
+			GroupBy(search.NewGroupByFilter("group3").               // Perform GroupByFilter aggregation filtering
+											Query(&search.TermQuery{ // The first bucket contains the index rows where the Col_Keyword field has a value of "hangzhou".
 					FieldName: "Col_Keyword",
 					Term:      "hangzhou",
 				}).
-				Query(&search.RangeQuery{ //第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
+				Query(&search.RangeQuery{ // The second bucket contains index rows with Col_Long field values in the range [3, 5].
 																			FieldName:    "Col_Long",
 																			From:         3,
 																			To:           5,
 																			IncludeLower: true,
 																			IncludeUpper: true})).
-			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
-																		Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
-																		Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-																		Range(15000, search.Inf)).   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+			GroupBy(search.NewGroupByGeoDistance("group4", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). // Perform GroupByGeoDistance geographic range aggregation on the Col_GeoPoint field
+																		Range(search.NegInf, 10000). // The first bucket contains the index rows for Col_GeoPoint with distances from the center point in the range (-∞, 10km).
+																		Range(10000, 15000).         // The second bucket contains the index rows for Col_GeoPoint with distances from the center point (10km, 15km).
+																		Range(15000, search.Inf)).   // The third bucket contains the index rows where the distance between Col_GeoPoint and the center point is within (15km, +∞).
 			GroupBy(search.NewGroupByHistogram("group5", "Col_Long").
 											SetInterval(10).
 											SetMinDocCount(1).
@@ -2011,7 +2019,7 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 				SetPrecision(model.GHP_156KM_156KM_3).
 				SetSize(10)))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2030,77 +2038,77 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	group1, err := groupByResults.GroupByField("group1") //获取名字为"group1"的GroupBy结果，类型为GroupByField
+	group1, err := groupByResults.GroupByField("group1") // Get the GroupBy result named "group1", the type is GroupByField
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group1: ")
-	for _, item := range group1.Items { //遍历返回的所有分桶
+	for _, item := range group1.Items { // Iterate through all the returned buckets.
 		//item
-		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) //打印本次分桶的行数
+		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 
 		//sub agg
-		subAgg1, err := item.SubAggregations.Avg("sub_agg1") //获取名字为sub_agg1的子统计的结果
+		subAgg1, err := item.SubAggregations.Avg("sub_agg1") // Get the result of the sub-statistic named sub_agg1
 		if err != nil {
 			panic(err)
 		}
-		if subAgg1.HasValue() { //如果子统计sub_agg1计算出了Col_Long字段的平均值，则HasValue()返回true
-			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) //打印本次分桶中，子统计计算出来的Col_Long字段的平均值
+		if subAgg1.HasValue() { // If the sub-statistic sub_agg1 calculates the average value of the Col_Long field, HasValue() returns true.
+			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) // Print the average value of the Col_Long field calculated by the sub-statistics in this partition bucket.
 		}
 
 		//sub group by
-		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") //获取名字为sub_group1的子聚合的结果
+		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") // Get the result of the sub-aggregation named sub_group1
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println("\t\tsub_group1")
-		for _, subItem := range subGroup1.Items { //遍历名字为sub_group1的子聚合结果
-			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) //打印sub_group1子聚合的结果分桶，即分桶中的行数
+		for _, subItem := range subGroup1.Items { // Iterate through the sub-aggregation results named sub_group1
+			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) // Print the result buckets of the sub_group1 sub-aggregation, i.e., the number of rows in each bucket.
 			tablestore.Assert(subItem.SubAggregations.Empty(), "")
 			tablestore.Assert(subItem.SubGroupBys.Empty(), "")
 		}
 	}
 
 	//group by range
-	group2, err := groupByResults.GroupByRange("group2") //获取名字为"group2"的GroupBy结果，类型为GroupByRange
+	group2, err := groupByResults.GroupByRange("group2") // Get the GroupBy result named "group2", the type is GroupByRange
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group2: ")
-	for _, item := range group2.Items { //遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range group2.Items { // Iterate through all the returned buckets.
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 
 	//group by filter
-	group3, err := groupByResults.GroupByFilter("group3") //获取名字为"group3"的GroupBy结果，类型为GroupByFilter
+	group3, err := groupByResults.GroupByFilter("group3") // Get the GroupBy result named "group3", the type is GroupByFilter.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group3: ")
-	for _, item := range group3.Items { //遍历返回的所有分桶
-		fmt.Println("\trowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range group3.Items { // Iterate through all the returned buckets.
+		fmt.Println("\trowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 
 	//group by geo distance
-	group4, err := groupByResults.GroupByGeoDistance("group4") //获取名字为"group4"的GroupBy结果，类型为GroupByGeoDistance
+	group4, err := groupByResults.GroupByGeoDistance("group4") // Get the GroupBy result named "group4", the type is GroupByGeoDistance
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group4: ")
-	for _, item := range group4.Items { //遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range group4.Items { // Iterate through all the returned buckets.
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 
 	//group by histogram
-	group5, err := groupByResults.GroupByHistogram("group5") //获取名字为"group5"的GroupBy结果，类型为GroupByHistogram
+	group5, err := groupByResults.GroupByHistogram("group5") // Get the GroupBy result named "group5", the type is GroupByHistogram
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group5: ")
 	for _, item := range group5.Items {
-		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) //打印返回的value
+		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) // Print the returned value
 	}
 
 	// group by date histogram
@@ -2138,7 +2146,7 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		SetTableName(tableName).
 		SetIndexName(indexName).
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
+			SetQuery(&search.MatchAllQuery{}). // Match all rows
 			SetLimit(100).
 			GroupBy(search.NewGroupByComposite("group7").
 				SourceGroupBy(search.NewGroupByField("groupByField", "Col_Keyword")).
@@ -2170,13 +2178,13 @@ func GroupBySample(client *tablestore.TableStoreClient, tableName string, indexN
 		fmt.Printf("\t%v, RowCount: %v\n", strings.Join(keysAsStrings, "\t"), item.RowCount)
 	}
 	//group by geo grid
-	group8, err := groupByResults.GroupByGeoGrid("group8") //获取名字为"group7"的GroupBy结果，类型为GroupByGeoGrid
+	group8, err := groupByResults.GroupByGeoGrid("group8") // Get the GroupBy result named "group7", the type is GroupByGeoGrid
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group8: ")
 	for _, item := range group8.Items {
-		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) //打印返回的value
+		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) // Print the returned value
 	}
 }
 
@@ -2184,18 +2192,18 @@ func GroupByFieldSample(client *tablestore.TableStoreClient, tableName string, i
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                               //匹配所有行
-			SetLimit(100).                                                   //限制返回前100行结果
-			GroupBy(search.NewGroupByField("group_by_field", "Col_Keyword"). //对Col_Keyword字段做GroupByField取值聚合
-												GroupBySorters([]search.GroupBySorter{}).                          //可以指定返回结果分桶的顺序
-												Size(2).                                                           //仅返回前2个分桶
-												SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  //对每个分桶进行子统计(Aggregation)
-												SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2")))) //对每个分桶进行子聚合(GroupBy)
+			SetQuery(&search.MatchAllQuery{}).                               // Match all rows
+			SetLimit(100).                                                   // Limit to returning the first 100 rows of results
+			GroupBy(search.NewGroupByField("group_by_field", "Col_Keyword"). // Perform value aggregation on the Col_Keyword field using GroupByField
+												GroupBySorters([]search.GroupBySorter{}).                          // You can specify the order of the buckets for the return results.
+												Size(2).                                                           // Return only the first 2 partitions.
+												SubAggregation(search.NewAvgAggregation("sub_agg1", "Col_Long")).  // Perform sub-statistics (Aggregation) on each bucket.
+												SubGroupBy(search.NewGroupByField("sub_group1", "Col_Keyword2")))) // Perform sub-aggregation (GroupBy) on each bucket.
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2214,34 +2222,34 @@ func GroupByFieldSample(client *tablestore.TableStoreClient, tableName string, i
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByFieldResult, err := groupByResults.GroupByField("group_by_field") //获取名字为"group_by_field"的GroupBy结果，类型为GroupByField
+	groupByFieldResult, err := groupByResults.GroupByField("group_by_field") // Get the GroupBy result named "group_by_field", the type is GroupByField
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_field: ")
-	for _, item := range groupByFieldResult.Items { //遍历返回的所有分桶
+	for _, item := range groupByFieldResult.Items { // Iterate through all the returned buckets.
 		//item
-		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) //打印本次分桶的行数
+		fmt.Println("\tkey: ", item.Key, ", rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 
 		//sub agg
-		subAgg1, err := item.SubAggregations.Avg("sub_agg1") //获取名字为sub_agg1的子统计的结果
+		subAgg1, err := item.SubAggregations.Avg("sub_agg1") // Get the result of the sub-statistic named sub_agg1
 		if err != nil {
 			panic(err)
 		}
-		if subAgg1.HasValue() { //如果子统计sub_agg1计算出了Col_Long字段的平均值，则HasValue()返回true
-			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) //打印本次分桶中，子统计计算出来的Col_Long字段的平均值
+		if subAgg1.HasValue() { // If the sub-statistic sub_agg1 calculates the average value of the Col_Long field, then HasValue() returns true.
+			fmt.Println("\t\tsub_agg1: ", subAgg1.Value) // Print the average value of the Col_Long field calculated by the sub-statistics in this partition bucket.
 		}
 
 		//sub group by
-		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") //获取名字为sub_group1的子聚合的结果
+		subGroup1, err := item.SubGroupBys.GroupByField("sub_group1") // Get the result of the sub-aggregation named sub_group1
 		if err != nil {
 			panic(err)
 		}
 		fmt.Println("\t\tsub_group1")
-		for _, subItem := range subGroup1.Items { //遍历名字为sub_group1的子聚合结果
-			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) //打印sub_group1子聚合的结果分桶，即分桶中的行数
+		for _, subItem := range subGroup1.Items { // Iterate through the sub-aggregation results named sub_group1
+			fmt.Println("\t\t\tkey: ", subItem.Key, ", rowCount: ", subItem.RowCount) // Print the result buckets of the sub_group1 sub-aggregation, i.e., the number of rows in each bucket.
 			tablestore.Assert(subItem.SubAggregations.Empty(), "")
 			tablestore.Assert(subItem.SubGroupBys.Empty(), "")
 		}
@@ -2252,17 +2260,17 @@ func GroupByRangeSample(client *tablestore.TableStoreClient, tableName string, i
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                            //匹配所有行
-			SetLimit(100).                                                //限制返回前100行结果
-			GroupBy(search.NewGroupByRange("group_by_range", "Col_Long"). //对Col_Long字段做GroupByRange范围
-											Range(search.NegInf, 3). //第一个分桶包含Col_Long在(-∞, 3)的索引行
-											Range(3, 5).             //第二个分桶包含Col_Long在[3, 5)的索引行
-											Range(5, search.Inf)))   //第三个分桶包含Col_Long在[5, +∞)的索引行
+			SetQuery(&search.MatchAllQuery{}).                            // Match all rows
+			SetLimit(100).                                                // Limit to returning the first 100 rows of results
+			GroupBy(search.NewGroupByRange("group_by_range", "Col_Long"). // Perform GroupByRange on the Col_Long field
+											Range(search.NegInf, 3). // The first bucket contains the index rows where Col_Long is in (-∞, 3).
+											Range(3, 5).             // The second bucket contains the index rows where Col_Long is in [3, 5).
+											Range(5, search.Inf)))   // The third bucket contains the index rows where Col_Long is in [5, +∞).
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2281,15 +2289,15 @@ func GroupByRangeSample(client *tablestore.TableStoreClient, tableName string, i
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByRangeResult, err := groupByResults.GroupByRange("group_by_range") //获取名字为"group_by_range"的GroupBy结果，类型为GroupByRange
+	groupByRangeResult, err := groupByResults.GroupByRange("group_by_range") // Get the GroupBy result named "group_by_range", the type is GroupByRange.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_range: ")
-	for _, item := range groupByRangeResult.Items { //遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range groupByRangeResult.Items { // Iterate through all the returned buckets.
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 }
 
@@ -2297,24 +2305,24 @@ func GroupByFilterSample(client *tablestore.TableStoreClient, tableName string, 
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                  //匹配所有行
-			SetLimit(100).                                      //限制返回前100行结果
-			GroupBy(search.NewGroupByFilter("group_by_filter"). //做GroupByFilter过滤聚合
-										Query(&search.TermQuery{ //第一个分桶包含Col_Keyword字段取值为"hangzhou"的索引行
+			SetQuery(&search.MatchAllQuery{}).                  // Match all rows
+			SetLimit(100).                                      // Limit to returning the first 100 rows of results
+			GroupBy(search.NewGroupByFilter("group_by_filter"). // Perform GroupByFilter aggregation filtering
+										Query(&search.TermQuery{ // The first bucket contains the index rows where the Col_Keyword field is "hangzhou".
 					FieldName: "Col_Keyword",
 					Term:      "hangzhou",
 				}).
-				Query(&search.RangeQuery{ //第二个分桶包含Col_Long字段取值在[3, 5]范围的索引行
+				Query(&search.RangeQuery{ // The second bucket contains the index rows where the Col_Long field value is in the range [3, 5].
 					FieldName:    "Col_Long",
 					From:         3,
 					To:           5,
 					IncludeLower: true,
 					IncludeUpper: true})))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2333,15 +2341,15 @@ func GroupByFilterSample(client *tablestore.TableStoreClient, tableName string, 
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByFilterResult, err := groupByResults.GroupByFilter("group_by_filter") //获取名字为"group_by_filter"的GroupBy结果，类型为GroupByFilter
+	groupByFilterResult, err := groupByResults.GroupByFilter("group_by_filter") // Get the GroupBy result named "group_by_filter", the type is GroupByFilter.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_filter: ")
-	for _, item := range groupByFilterResult.Items { //遍历返回的所有分桶
-		fmt.Println("\trowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range groupByFilterResult.Items { // Iterate through all the returned buckets.
+		fmt.Println("\trowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 }
 
@@ -2349,17 +2357,17 @@ func GroupByGeoDistanceSample(client *tablestore.TableStoreClient, tableName str
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                                                                              //匹配所有行
-			SetLimit(100).                                                                                                                  //限制返回前100行结果
-			GroupBy(search.NewGroupByGeoDistance("group_by_geo_distance", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). //对Col_GeoPoint字段做GroupByGeoDistance地理范围聚合
-																			Range(search.NegInf, 10000). //第一个分桶包含Col_GeoPoint离中心点距离(-∞, 10km)的索引行
-																			Range(10000, 15000).         //第二个分桶包含Col_GeoPoint离中心点距离(10km, 15km)的索引行
-																			Range(15000, search.Inf)))   //第三个分桶包含Col_GeoPoint离中心点距离(15km, +∞)的索引行
+			SetQuery(&search.MatchAllQuery{}).                                                                                              // Match all rows
+			SetLimit(100).                                                                                                                  // Limit to returning the first 100 rows of results
+			GroupBy(search.NewGroupByGeoDistance("group_by_geo_distance", "Col_GeoPoint", search.GeoPoint{Lat: 30.137817, Lon: 120.08681}). // Perform GroupByGeoDistance geographic range aggregation on the Col_GeoPoint field.
+																			Range(search.NegInf, 10000). // The first bucket contains the index rows where the distance between Col_GeoPoint and the center point is (-∞, 10km).
+																			Range(10000, 15000).         // The second bucket contains the index rows for Col_GeoPoint that are between 10km and 15km away from the center point.
+																			Range(15000, search.Inf)))   // The third bucket contains the index rows where the distance between Col_GeoPoint and the center point is within (15km, +∞).
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2378,15 +2386,15 @@ func GroupByGeoDistanceSample(client *tablestore.TableStoreClient, tableName str
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByGeoDistanceResult, err := groupByResults.GroupByGeoDistance("group_by_geo_distance") //获取名字为"group_by_geo_distance"的GroupBy结果，类型为GroupByGeoDistance
+	groupByGeoDistanceResult, err := groupByResults.GroupByGeoDistance("group_by_geo_distance") // Get the GroupBy result named "group_by_geo_distance", the type is GroupByGeoDistance.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_geo_distance: ")
-	for _, item := range groupByGeoDistanceResult.Items { //遍历返回的所有分桶
-		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) //打印本次分桶的行数
+	for _, item := range groupByGeoDistanceResult.Items { // Iterate through all the returned buckets.
+		fmt.Println("\t[", item.From, ", ", item.To, "), rowCount: ", item.RowCount) // Print the number of rows for this partition bucket
 	}
 }
 
@@ -2394,18 +2402,18 @@ func GroupByHistogramSample(client *tablestore.TableStoreClient, tableName strin
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
-			SetLimit(100).                     //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). // Match all rows
+			SetLimit(100).                     // Limit to returning the first 100 rows of results
 			GroupBy(search.NewGroupByHistogram("group_by_histogram", "Col_Long").
 				SetInterval(10).
 				SetMinDocCount(1).
 				SetFiledRange(0, 100).
 				SetMissing(3)))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2424,15 +2432,15 @@ func GroupByHistogramSample(client *tablestore.TableStoreClient, tableName strin
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByHistogramResult, err := groupByResults.GroupByHistogram("group_by_histogram") //获取名字为"group_by_histogram"的GroupBy结果，类型为GroupByHistogram
+	groupByHistogramResult, err := groupByResults.GroupByHistogram("group_by_histogram") // Get the GroupBy result named "group_by_histogram", the type is GroupByHistogram.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_histogram: ")
 	for _, item := range groupByHistogramResult.Items {
-		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) //打印返回的value
+		fmt.Println("key: ", item.Key.Value, ", value: ", item.Value) // Print the returned value
 	}
 }
 
@@ -2440,18 +2448,18 @@ func GroupByDateHistogramSample(client *tablestore.TableStoreClient, tableName s
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}).                                             //匹配所有行
-			SetLimit(100).                                                                 //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}).                                             // Match all rows
+			SetLimit(100).                                                                 // Limit to returning the first 100 rows of results
 			GroupBy(search.NewGroupByDateHistogram("group_by_date_histogram", "Col_date"). // Suppose date format is : 'yyyy-MM-dd HH:mm:ss'
 													SetInterval(model.DateTimeValue{Unit: model.DateTimeUnit_HOUR.Enum(), Value: proto.Int32(30)}).
 													SetMinDocCount(1).
 													SetFiledRange("2022-01-01 12:13:14", "2022-01-05 12:13:14").
 													SetMissing("2022-01-06 12:13:14")))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2470,15 +2478,15 @@ func GroupByDateHistogramSample(client *tablestore.TableStoreClient, tableName s
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByDateHistogramResult, err := groupByResults.GroupByDateHistogram("group_by_date_histogram") //获取名字为"group_by_date_histogram"的GroupBy结果，类型为GroupByHistogram
+	groupByDateHistogramResult, err := groupByResults.GroupByDateHistogram("group_by_date_histogram") // Get the GroupBy result named "group_by_date_histogram", the type is GroupByHistogram
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_date_histogram: ")
 	for _, item := range groupByDateHistogramResult.Items {
-		fmt.Println("timestamp: ", item.Timestamp, ", row_count: ", item.RowCount) //打印返回的value
+		fmt.Println("timestamp: ", item.Timestamp, ", row_count: ", item.RowCount) // Print the returned value
 	}
 }
 
@@ -2486,16 +2494,16 @@ func GroupByGeoGridSample(client *tablestore.TableStoreClient, tableName string,
 	searchRequest := &tablestore.SearchRequest{}
 
 	searchRequest.
-		SetTableName(tableName). //设置表名
-		SetIndexName(indexName). //设置多元索引名
+		SetTableName(tableName). // Set the table name
+		SetIndexName(indexName). // Set the multi-index name
 		SetSearchQuery(search.NewSearchQuery().
-			SetQuery(&search.MatchAllQuery{}). //匹配所有行
-			SetLimit(100).                     //限制返回前100行结果
+			SetQuery(&search.MatchAllQuery{}). // Match all rows
+			SetLimit(100).                     // Limit to returning the first 100 rows of results
 			GroupBy(search.NewGroupByGeoGrid("group_by_geo_grid", "Col_geo").
 				SetPrecision(model.GHP_156KM_156KM_3).
 				SetSize(10)))
 
-	// 设置返回所有列
+	// Set to return all columns
 	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
 		ReturnAll: true,
 	})
@@ -2514,15 +2522,15 @@ func GroupByGeoGridSample(client *tablestore.TableStoreClient, tableName string,
 		}
 		fmt.Println("Row: ", string(jsonBody))
 	}
-	groupByResults := searchResponse.GroupByResults //获取所有聚合结果
+	groupByResults := searchResponse.GroupByResults // Get all aggregation results
 
-	groupByGeoGridResult, err := groupByResults.GroupByGeoGrid("group_by_geo_grid") //获取名字为"group_by_geo_grid"的GroupBy结果，类型为GroupByGeoGrid
+	groupByGeoGridResult, err := groupByResults.GroupByGeoGrid("group_by_geo_grid") // Get the GroupBy result named "group_by_geo_grid", the type is GroupByGeoGrid.
 	if err != nil {
 		panic(err)
 	}
 	fmt.Println("group_by_geo_grid: ")
 	for _, item := range groupByGeoGridResult.Items {
-		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) //打印返回的value
+		fmt.Println("key: ", item.Key, ", geoGrid: ", item.GeoGrid, ", rowCount: ", item.RowCount) // Print the returned value
 	}
 }
 
@@ -2539,7 +2547,7 @@ func computeSplits(client *tablestore.TableStoreClient, tableName string, indexN
 }
 
 /**
- * ParallelScan单并发
+ * Single concurrency for ParallelScan
  */
 func ParallelScanSingleConcurrency(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	computeSplitsResp, err := computeSplits(client, tableName, indexName)
@@ -2578,7 +2586,7 @@ func ParallelScanSingleConcurrency(client *tablestore.TableStoreClient, tableNam
 }
 
 /**
- * ParallelScan多并发
+ * ParallelScan with multiple concurrency
  */
 func ParallelScanMultiConcurrency(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	computeSplitsResp, err := computeSplits(client, tableName, indexName)
@@ -2631,12 +2639,12 @@ func ParallelScanMultiConcurrency(client *tablestore.TableStoreClient, tableName
 }
 
 /**
- * 动态修改schema
- * 修改schema的索引必须以_reindex结尾
+ * Dynamically modify the schema.
+ * The index for modifying the schema must end with _reindex.
  */
 func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName string, indexName string, indexReindexName string) {
 	{
-		// step 1.创建索引
+		// Step 1: Create an index
 		fmt.Println("Begin to create table:", tableName)
 		createtableRequest := new(tablestore.CreateTableRequest)
 		tableMeta := new(tablestore.TableMeta)
@@ -2661,15 +2669,15 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 
 		fmt.Println("Begin to create index:", indexName)
 		request := &tablestore.CreateSearchIndexRequest{}
-		request.TableName = tableName // 设置表名
-		request.IndexName = indexName // 设置索引名
+		request.TableName = tableName // Set the table name
+		request.IndexName = indexName // Set the index name
 
 		schemas := []*tablestore.FieldSchema{}
 		field1 := &tablestore.FieldSchema{
-			FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-			FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-			Index:            proto.Bool(true),             // 设置开启索引
-			EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+			FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer
+			FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+			Index:            proto.Bool(true),             // Set to enable indexing
+			EnableSortAndAgg: proto.Bool(true),             // Set to enable the sorting and statistics function
 		}
 		field2 := &tablestore.FieldSchema{
 			FieldName:        proto.String("Col_Long"),
@@ -2680,9 +2688,9 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 		schemas = append(schemas, field1, field2)
 
 		request.IndexSchema = &tablestore.IndexSchema{
-			FieldSchemas: schemas, // 设置SearchIndex包含的字段
+			FieldSchemas: schemas, // Set the fields included in the SearchIndex
 		}
-		resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+		resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 		if err != nil {
 			fmt.Println("error :", err)
 			return
@@ -2690,26 +2698,26 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 		fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
 	}
 	{
-		// step 2.创建修改schema后的索引，将field2删除
+		// Step 2. Create the index with the modified schema, removing field2.
 		fmt.Println("Begin to create index:", indexReindexName)
 		request := &tablestore.CreateSearchIndexRequest{}
-		request.TableName = tableName        // 设置表名
-		request.IndexName = indexReindexName // 设置索引名
-		request.SourceIndexName = &indexName // 设置源索引：被修改schema的索引
+		request.TableName = tableName        // Set the table name
+		request.IndexName = indexReindexName // Set the index name
+		request.SourceIndexName = &indexName // Set the source index: the index whose schema is being modified
 
 		schemas := []*tablestore.FieldSchema{}
 		field1 := &tablestore.FieldSchema{
-			FieldName:        proto.String("Col_Keyword"),  // 设置字段名，使用proto.String用于获取字符串指针
-			FieldType:        tablestore.FieldType_KEYWORD, // 设置字段类型
-			Index:            proto.Bool(true),             // 设置开启索引
-			EnableSortAndAgg: proto.Bool(true),             // 设置开启排序与统计功能
+			FieldName:        proto.String("Col_Keyword"),  // Set the field name, use proto.String to get a string pointer.
+			FieldType:        tablestore.FieldType_KEYWORD, // Set the field type
+			Index:            proto.Bool(true),             // Set to enable indexing
+			EnableSortAndAgg: proto.Bool(true),             // Set to enable the sorting and statistics feature
 		}
 		schemas = append(schemas, field1)
 
 		request.IndexSchema = &tablestore.IndexSchema{
-			FieldSchemas: schemas, // 设置SearchIndex包含的字段
+			FieldSchemas: schemas, // Set the fields included in the SearchIndex
 		}
-		resp, err := client.CreateSearchIndex(request) // 调用client创建SearchIndex
+		resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
 		if err != nil {
 			fmt.Println("error :", err)
 			return
@@ -2717,12 +2725,12 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 		fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
 	}
 	{
-		// step 3.设置AB索引权重，权重在0-100
-		// 做此步前需要等待"重建索引"数据同步。先后经历"全量同步"和"增量同步"两个阶段
+		// Step 3. Set the AB index weight, the weight is between 0-100
+		// Before performing this step, you need to wait for the "rebuild index" data synchronization, which goes through two phases: "full synchronization" and "incremental synchronization".
 		fmt.Println("wait schema reload")
 		time.Sleep(60 * time.Second)
 		{
-			// 此处原索引权重为50 新索引权重为50
+			// The original index weight here is 50, and the new index weight is 50.
 			req := new(tablestore.UpdateSearchIndexRequest)
 			req.TableName = tableName
 			req.IndexName = indexName
@@ -2741,7 +2749,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 				fmt.Println("update searchIndex failed with error:", err)
 			}
 			fmt.Println("UpdateSearchIndex finished, requestId:", respU.ResponseInfo.RequestId)
-			// 检查权重设置是否成功
+			// Check if the weight setting is successful
 			requestD := &tablestore.DescribeSearchIndexRequest{}
 			requestD.TableName = tableName
 			requestD.IndexName = indexName
@@ -2758,7 +2766,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 			}
 		}
 		{
-			// 此处原索引权重为0 新索引权重为100
+			// The original index weight here is 0, and the new index weight is 100.
 			req := new(tablestore.UpdateSearchIndexRequest)
 			req.TableName = tableName
 			req.IndexName = indexName
@@ -2777,7 +2785,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 				fmt.Println("update searchIndex failed with error:", err)
 			}
 			fmt.Println("UpdateSearchIndex finished, requestId:", respU.ResponseInfo.RequestId)
-			// 检查权重设置是否成功
+			// Check if the weight setting is successful
 			requestD := &tablestore.DescribeSearchIndexRequest{}
 			requestD.TableName = tableName
 			requestD.IndexName = indexName
@@ -2796,7 +2804,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 	}
 
 	{
-		// step 4.切换索引, 此时索引schema变为新索引的schema
+		// Step 4: Switch the index, at this point the index schema becomes the schema of the new index.
 		switchReq := new(tablestore.UpdateSearchIndexRequest)
 		switchReq.TableName = tableName
 		switchReq.IndexName = indexName
@@ -2806,7 +2814,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 			fmt.Println("update search index failed with error:", err)
 		}
 		fmt.Println("UpdateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
-		// 检查索引切换完后，schema变为新的schema
+		// Check if the schema changes to the new one after the index switch is completed.
 		requestD := &tablestore.DescribeSearchIndexRequest{}
 		requestD.TableName = tableName
 		requestD.IndexName = indexName
@@ -2820,7 +2828,7 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 			fmt.Printf("%s\n", schema)
 		}
 
-		// 如果发现问题，还有机会切回
+		// If an issue is found, there is still a chance to switch back.
 		//switchReq := new(tablestore.UpdateSearchIndexRequest)
 		//switchReq.TableName = tableName
 		//switchReq.IndexName = indexName
@@ -2828,7 +2836,163 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 		//resp, err := client.UpdateSearchIndex(switchReq)
 	}
 	{
-		// step 5.经过一段静默时间后，可以删除修改前的索引
+		// Step 5. After a period of silence, the index before modification can be deleted.
 		DeleteSearchIndex(client, tableName, indexReindexName)
+	}
+}
+
+func CreateSearchIndexWithJsonField(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to create table:", tableName)
+	createtableRequest := new(tablestore.CreateTableRequest)
+
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	_, err := client.CreateTable(createtableRequest)
+	if err != nil {
+		fmt.Println("Failed to create table with error:", err)
+	} else {
+		fmt.Println("Create table finished")
+	}
+
+	fmt.Println("Begin to create index:", indexName)
+	request := &tablestore.CreateSearchIndexRequest{}
+	request.TableName = tableName // Set the table name
+	request.IndexName = indexName // Set the index name
+
+	var schemas []*tablestore.FieldSchema
+	field := &tablestore.FieldSchema{ // Do not set IsArray for Json Field
+		FieldName: proto.String("Col_ObjectJson"),    // Set the field name, use proto.String to get a string pointer
+		FieldType: tablestore.FieldType_JSON,         // Set the field type
+		JsonType:  tablestore.JsonType_OBJECT.Enum(), // Set the json type, use JsonType_XXX.Enum()
+		FieldSchemas: []*tablestore.FieldSchema{
+			{
+				FieldName: proto.String("Col_Ip"),
+				FieldType: tablestore.FieldType_IP,
+				Index:     proto.Bool(true),
+			},
+			{
+				FieldName: proto.String("Col_NestedJson"),
+				FieldType: tablestore.FieldType_JSON,
+				JsonType:  tablestore.JsonType_NESTED.Enum(),
+				FieldSchemas: []*tablestore.FieldSchema{
+					{
+						FieldName: proto.String("Col_NestedJson_Long"),
+						FieldType: tablestore.FieldType_LONG,
+					},
+					{
+						FieldName: proto.String("Col_NestedJson_Keyword"),
+						FieldType: tablestore.FieldType_KEYWORD,
+					},
+				},
+			},
+		},
+	}
+
+	schemas = append(schemas, field)
+
+	request.IndexSchema = &tablestore.IndexSchema{
+		FieldSchemas: schemas, // Set the fields included in the SearchIndex
+	}
+	resp, err := client.CreateSearchIndex(request) // Call the client to create a SearchIndex
+	if err != nil {
+		fmt.Println("error :", err)
+		return
+	}
+	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+}
+
+func WriteDataForJsonField(client *tablestore.TableStoreClient, tableName string) {
+	fmt.Println("Begin to write data")
+
+	for i := 0; i < 100; i++ {
+		putRowRequest := new(tablestore.PutRowRequest)
+		putRowChange := new(tablestore.PutRowChange)
+		putRowChange.TableName = tableName
+		putPk := new(tablestore.PrimaryKey)
+		putPk.AddPrimaryKeyColumn("pk1", fmt.Sprintf("pk_val%d", i))
+
+		putRowChange.PrimaryKey = putPk
+		putRowChange.AddColumn("Col_ObjectJson", fmt.Sprintf(`{"Col_Ip":"192.168.1.%d","Col_NestedJson":{"Col_NestedJson_Long":%d,"Col_NestedJson_Keyword":"keyword_%d"}}`, i, i, i))
+		putRowChange.SetCondition(tablestore.RowExistenceExpectation_IGNORE)
+		putRowRequest.PutRowChange = putRowChange
+		_, err := client.PutRow(putRowRequest)
+
+		if err != nil {
+			fmt.Println("putrow failed with error:", err)
+		}
+	}
+
+	time.Sleep(30 * time.Second)
+}
+
+func JsonQuerySample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+	query := &search.TermQuery{}              // Set the query type to MatchQuery
+	query.FieldName = "Col_ObjectJson.Col_Ip" // Set the subfield in Json, use `.` to join the field name and subfield name
+	query.Term = "192.168.1.1"                // Set the value to match
+	searchQuery := search.NewSearchQuery()
+	searchQuery.SetQuery(query)
+	searchQuery.SetOffset(0) // Set the offset to 0
+	searchQuery.SetLimit(20) // Set the limit to 20, which means a maximum of 20 data entries will be returned.
+	searchRequest.SetSearchQuery(searchQuery)
+	// Set to return all columns
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAllFromIndex: true,
+	})
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+
+	// search nested type json in json field
+	nestedQuery := &search.NestedQuery{
+		Path:      "Col_ObjectJson.Col_NestedJson", // the path of nested field
+		ScoreMode: search.ScoreMode_Avg,
+		Query: &search.RangeQuery{
+			FieldName:    "Col_ObjectJson.Col_NestedJson.Col_NestedJson_Long",
+			From:         1,
+			To:           20,
+			IncludeLower: true,
+			IncludeUpper: true,
+		},
+	}
+	searchQuery.SetQuery(nestedQuery)
+	searchRequest.SetSearchQuery(searchQuery)
+	searchResponse, err = client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
 	}
 }

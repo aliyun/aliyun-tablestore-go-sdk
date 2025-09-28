@@ -2,16 +2,21 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/golang/protobuf/proto"
-	"github.com/stretchr/testify/assert"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/golang/protobuf/proto"
+	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -24,7 +29,114 @@ var (
 	readRecordsAlwaysFailUri = "/tunnel/readrecords"
 
 	requestId = "abcd-123"
+
+	testTableName  = "testTableNameForTunnel"
+	testTunnelName = "testTunnelName"
 )
+
+func TestNewTunnelApi(t *testing.T) {
+	log.Println("TestNewTunnelApi started")
+
+	c := assert.New(t)
+
+	testClient := tablestore.NewClientWithConfig(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, "", nil)
+	api := NewTunnelApi(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, nil)
+
+	_, err := testClient.CreateTable(getCreateTableRequest())
+	c.Equal(err, nil)
+
+	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	c.Equal(err, nil)
+
+	log.Println("TestNewTunnelApi finished")
+}
+
+func TestNewTunnelApiWithCredentialsProvider(t *testing.T) {
+	log.Println("TestNewTunnelApiWithCredentialsProvider started")
+
+	c := assert.New(t)
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+
+	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil)
+	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil)
+
+	_, err := testClient.CreateTable(getCreateTableRequest())
+	c.Equal(err, nil)
+
+	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	c.Equal(err, nil)
+
+	log.Println("TestNewTunnelApiWithCredentialsProvider finished")
+}
+
+func TestNewTunnelApiWithV4Credentials(t *testing.T) {
+	log.Println("TestNewTunnelApiWithV4Credentials started")
+
+	c := assert.New(t)
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), testConfig.Region)
+
+	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+
+	_, err := testClient.CreateTable(getCreateTableRequest())
+	c.Equal(err, nil)
+
+	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	c.Equal(err, nil)
+
+	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	c.Equal(err, nil)
+
+	log.Println("TestNewTunnelApiWithV4Credentials finished")
+}
+
+func TestNewTunnelApiWithV4CredentialsAndEmptyRegion(t *testing.T) {
+	log.Println("TestNewTunnelApiWithV4CredentialsAndEmptyRegion started")
+
+	c := assert.New(t)
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), "")
+
+	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+
+	_, err := testClient.CreateTable(getCreateTableRequest())
+	c.NotNil(err)
+	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
+
+	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	c.NotNil(err)
+	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
+
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	c.NotNil(err)
+	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
+
+	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	c.NotNil(err)
+	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
+
+	log.Println("TestNewTunnelApiWithV4CredentialsAndEmptyRegion finished")
+}
 
 func TestDoRequest_RetryBackoffElapsedTimeForMetaApi(t *testing.T) {
 	c := assert.New(t)
@@ -98,7 +210,7 @@ func TestDoRequest_EOFRetry4Times(t *testing.T) {
 
 	dur := time.Now().Sub(s)
 
-	c.True(dur < 2*time.Second)
+	c.True(dur < 5*time.Second)
 	c.True(dur > 1*time.Second)
 
 }
@@ -118,7 +230,7 @@ func TestDoRequest_RetryBackoff3Times(t *testing.T) {
 
 	dur := time.Now().Sub(s)
 	fmt.Println(dur)
-	c.True(dur < 1*time.Second)
+	c.True(dur < 2*time.Second)
 	c.True(dur > 400*time.Millisecond)
 }
 
@@ -312,4 +424,48 @@ func mockServer() *httptest.Server {
 		w.Write(nil)
 	})
 	return httptest.NewServer(handler)
+}
+
+func getCreateTableRequest() *tablestore.CreateTableRequest {
+	createtableRequest := new(tablestore.CreateTableRequest)
+
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = testTableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableMeta.AddPrimaryKeyColumn("pk2", tablestore.PrimaryKeyType_INTEGER)
+	tableMeta.AddPrimaryKeyColumn("pk3", tablestore.PrimaryKeyType_BINARY)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 3
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	return createtableRequest
+}
+
+func getDeleteTableRequest() *tablestore.DeleteTableRequest {
+	deleteRequest := new(tablestore.DeleteTableRequest)
+	deleteRequest.TableName = testTableName
+	return deleteRequest
+}
+
+func getCreateTunnelRequest() *CreateTunnelRequest {
+	req := &CreateTunnelRequest{
+		TableName:  testTableName,
+		TunnelName: testTunnelName,
+		Type:       TunnelTypeStream,
+	}
+	return req
+}
+
+func getDeleteTunnelRequest() *DeleteTunnelRequest {
+	deleteTunnelRequest := &DeleteTunnelRequest{
+		TableName:  testTableName,
+		TunnelName: testTunnelName,
+	}
+	return deleteTunnelRequest
 }

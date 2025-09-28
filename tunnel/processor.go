@@ -266,6 +266,15 @@ func (p *defaultProcessor) CommitToken(token string) error {
 	err := p.checkpointer.Checkpoint(token)
 	if err != nil {
 		p.lg.Error("async commit checkpoint failed", zap.String("checkpoint", token), zap.Error(err))
+		if terr, ok := err.(*TunnelError); ok && terr.Code == ErrCodeSequenceNotMatch {
+			err = p.checkpointer.Checkpoint(token)
+			if err != nil {
+				p.lg.Error(" async commit checkpoint still failed after correcting sequence number", zap.String("checkpoint", token), zap.Error(err))
+				return err
+			}
+			p.lg.Info("async commit checkpoint progress after correcting sequence number", zap.String("context", p.ctx.String()), zap.String("checkpoint", token))
+			return nil
+		}
 		return err
 	} else {
 		p.lg.Info("async commit checkpoint progress", zap.String("context", p.ctx.String()), zap.String("checkpoint", token))

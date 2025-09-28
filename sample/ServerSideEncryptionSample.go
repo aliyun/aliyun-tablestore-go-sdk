@@ -17,32 +17,32 @@ const (
 )
 
 func ServerSideEncryptionSample(client *tablestore.TableStoreClient) {
-	// 创建关闭服务器端加密功能的表
+	// Create a table with server-side encryption disabled
 	deleteTableIfExist(client, TABLE_NAME_DISABLE)
 	createTableDisableSse(client, TABLE_NAME_DISABLE)
 
-	// 创建开启服务器端加密功能(服务主秘钥)的表
+	// Create a table with server-side encryption (service master key) enabled
 	deleteTableIfExist(client, TABLE_NAME_KMS_SERVICE)
 	createTableKmsService(client, TABLE_NAME_KMS_SERVICE)
 
-	// 创建开启服务器端加密功能(用户主秘钥)的表
+	// Create a table with server-side encryption (user master key) enabled
 	deleteTableIfExist(client, TABLE_NAME_BYOK)
 	createTableByok(client, TABLE_NAME_BYOK, BYOK_KEY_ID, BYOK_ROLE_ARN)
 
-	// 查看表的属性
+	// View table properties
 	describeTable(client, TABLE_NAME_DISABLE)
 	describeTable(client, TABLE_NAME_KMS_SERVICE)
 	describeTable(client, TABLE_NAME_BYOK)
 
-	// 等待表load完毕.
+	// Wait for the table to load.
 	time.Sleep(10 * time.Second)
 
-	// 各写入一行数据
+	// Write one row of data each
 	putRow(client, TABLE_NAME_DISABLE, "pkValue")
 	putRow(client, TABLE_NAME_KMS_SERVICE, "pkValue")
 	putRow(client, TABLE_NAME_BYOK, "pkValue")
 
-	// 各读取该行数据
+	// Read the data of each row separately.
 	getRow(client, TABLE_NAME_DISABLE, "pkValue")
 	getRow(client, TABLE_NAME_KMS_SERVICE, "pkValue")
 	getRow(client, TABLE_NAME_BYOK, "pkValue")
@@ -80,7 +80,7 @@ func createTable(client *tablestore.TableStoreClient, tableName string, sseSpec 
 }
 
 func createTableDisableSse(client *tablestore.TableStoreClient, tableName string) {
-	// 关闭服务器端加密功能
+	// Disable server-side encryption
 	sseSpec := new(tablestore.SSESpecification)
 	sseSpec.SetEnable(false)
 
@@ -88,8 +88,8 @@ func createTableDisableSse(client *tablestore.TableStoreClient, tableName string
 }
 
 func createTableKmsService(client *tablestore.TableStoreClient, tableName string) {
-	// 打开服务器端加密功能，使用KMS的服务主密钥
-	// 需要确保已经在所在区域开通了KMS服务
+	// Enable the server-side encryption feature, using the service master key of KMS.
+	// Make sure that the KMS service has been activated in the corresponding region.
 	sseSpec := new(tablestore.SSESpecification)
 	sseSpec.SetEnable(true)
 	sseSpec.SetKeyType(tablestore.SSE_KMS_SERVICE)
@@ -98,8 +98,8 @@ func createTableKmsService(client *tablestore.TableStoreClient, tableName string
 }
 
 func createTableByok(client *tablestore.TableStoreClient, tableName string, keyId string, roleArn string) {
-	// 打开服务器端加密功能，使用KMS的用户主密钥
-	// 需要确保keyId合法有效且未被禁用，同时roleArn被授予了临时访问该keyId的权限
+	// Enable the server-side encryption feature, using the user's main key in KMS
+	// Ensure that the keyId is valid and not disabled, and that the roleArn has been granted temporary access permissions for this keyId.
 	sseSpec := new(tablestore.SSESpecification)
 	sseSpec.SetEnable(true)
 	sseSpec.SetKeyType(tablestore.SSE_BYOK)

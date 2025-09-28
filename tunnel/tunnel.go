@@ -1,5 +1,7 @@
 package tunnel
 
+import "github.com/aliyun/aliyun-tablestore-go-sdk/common"
+
 type TunnelClient interface {
 	TunnelMetaApi
 	NewTunnelWorker(tunnelId string, workerConfig *TunnelWorkerConfig) (TunnelWorker, error)
@@ -29,6 +31,12 @@ func NewTunnelClientWithExternalHeader(endpoint, instanceName, accessId, accessK
 	return NewTunnelClientWithConfigAndExternalHeader(endpoint, instanceName, accessId, accessKey, token, nil, header)
 }
 
+func NewTunnelClientWithCredentialsProvider(endpoint, instanceName string, provider common.CredentialsProvider, conf *TunnelConfig, options ...ClientOption) TunnelClient {
+	return &DefaultTunnelClient{
+		api: NewTunnelApiWithCredentialsProvider(endpoint, instanceName, provider, conf, options...),
+	}
+}
+
 func NewTunnelClientWithConfigAndExternalHeader(endpoint, instanceName, accessId, accessKey, token string, conf *TunnelConfig, header map[string]string) TunnelClient {
 	return &DefaultTunnelClient{
 		api: NewTunnelApiWithExternalHeader(endpoint, instanceName, accessId, accessKey, token, conf, header),
@@ -49,6 +57,10 @@ func (c *DefaultTunnelClient) ListTunnel(req *ListTunnelRequest) (*ListTunnelRes
 
 func (c *DefaultTunnelClient) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunnelResponse, error) {
 	return c.api.DescribeTunnel(req)
+}
+
+func (c *DefaultTunnelClient) SwitchTunnel(req *SwitchTunnelRequest) (*SwitchTunnelResponse, error) {
+	return c.api.SwitchTunnel(req)
 }
 
 func (c *DefaultTunnelClient) GetRpo(req *GetRpoRequest) (*GetRpoResponse, error) {

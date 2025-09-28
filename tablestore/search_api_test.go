@@ -720,16 +720,16 @@ func writeData1(c *C) {
 	strs := []string{"hangzhou", "tablestore", "ots"}
 	highlightText := []string{"dengcai <em>street</em>", "xihu district", "hangzhou city"}
 	geopoints := []string{
-		"30.137817,120.08681",  //飞天园区
-		"30.135131,120.088355", //中大银座
-		"30.181877,120.152818", //中医药地铁站
-		"30.20223,120.13787",   //六和塔
-		"30.216961,120.157633", //八卦田
-		"30.231566,120.148578", //太子湾
-		"30.26058,120.170712",  //龙翔桥
-		"30.269501,120.169347", //凤起路
-		"30.28073,120.168843",  //运河
-		"30.296946,120.21958",  //杭州东站
+		"30.137817,120.08681",  // Fly Heaven Park
+		"30.135131,120.088355", // Central Plaza
+		"30.181877,120.152818", // Traditional Chinese Medicine subway station
+		"30.20223,120.13787",   // Liuhetower
+		"30.216961,120.157633", //Bagua Field
+		"30.231566,120.148578", // Taiziwang
+		"30.26058,120.170712",  // Longxiang Bridge
+		"30.269501,120.169347", // Fengqilu
+		"30.28073,120.168843",  // Canal
+		"30.296946,120.21958",  // Hangzhou East Station
 	}
 	date := []string{
 		"2017-05-01T11:00:00.123",
@@ -819,16 +819,16 @@ func writeData2(c *C) {
 	bools := []bool{false, false, false, false, true, true, true, true, true, true}
 	strs := []string{"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
 	geopoints := []string{
-		"30.137817,120.08681",  //飞天园区
-		"30.135131,120.088355", //中大银座
-		"30.181877,120.152818", //中医药地铁站
-		"30.20223,120.13787",   //六和塔
-		"30.216961,120.157633", //八卦田
+		"30.137817,120.08681",  // Fly Heaven Park
+		"30.135131,120.088355", // Central Plaza
+		"30.181877,120.152818", // Metro station for traditional Chinese medicine
+		"30.20223,120.13787",   // Liuhe Pagoda
+		"30.216961,120.157633", // Octagonal Field
 		"30.231566,120.148578", //太子湾
-		"30.26058,120.170712",  //龙翔桥
-		"30.269501,120.169347", //凤起路
-		"30.28073,120.168843",  //运河
-		"30.296946,120.21958",  //杭州东站
+		"30.26058,120.170712",  // Longxiang Bridge
+		"30.269501,120.169347", // Fengqilu
+		"30.28073,120.168843",  // Canal
+		"30.296946,120.21958",  // Hangzhou East Station
 	}
 
 	for i := 0; i < 10; i++ { //0, 1, ..., 9
@@ -882,16 +882,16 @@ func writeDataWithoutNested(c *C) {
 	bools := []bool{false, false, false, false, true, true, true, true, true, true}
 	strs := []string{"hangzhou", "hangzhou", "hangzhou", "hangzhou", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore", "tablestore"}
 	geopoints := []string{
-		"30.137817,120.08681",  //飞天园区
-		"30.135131,120.088355", //中大银座
-		"30.181877,120.152818", //中医药地铁站
-		"30.20223,120.13787",   //六和塔
-		"30.216961,120.157633", //八卦田
+		"30.137817,120.08681",  // Fly Heaven Park
+		"30.135131,120.088355", // Central Plaza
+		"30.181877,120.152818", // Traditional Chinese Medicine subway station
+		"30.20223,120.13787",   // Liuheta (Six Harmonies Pagoda)
+		"30.216961,120.157633", //Bagua Field
 		"30.231566,120.148578", //太子湾
-		"30.26058,120.170712",  //龙翔桥
-		"30.269501,120.169347", //凤起路
-		"30.28073,120.168843",  //运河
-		"30.296946,120.21958",  //杭州东站
+		"30.26058,120.170712",  // Longxiang Bridge
+		"30.269501,120.169347", // Fengqilu
+		"30.28073,120.168843",  // Canal
+		"30.296946,120.21958",  // Hangzhou East Railway Station
 	}
 
 	for i := 0; i < 10; i++ { //0, 1, ..., 9
@@ -2037,7 +2037,7 @@ func (s *SearchSuite) TestGroupByGroupByFilter(c *C) {
 
 func (s *SearchSuite) TestGroupByGroupByGeoDistance(c *C) {
 	searchRequest := &SearchRequest{}
-	// 30.137817,120.08681 飞天
+	// 30.137817,120.08681 Feitian
 	searchRequest.
 		SetTableName(searchAPITestTableName2).
 		SetIndexName(searchAPITestIndexName2).
@@ -2073,7 +2073,7 @@ func (s *SearchSuite) TestGroupByGroupByGeoDistance(c *C) {
 
 func (s *SearchSuite) TestGroupByGroupByRange(c *C) {
 	searchRequest := &SearchRequest{}
-	// 30.137817,120.08681 飞天
+	// 30.137817,120.08681 Flying Heaven
 	searchRequest.
 		SetTableName(searchAPITestTableName2).
 		SetIndexName(searchAPITestIndexName2).
@@ -2549,7 +2549,7 @@ func (s *SearchSuite) TestGroupByGroupByComposite(c *C) {
 
 func (s *SearchSuite) TestGroupByGroupByGeoGrid(c *C) {
 	searchRequest := &SearchRequest{}
-	// 30.137817,120.08681 飞天
+	// 30.137817,120.08681 Flying Heaven
 	searchRequest.
 		SetTableName(searchAPITestTableName2).
 		SetIndexName(searchAPITestIndexName2).
@@ -2802,13 +2802,13 @@ func (s *SearchSuite) TestUpdateSearchIndexTTL(c *C) {
 func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 	tableName := "go_sdk_test_table"
 	indexName := "go_sdk_test_index"
-	// 修改schema后的索引, 索引必须以_reindex结尾
+	// The index after modifying the schema, the index must end with _reindex
 	indexReindexName := "go_sdk_test_index_reindex"
 	indexSchema := getNormalTestIndexSchema()
 	indexReindexSchema := getNormalTestIndexSchemaWithNested()
 
 	{
-		// step 1.创建索引
+		// Step 1: Create an index
 		DeleteTableAndAllIndex(c, client, tableName)
 		CreateSearchTable(c, client, tableName)
 		CreateSearchIndex(c, client, tableName, indexName, nil, indexSchema, -1)
@@ -2821,7 +2821,7 @@ func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 		c.Check(*fieldSchemas[0].FieldName, Equals, *indexSchema.FieldSchemas[0].FieldName)
 	}
 	{
-		// step 2.创建修改schema后的索引
+		// Step 2: Create the index after modifying the schema
 		CreateSearchIndex(c, client, tableName, indexReindexName, &indexName, indexReindexSchema, -1)
 		resp := DescribeSearchIndex(c, client, tableName, indexReindexName)
 		c.Check(resp, NotNil)
@@ -2839,7 +2839,7 @@ func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 		c.Check(*fieldSchemas[1].FieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldName)
 	}
 	{
-		// step 3.设置AB索引权重，权重在0-100，此处原索引权重为0 新索引权重为100
+		// Step 3. Set the AB index weight, the weight is between 0-100, here the original index weight is 0 and the new index weight is 100.
 		fmt.Println("wait schema reload")
 		time.Sleep(60 * time.Second)
 		req := new(UpdateSearchIndexRequest)
@@ -2871,7 +2871,7 @@ func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 	}
 
 	{
-		// step 4.切换索引, 此时索引schema变为新索引的schema
+		// Step 4. Switch the index, at this point the index schema becomes the schema of the new index.
 		switchReq := new(UpdateSearchIndexRequest)
 		switchReq.TableName = tableName
 		switchReq.IndexName = indexName
@@ -2898,7 +2898,29 @@ func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 		c.Check(*fieldSchemas[1].FieldSchemas[0].FieldName, Equals, *indexReindexSchema.FieldSchemas[1].FieldSchemas[0].FieldName)
 	}
 	{
-		// step 5.经过一段静默时间后，可以删除修改前的索引
+		// Step 5. After a period of silence, the index before modification can be deleted.
 		DeleteIndex(c, client, tableName, indexReindexName)
 	}
+}
+
+func (s *SearchSuite) TestSearchQueryWithSearchTag(c *C) {
+	requestExtension := RequestExtension{}
+	requestExtension.SetSearchTag("test_tag")
+	searchRequest := &SearchRequest{}
+	searchRequest.
+		SetTableName(searchAPITestTableName1).
+		SetIndexName(searchAPITestIndexName1).
+		SetSearchQuery(search.NewSearchQuery().
+			SetQuery(&search.MatchQuery{
+				FieldName: "Col_Keyword",
+				Text:      "hangzhou",
+			})).
+		SetColumnsToGet(&ColumnsToGet{
+			ReturnAllFromIndex: true,
+		}).
+		SetRequestExtension(requestExtension)
+	resp, err := client.Search(searchRequest)
+	c.Check(err, IsNil)
+	c.Check(resp.SearchHits, NotNil)
+	c.Check(resp.SearchHits[0].Row, NotNil)
 }

@@ -12,10 +12,10 @@ import (
 )
 
 type userCheckpointer interface {
-	//指定主键和列名，返回该行之前的channelId, sequenceInfo, 属性列map
+	// Specify the primary key and column names, return the channelId, sequenceInfo, and attribute column map before that row.
 	getCheckpoint(id string, colNameToGet []string) (channelId string, sequenceInfo *tunnel.SequenceInfo,
 		valueMap map[string]interface{}, err error)
-	//更新指定列的channelId，sequenceInfo，condition是乐观锁的条件期望，valueMap是属性列map
+	// Update the specified column's channelId, sequenceInfo. The condition is the expected condition for optimistic locking, and valueMap is the attribute column map.
 	updateCheckpoint(id, channelId string, sequenceInfo *tunnel.SequenceInfo,
 		condition *tablestore.RowCondition, valueMap map[string]interface{}) error
 }
@@ -52,7 +52,7 @@ func main() {
 	}
 	log.Println("tunnel id is", resp.Tunnel.TunnelId)
 
-	//基于ots的userCheckpointer接口
+	// UserCheckpointer interface based on OTS
 	var checkpointer userCheckpointer //todo implementation
 
 	//start consume tunnel
@@ -82,14 +82,14 @@ func main() {
 	}
 }
 
-//目前版本的exactly once，目前record.SequenceInfo中的epoch还不ready，都是0，partition分裂后需要通过比较channelId变化
-//来区分这种情况的乐观锁条件
+// In the current version of exactly once, the epoch in record.SequenceInfo is not ready yet and is always 0. After partition splitting, comparisons need to be made based on changes in channelId.
+// to distinguish the optimistic lock condition for this situation
 func exactlyOnceIngestionCurrentState(ctx *tunnel.ChannelContext, records []*tunnel.Record) error {
 	checkpointer := ctx.CustomValue.(userCheckpointer)
 	inputChannelId := ctx.ChannelId
 
 	for _, rec := range records {
-		if rec.SequenceInfo == nil { //增量数据才有SequenceInfo
+		if rec.SequenceInfo == nil { // Only incremental data has SequenceInfo
 			//unexpected base data record
 			continue
 		}
@@ -115,11 +115,11 @@ func exactlyOnceIngestionCurrentState(ctx *tunnel.ChannelContext, records []*tun
 
 func checkRecordCurrentState(incomingCid, instateCid string, incomingSeq, instateSeq *tunnel.SequenceInfo) (duplicated bool, condition *tablestore.RowCondition) {
 	condition = new(tablestore.RowCondition)
-	if instateSeq == nil { //数据行不存在
+	if instateSeq == nil { // Data row does not exist
 		condition.RowExistenceExpectation = tablestore.RowExistenceExpectation_EXPECT_NOT_EXIST
 		return
 	}
-	if incomingCid == instateCid { //目前cid不能比大小，不相等认为是partition发生了分裂，推送的是新分区的数据(也有可能是D住的老进程的老数据...)
+	if incomingCid == instateCid { // Currently, cid cannot be compared in size. If they are not equal, it is considered that the partition has split, and the data of the new partition is pushed (it could also be the old data from the old process under D...)
 		if !tunnel.StreamRecordSequenceLess(instateSeq, incomingSeq) {
 			duplicated = true
 			return
@@ -134,12 +134,12 @@ func checkRecordCurrentState(incomingCid, instateCid string, incomingSeq, instat
 	return
 }
 
-//后续版本中，record.SequenceInfo中的epoch会随分区分裂递增，保证自分区log的epoch肯定大于其父分区log的epoch, 不需要再关心channelId
+// In future versions, the epoch in record.SequenceInfo will increment as the partition splits, ensuring that the epoch of the sub-partition log is definitely greater than that of its parent partition log, so there's no need to worry about channelId anymore.
 func exactlyOnceIngestionFinalState(ctx *tunnel.ChannelContext, records []*tunnel.Record) error {
 	checkpointer := ctx.CustomValue.(userCheckpointer)
 
 	for _, rec := range records {
-		if rec.SequenceInfo == nil { //增量数据才有SequenceInfo
+		if rec.SequenceInfo == nil { // Only incremental data has SequenceInfo
 			//unexpected base data record
 			continue
 		}
@@ -165,7 +165,7 @@ func exactlyOnceIngestionFinalState(ctx *tunnel.ChannelContext, records []*tunne
 
 func checkRecordFinalState(incomingSeq, instateSeq *tunnel.SequenceInfo) (duplicated bool, condition *tablestore.RowCondition) {
 	condition = new(tablestore.RowCondition)
-	if instateSeq == nil { //数据行不存在
+	if instateSeq == nil { // Data row does not exist
 		condition.RowExistenceExpectation = tablestore.RowExistenceExpectation_EXPECT_NOT_EXIST
 		return
 	}

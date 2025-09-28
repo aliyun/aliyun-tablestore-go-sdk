@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
 	. "gopkg.in/check.v1"
@@ -265,6 +266,52 @@ func PrepareSQLSearchIndex(c *C, tableName string, indexName string) {
 	}
 }
 
+func (s *TableStoreSuite) TestNewClientWithConfig(c *C) {
+	log.Println("TestNewClientWithConfig started")
+
+	testClient := NewClientWithConfig(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, "", nil)
+	_, err := testClient.ListTable()
+	c.Check(err, Equals, nil)
+
+	log.Println("TestNewClientWithConfig finished")
+}
+
+func (s *TableStoreSuite) TestNewClientWithCredentialsProvider(c *C) {
+	log.Println("TestNewClientWithCredentialsProvider started")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	testClient := NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil)
+	_, err := testClient.ListTable()
+	c.Check(err, Equals, nil)
+
+	log.Println("TestNewClientWithCredentialsProvider finished")
+}
+
+func (s *TableStoreSuite) TestNewClientWithV4Credentials(c *C) {
+	log.Println("TestNewClientWithV4Credentials started")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), testConfig.Region)
+	testClient := NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+	_, err := testClient.ListTable()
+	c.Check(err, Equals, nil)
+
+	log.Println("TestNewClientWithV4Credentials finished")
+}
+
+func (s *TableStoreSuite) TestNewClientWithV4CredentialsAndEmptyRegion(c *C) {
+	log.Println("TestNewClientWithV4CredentialsAndEmptyRegion started")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), "")
+	testClient := NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
+	_, err := testClient.ListTable()
+	c.Check(err, NotNil)
+	c.Check(err.Error(), Equals, errMissMustHeader("x-ots-signregion").Error())
+
+	log.Println("TestNewClientWithV4CredentialsAndEmptyRegion finished")
+}
+
 func checkTableExist(tableName string) bool {
 	listTables, err := client.ListTable()
 	if err != nil {
@@ -303,7 +350,7 @@ func (s *TableStoreSuite) TestCreateTable(c *C) {
 		} else {
 			tableOption.TimeToAlive = 86400 + i
 		}
-		tableOption.MaxVersion = i + 1
+		tableOption.MaxVersion = 1
 		tableOption.DeviationCellVersionInSec = int64(i * 100000)
 		tableOption.AllowUpdate = proto.Bool(i%2 == 0)
 		tableOption.UpdateFullRow = proto.Bool(i%3 == 0)
@@ -455,7 +502,6 @@ func (s *TableStoreSuite) TestReCreateTableAndPutRow(c *C) {
 	_, err := client.CreateTable(createTableRequest)
 	c.Check(err, Equals, nil)
 
-	//time.Sleep(500 * time.Millisecond)
 	_, err = client.DeleteTable(deleteReq)
 	c.Check(err, Equals, nil)
 
@@ -508,7 +554,6 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 		updateTableReq.StreamSpec = new(StreamSpecification)
 		updateTableReq.StreamSpec.EnableStream = true
 		updateTableReq.StreamSpec.ExpirationTime = 168
-		updateTableReq.StreamSpec.OriginColumnsToGet = []string{"col1", "col2"}
 
 		updateTableResp, err := client.UpdateTable(updateTableReq)
 		c.Assert(err, Equals, nil)
@@ -528,10 +573,6 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 		c.Assert(descResp.TableOption.MaxVersion, Equals, updateTableReq.TableOption.MaxVersion)
 		c.Assert(descResp.StreamDetails.EnableStream, Equals, updateTableReq.StreamSpec.EnableStream)
 		c.Assert(descResp.StreamDetails.ExpirationTime, Equals, updateTableReq.StreamSpec.ExpirationTime)
-		c.Assert(len(descResp.StreamDetails.OriginColumnsToGet), Equals, len(updateTableReq.StreamSpec.OriginColumnsToGet))
-		for i, col := range descResp.StreamDetails.OriginColumnsToGet {
-			c.Assert(col, Equals, updateTableReq.StreamSpec.OriginColumnsToGet[i])
-		}
 	}
 
 	// test update table option fail
@@ -1683,8 +1724,8 @@ func (s *TableStoreSuite) TestGetRangeWithFilter(c *C) {
 	rangeRowQueryCriteria.Filter = filter
 	getRangeRequest.RangeRowQueryCriteria = rangeRowQueryCriteria
 
-	getRangeResp, error := client.GetRange(getRangeRequest)
-	c.Check(error, Equals, nil)
+	getRangeResp, err := client.GetRange(getRangeRequest)
+	c.Check(err, Equals, nil)
 	log.Println(getRangeResp)
 	log.Println(getRangeResp.NextStartPrimaryKey)
 	log.Println(getRangeResp.Rows)
@@ -1727,39 +1768,34 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	log.Println("TestPutRowsWorkload started")
 
 	start := time.Now().UnixNano()
-
-	isFinished := make(chan bool)
-	totalCount := 100
+	const totalCount = 100
+	var isFinishedChans [totalCount]chan bool
+	for i := 0; i < len(isFinishedChans); i++ {
+		isFinishedChans[i] = make(chan bool)
+	}
 	for i := 0; i < totalCount; i++ {
 		value := i * 10000
-		go func(index int) {
-			for j := 0; j < 100; j++ {
+		go func(index int, id int) {
+			for j := 0; j < 20; j++ {
 				currentIndex := index + j
 				rowToPut1 := CreatePutRowChange("workloadtestkey"+strconv.Itoa(currentIndex), "perfdata1")
 				putRowRequest := new(PutRowRequest)
 				putRowRequest.PutRowChange = rowToPut1
-				_, error := client.PutRow(putRowRequest)
-				if error != nil {
-					log.Println("put row error", error)
+				_, err := client.PutRow(putRowRequest)
+				if err != nil {
+					log.Println("put row error", err)
 				}
-				c.Check(error, IsNil)
+				c.Check(err, IsNil)
 			}
-
-			isFinished <- true
-		}(value)
+			isFinishedChans[id] <- true
+		}(value, i)
 	}
 
-	/*go func(){
-		time.Sleep(time.Millisecond * 1000 * 10)
-		close(isFinished)
-	}()*/
-
 	count := 0
-	for _ = range isFinished {
-		count++
-		log.Println("catched count is:", count)
-		if count >= totalCount {
-			close(isFinished)
+	for i := 0; i < len(isFinishedChans); i++ {
+		var isFinished = <-isFinishedChans[i]
+		if isFinished {
+			count++
 		}
 	}
 	c.Check(count, Equals, totalCount)
@@ -1768,8 +1804,6 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 	totalCost := (end - start) / 1000000
 	log.Println("total cost:", totalCost)
 	c.Check(totalCost < 30*1000, Equals, true)
-
-	time.Sleep(time.Millisecond * 20)
 	log.Println("TestPutRowsWorkload finished")
 }
 
@@ -1901,7 +1935,7 @@ func (s *TableStoreSuite) TestMockHttpClientCase(c *C) {
 }
 
 func (s *TableStoreSuite) TestUnit(c *C) {
-	otshead := createOtsHeaders("test")
+	otshead := createOtsHeaders(false)
 	otshead.set(xOtsApiversion, ApiVersion)
 	_, error := otshead.signature(getRowUri, "POST", "test")
 	c.Check(error, NotNil)

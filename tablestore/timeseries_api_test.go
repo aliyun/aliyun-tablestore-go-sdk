@@ -2,6 +2,7 @@ package tablestore
 
 import (
 	"fmt"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
 	"github.com/golang/protobuf/proto"
@@ -72,14 +73,60 @@ func PrepareTimeseriesTable(timeseriesTableName string) error {
 	return err
 }
 
+func (s *TimeseriesSuite) TestNewTimeseriesClientWithConfig(c *C) {
+	fmt.Println("[Info]: TestNewTimeseriesClientWithConfig start !")
+
+	testClient := NewTimeseriesClientWithConfig(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, "", nil, nil)
+	_, err := testClient.ListTimeseriesTable()
+	c.Check(err, Equals, nil)
+
+	fmt.Println("[Info]: TestNewTimeseriesClientWithConfig finished !")
+}
+
+func (s *TimeseriesSuite) TestNewTimeseriesClientWithCredentialsProvider(c *C) {
+	fmt.Println("[Info]: TestNewTimeseriesClientWithCredentialsProvider start !")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	testClient := NewTimeseriesClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil, nil)
+	_, err := testClient.ListTimeseriesTable()
+	c.Check(err, Equals, nil)
+
+	fmt.Println("[Info]: TestNewTimeseriesClientWithCredentialsProvider finished !")
+}
+
+func (s *TimeseriesSuite) TestNewTimeseriesClientWithV4Credentials(c *C) {
+	fmt.Println("[Info]: TestNewTimeseriesClientWithV4Credentials start !")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), testConfig.Region)
+	testClient := NewTimeseriesClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil, nil)
+	_, err := testClient.ListTimeseriesTable()
+	c.Check(err, Equals, nil)
+
+	fmt.Println("[Info]: TestNewTimeseriesClientWithV4Credentials finished !")
+}
+
+func (s *TimeseriesSuite) TestNewTimeseriesClientWithV4CredentialsAndEmptyRegion(c *C) {
+	fmt.Println("[Info]: TestNewTimeseriesClientWithV4CredentialsAndEmptyRegion start !")
+
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: testConfig.OtsAccessId, AccessKeySecret: testConfig.OtsAccessKey}
+	v4Credentials := common.CreateByCredentials(provider.GetCredentials(), "")
+	testClient := NewTimeseriesClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil, nil)
+	_, err := testClient.ListTimeseriesTable()
+	c.Check(err, NotNil)
+	c.Check(err.Error(), Equals, errMissMustHeader("x-ots-signregion").Error())
+
+	fmt.Println("[Info]: TestNewTimeseriesClientWithV4CredentialsAndEmptyRegion finished !")
+}
+
 func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 	fmt.Println("[Info]: TestDeleteAndCreateTimeseriesTable start !")
 
-	// 列出并删除所有时序表(注意：会删除所有已建立的时序表)
+	// List and delete all time-series tables (Note: This will delete all established time-series tables)
 	listTimeseriesTables, err := timeseriesClient.ListTimeseriesTable()
 	c.Check(err, Equals, nil)
 	for _, timeseriesTable := range listTimeseriesTables.GetTimeseriesTableNames() {
-		// 删除表格
+		// Delete table
 		deleteTimeseriesTableReq := NewDeleteTimeseriesTableRequest(timeseriesTable)
 		_, err = timeseriesClient.DeleteTimeseriesTable(deleteTimeseriesTableReq)
 		c.Assert(err, Equals, nil)
@@ -87,12 +134,12 @@ func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 	}
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
-	// 删除不存在表格：返回table not exist错误。
+	// Delete non-existent table: return 'table not exist' error.
 	deleteTimeseriesReq := NewDeleteTimeseriesTableRequest(curTimeseriesTableName)
 	_, err = timeseriesClient.DeleteTimeseriesTable(deleteTimeseriesReq)
 	c.Assert(err, NotNil)
 
-	// 创建表格
+	// Create table
 	timeseriesTableMeta := NewTimeseriesTableMeta(curTimeseriesTableName)
 	timeseriesTableOptions := NewTimeseriesTableOptions(86400)
 	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)
@@ -103,7 +150,7 @@ func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 	_, err = timeseriesClient.CreateTimeseriesTable(createTimeseriesTableReq)
 	c.Check(err, Equals, nil)
 
-	// 重复创建同一表格返回错误信息：服务端存在此表格
+	// Returning error information for creating the same table repeatedly: the table exists on the server.
 	timeseriesTableMeta = NewTimeseriesTableMeta(curTimeseriesTableName)
 	timeseriesTableOptions = NewTimeseriesTableOptions(86400)
 	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)
@@ -117,7 +164,7 @@ func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 	fmt.Println("	[Info]: Create timeseries ", curTimeseriesTableName, " succeed !")
 	fmt.Println("[Info]: TestDeleteAndCreateTimeseriesTable finished !")
 
-	time.Sleep(time.Second * 30) // 建立meta表
+	time.Sleep(time.Second * 30) // Create the meta table
 }
 
 func (s *TimeseriesSuite) TestListTimeseriesTable(c *C) {
@@ -144,20 +191,20 @@ func (s *TimeseriesSuite) TestUpdateAndDescribeTimeseriesTable(c *C) {
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
 
-	// 描述表信息
+	// Describe table information
 	describeTimeseriesTableReq := NewDescribeTimeseriesTableRequset(curTimeseriesTableName)
 	describeResp, err := timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableReq)
 	c.Assert(err, Equals, nil)
 	c.Assert(describeResp, NotNil)
 
-	// 更新表选项
+	// Update table options
 	updateTimeseriesTableReq := NewUpdateTimeseriesTableRequest(curTimeseriesTableName)
 	timeseriesTableOptions := NewTimeseriesTableOptions(965000)
 	updateTimeseriesTableReq.SetTimeseriesTableOptions(timeseriesTableOptions)
 	_, err = timeseriesClient.UpdateTimeseriesTable(updateTimeseriesTableReq)
 	c.Assert(err, Equals, nil)
 
-	// 描述表信息
+	// Describes table information
 	describeTimeseriesTableReq = NewDescribeTimeseriesTableRequset(curTimeseriesTableName)
 	describeResp, err = timeseriesClient.DescribeTimeseriesTable(describeTimeseriesTableReq)
 	c.Assert(err, Equals, nil)
@@ -189,7 +236,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 
 	time.Sleep(30 * time.Second)
 
-	// 写入数据
+	// Write data
 	putTimeseriesDataRep := NewPutTimeseriesDataRequest(curTimeseriesTableName)
 
 	var timeseriesKey *TimeseriesKey
@@ -234,7 +281,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(putTimeseriesDataResp.GetFailedRowResults()), Equals, 0)
 
-	// 查询数据
+	// Query data
 	timeseriesKey = NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("NETWORK")
 	timeseriesKey.SetDataSource("127.0.0.1")
@@ -265,7 +312,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(row.GetFieldsMap()["datasize"].Value.(int64), Equals, int64(512))
 	}
 
-	// 逆序查询数据
+	// Reverse query data
 	getTimeseriesDataReq = NewGetTimeseriesDataRequest(curTimeseriesTableName)
 	getTimeseriesDataReq.SetTimeRange(0, time.Now().UnixNano())
 	getTimeseriesDataReq.SetTimeseriesKey(timeseriesKey)
@@ -282,7 +329,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(len(row.GetTimeseriesKey().GetTags()), Equals, 2)
 		c.Assert(row.GetTimeseriesKey().GetTags()["City"], Equals, "Hangzhou")
 		c.Assert(row.GetTimeseriesKey().GetTags()["Region"], Equals, "Xihu")
-		c.Assert(row.GetTimeInus() < lastRowTime, Equals, true) // 逆序
+		c.Assert(row.GetTimeInus() < lastRowTime, Equals, true) // Reverse order
 		lastRowTime = row.GetTimeInus()
 		c.Assert(string(row.GetFieldsMap()["data"].Value.([]byte)), Equals, "select * from NET")
 		c.Assert(row.GetFieldsMap()["netstatus"].Value.(bool), Equals, true)
@@ -291,7 +338,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(row.GetFieldsMap()["datasize"].Value.(int64), Equals, int64(512))
 	}
 
-	// 查询数据
+	// Query data
 	timeseriesKey = NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("CPU")
 	timeseriesKey.SetDataSource("127.0.0.1")
@@ -320,7 +367,7 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 		c.Assert(row.GetFieldsMap()["runminute"].Value.(int64), NotNil)
 	}
 
-	// 指定列查询数据
+	// Specify column to query data
 	getTimeseriesDataReq = NewGetTimeseriesDataRequest(curTimeseriesTableName)
 	getTimeseriesDataReq.SetTimeRange(0, time.Now().UnixNano())
 	getTimeseriesDataReq.SetTimeseriesKey(timeseriesKey)
@@ -368,7 +415,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
 
-	// 创建用于测试QueryTimeseriesMeta接口的时序表
+	// Create a timeseries table for testing the QueryTimeseriesMeta interface
 	PrepareTimeseriesTable(curTimeseriesTableName)
 
 	time.Sleep(30 * time.Second)
@@ -432,9 +479,9 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(putTimeseriesDataResp.GetFailedRowResults()), Equals, 0)
 
-	time.Sleep(time.Second * 30) // 数据同步到meta表
+	time.Sleep(time.Second * 30) // Data synchronization to the meta table
 
-	// 查询timeseriesMeta信息,单条件：measurementQueryMetaCondition
+	// Query timeseriesMeta information, single condition: measurementQueryMetaCondition
 	measurementMetaQueryCondition := NewMeasurementQueryCondition(OP_GREATER_EQUAL, "")
 	queryTimeseriesMetaReq := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq.SetCondition(measurementMetaQueryCondition)
@@ -442,7 +489,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp.GetTimeseriesMetas()), Equals, 3)
 
-	// 查询timeseriesMeta信息,单条件：sourceQueryMetaCondition
+	// Query timeseriesMeta information, single condition: sourceQueryMetaCondition
 	sourceMetaQueryCondition := NewDataSourceMetaQueryCondition(OP_EQUAL, "127.0.0.1")
 	queryTimeseriesMetaReq = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq.SetCondition(sourceMetaQueryCondition)
@@ -450,7 +497,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp.GetTimeseriesMetas()), Equals, 3)
 
-	// 查询timeseriesMeta信息,单条件：tagQueryMetaCondition
+	// Query timeseriesMeta information, single condition: tagQueryMetaCondition
 	tagMetaQueryCondition := NewTagMetaQueryCondition(OP_EQUAL, "Street", "Zhuantang")
 	queryTimeseriesMetaReq = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq.SetCondition(tagMetaQueryCondition)
@@ -466,12 +513,12 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(key.GetTags()["Region"], Equals, "YuHang")
 	c.Assert(key.GetTags()["Street"], Equals, "Zhuantang")
 
-	// 组合条件查询
+	// Composite condition query
 	measurementMetaQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
 	sourceMetaQueryCondition = NewDataSourceMetaQueryCondition(OP_EQUAL, "127.0.0.1")
 	tagMetaQueryCondition = NewTagMetaQueryCondition(OP_GREATER_EQUAL, "Region", "Jiangning")
 
-	// 设置measurement,source,tag条件
+	// Set the measurement, source, and tag conditions.
 	compsiteMetaQueryCondition0 := NewCompositeMetaQueryCondition(OP_AND, measurementMetaQueryCondition, sourceMetaQueryCondition, tagMetaQueryCondition)
 	queryTimeseriesMetaReq0 := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq0.SetCondition(compsiteMetaQueryCondition0)
@@ -479,7 +526,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp0.GetTimeseriesMetas()), Equals, 2)
 
-	// 设置measurement，source条件
+	// Set the measurement and source conditions
 	compsiteMetaQueryCondition1 := NewCompositeMetaQueryCondition(OP_AND, measurementMetaQueryCondition, sourceMetaQueryCondition)
 	queryTimeseriesMetaReq1 := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq1.SetCondition(compsiteMetaQueryCondition1)
@@ -487,7 +534,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp1.GetTimeseriesMetas()), Equals, 2)
 
-	// 设置measurement，tag条件
+	// Set the measurement and tag conditions.
 	compsiteMetaQueryCondition2 := NewCompositeMetaQueryCondition(OP_AND, measurementMetaQueryCondition, tagMetaQueryCondition)
 	queryTimeseriesMetaReq2 := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq2.SetCondition(compsiteMetaQueryCondition2)
@@ -495,7 +542,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp2.GetTimeseriesMetas()), Equals, 2)
 
-	// 设置source，tag条件
+	// Set the source and tag conditions
 	compsiteMetaQueryCondition3 := NewCompositeMetaQueryCondition(OP_OR, sourceMetaQueryCondition, tagMetaQueryCondition)
 	queryTimeseriesMetaReq3 := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq3.SetCondition(compsiteMetaQueryCondition3)
@@ -511,7 +558,7 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 
-	// 创建用于测试UpdateTimeseriesMeta接口的时序表
+	// Create a timeseries table for testing the UpdateTimeseriesMeta interface
 	err := PrepareTimeseriesTable(curTimeseriesTableName)
 	if err != nil {
 		c.Fatal(err)
@@ -540,7 +587,7 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 
 	time.Sleep(10 * time.Second)
 
-	// 查询meta
+	// Query meta
 	measurementQueryCondition := NewMeasurementQueryCondition(OP_EQUAL, "CPU")
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaRequest.SetLimit(-1)
@@ -551,29 +598,83 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()), Equals, 0)
 
-	// 更新meta
-	timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
-	timeseriesMeta.AddAttribute("NewRegion", "Yuhang")
+	// Update meta
+	{
+		timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
+		timeseriesMeta.AddAttribute("NewRegion", "Yuhang")
 
-	updateTimeseriesMetaRequest := NewUpdateTimeseriesMetaRequest(curTimeseriesTableName)
-	updateTimeseriesMetaRequest.AddTimeseriesMetas(timeseriesMeta)
+		updateTimeseriesMetaRequest := NewUpdateTimeseriesMetaRequest(curTimeseriesTableName)
+		updateTimeseriesMetaRequest.AddTimeseriesMetas(timeseriesMeta)
 
-	updateTimeseriesMetaResponse, err := timeseriesClient.UpdateTimeseriesMeta(updateTimeseriesMetaRequest)
-	c.Assert(err, Equals, nil)
-	c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
+		updateTimeseriesMetaResponse, err := timeseriesClient.UpdateTimeseriesMeta(updateTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
 
-	time.Sleep(10 * time.Second)
+		time.Sleep(10 * time.Second)
 
-	// 再次查询meta
-	measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
-	queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
-	queryTimeseriesMetaRequest.SetLimit(-1)
-	queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
+		// Query meta again
+		measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
+		queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
+		queryTimeseriesMetaRequest.SetLimit(-1)
+		queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
 
-	queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
-	c.Assert(err, Equals, nil)
-	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
-	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()), Equals, 1)
+		queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()), Equals, 1)
+	}
+
+	// Ignore attributes
+	{
+		timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
+		timeseriesMeta.AddAttributesWithIgnoreFlag(nil, true)
+
+		updateTimeseriesMetaRequest := NewUpdateTimeseriesMetaRequest(curTimeseriesTableName)
+		updateTimeseriesMetaRequest.AddTimeseriesMetas(timeseriesMeta)
+
+		updateTimeseriesMetaResponse, err := timeseriesClient.UpdateTimeseriesMeta(updateTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
+
+		time.Sleep(10 * time.Second)
+
+		// Query meta again
+		measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
+		queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
+		queryTimeseriesMetaRequest.SetLimit(-1)
+		queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
+
+		queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()), Equals, 1)
+	}
+
+	// Delete attributes
+	{
+		timeseriesMeta := NewTimeseriesMeta(timeseriesKey)
+		timeseriesMeta.AddAttributes(nil)
+
+		updateTimeseriesMetaRequest := NewUpdateTimeseriesMetaRequest(curTimeseriesTableName)
+		updateTimeseriesMetaRequest.AddTimeseriesMetas(timeseriesMeta)
+
+		updateTimeseriesMetaResponse, err := timeseriesClient.UpdateTimeseriesMeta(updateTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
+
+		time.Sleep(10 * time.Second)
+
+		// Query meta again
+		measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
+		queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
+		queryTimeseriesMetaRequest.SetLimit(-1)
+		queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
+
+		queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
+		c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()[0].GetAttributes()), Equals, 0)
+	}
 }
 
 func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
@@ -581,7 +682,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 
 	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 
-	// 创建用于测试DeleteTimeseriesMeta接口的时序表
+	// Create a timeseries table for testing the DeleteTimeseriesMeta interface
 	err := PrepareTimeseriesTable(curTimeseriesTableName)
 	if err != nil {
 		c.Fatal(err)
@@ -608,7 +709,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 
 	time.Sleep(20 * time.Second)
 
-	// 查询meta
+	// Query meta
 	measurementQueryCondition := NewMeasurementQueryCondition(OP_EQUAL, "CPU")
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaRequest.SetLimit(-1)
@@ -618,7 +719,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 100)
 
-	// 删除meta
+	// Delete meta
 	deleteTimeseriesMetaRequest := NewDeleteTimeseriesMetaRequest(curTimeseriesTableName)
 	for i := 0; i < len(queryTimeseriesMetaResponse.GetTimeseriesMetas()); i++ {
 		deleteTimeseriesMetaRequest.AddTimeseriesKeys(queryTimeseriesMetaResponse.GetTimeseriesMetas()[i].GetTimeseriesKey())
@@ -629,7 +730,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 
 	time.Sleep(20 * time.Second)
 
-	// 再次查询meta
+	// Query meta again
 	measurementQueryCondition = NewMeasurementQueryCondition(OP_EQUAL, "CPU")
 	queryTimeseriesMetaRequest = NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaRequest.SetLimit(-1)
@@ -970,6 +1071,8 @@ func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
 	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	c.Assert(err, Equals, nil)
 
+	time.Sleep(10 * time.Second)
+
 	// update meta
 	timeseriesKey := NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("cpu")
@@ -988,6 +1091,14 @@ func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
 	// query meta
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest("test_custom_primary_keys_meta")
 	queryTimeseriesMetaRequest.SetLimit(-1)
+	for i := 0; i < 5; i++ { // wait for meta sync
+		queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		if len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) == 1 {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
 	queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	metas := queryTimeseriesMetaResponse.GetTimeseriesMetas()

@@ -38,6 +38,8 @@ type CreateTunnelResponse struct {
 
 type ListTunnelRequest struct {
 	TableName string
+	// The following fields are for internal use only.
+	OnlyPhysical bool
 }
 
 type StreamTunnelConfig struct {
@@ -67,6 +69,8 @@ type ListTunnelResponse struct {
 type DescribeTunnelRequest struct {
 	TableName  string
 	TunnelName string
+	// The following fields are for internal use only.
+	OnlyPhysical bool
 }
 
 type ChannelInfo struct {
@@ -81,6 +85,18 @@ type DescribeTunnelResponse struct {
 	TunnelRPO int64
 	Tunnel    *TunnelInfo
 	Channels  []*ChannelInfo
+	ResponseInfo
+}
+
+// SwitchTunnelRequest The following fields are for internal use only.
+type SwitchTunnelRequest struct {
+	CurrentPrimaryCluster   string
+	CurrentSecondaryCluster string
+	LogicalTunnelID         string
+	PhysicalTunnelID        string
+}
+
+type SwitchTunnelResponse struct {
 	ResponseInfo
 }
 
@@ -176,6 +192,8 @@ const (
 type DeleteTunnelRequest struct {
 	TableName  string
 	TunnelName string
+	// The following fields are for internal use only.
+	OnlyPhysical bool
 }
 
 type DeleteTunnelResponse struct {

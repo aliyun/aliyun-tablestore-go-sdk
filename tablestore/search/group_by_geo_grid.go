@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// GroupByGeoGrid 对GeoPoint类型的字段按照地理区域进行分组统计
+// GroupByGeoGrid performs grouping and statistical analysis on fields of GeoPoint type based on geographic areas.
 type GroupByGeoGrid struct {
 	GroupByName string
 

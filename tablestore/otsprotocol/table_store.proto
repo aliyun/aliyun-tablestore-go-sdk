@@ -44,13 +44,13 @@ enum BloomFilterType {
 }
 
 message TableOptions {
-    optional int32 time_to_live = 1; // 可以动态更改
-    optional int32 max_versions = 2; // 可以动态更改
-    optional BloomFilterType bloom_filter_type = 3; // 可以动态更改
-    optional int32 block_size = 4; // 可以动态更改
-    optional int64 deviation_cell_version_in_sec = 5; // 可以动态修改
+    optional int32 time_to_live = 1; // Can be dynamically changed
+    optional int32 max_versions = 2; // Can be dynamically changed
+    optional BloomFilterType bloom_filter_type = 3; // Can be dynamically changed
+    optional int32 block_size = 4; // Can be dynamically changed
+    optional int64 deviation_cell_version_in_sec = 5; // Can be dynamically modified
     optional bool allow_update = 6;
-    optional bool update_full_row = 7; // 不可动态修改
+    optional bool update_full_row = 7; // Cannot be dynamically modified
 }
 
 message TableMeta {
@@ -61,18 +61,18 @@ message TableMeta {
 }
 
 /**
- * 表的状态变更只与用户的操作对应，内部的机器failover等状况不对应表的状态变更。
- * 有三个考虑：
- *     一是一般场景下用户只会在做了对表的修改操作后才会去检查表的状态；
- *     二是内部机器failover导致访问异常到用户能够查看到表的状态变更这两个时刻之间会有一段延迟，无法将表的不可服务状态与用户查看到的表的状态完全匹配上。
- *     三是内部机器failover后不能说是表的整个状态变更，而应该是partition的状态变更，对应表的状态就是PARTIAL_FAILOVER，这个partial的粒度无法体现，会让用户更加困惑。
+ * Table status changes only correspond to user operations; internal machine failovers or other conditions do not result in table status changes.
+ * There are three considerations:
+ *     One, in general scenarios, users will only check the table's status after performing a modification operation on the table;
+ *     Two, there is a delay between the time when an internal machine failover causes access anomalies and when the user can see the table's status change. It is impossible to fully match the table's unserviceable state with the state the user observes.
+ *     Three, after an internal machine failover, it should not be considered as a change in the entire table's state but rather as a state change of a partition. The corresponding table state would be PARTIAL_FAILOVER. However, the granularity of this "partial" cannot be clearly represented, which might confuse users even more.
  */
 enum TableStatus {
-    ACTIVE = 1; // 表处于可服务状态。
-    INACTIVE = 2; // 用户通过UnloadTable将表禁用。
-    LOADING = 3; // 表正在被创建，partition还未全部加载完毕；或者表刚从INACTIVE状态被Enable。
-    UNLOADING = 4; // 表正在被删除（从delete table到partition完全unload的这段期间）或者表从ACTIVE状态被Unload。
-    UPDATING = 5; // 表正在被更新（table属性变更、预留吞吐量变更）。
+    ACTIVE = 1; // The table is in a servable state.
+    INACTIVE = 2; // The user disables the table through UnloadTable.
+    LOADING = 3; // The table is being created, and the partition has not been fully loaded yet; or the table has just been enabled from the INACTIVE state.
+    UNLOADING = 4; // The table is being deleted (during the period from delete table to partition completely unloaded) or the table is unloaded from ACTIVE status.
+    UPDATING = 5; // The table is being updated (table property changes, reserved throughput changes).
 }
 
 enum RowExistenceExpectation {
@@ -92,9 +92,9 @@ message CapacityUnit {
 }
 
 message ReservedThroughputDetails {
-    required CapacityUnit capacity_unit = 1; // 表当前的预留吞吐量的值。
-    required int64 last_increase_time = 2; // 最后一次上调预留吞吐量的时间。
-    optional int64 last_decrease_time = 3; // 最后一次下调预留吞吐量的时间。
+    required CapacityUnit capacity_unit = 1; // The reserved throughput value of the table.
+    required int64 last_increase_time = 2; // The time of the last increase in reserved throughput.
+    optional int64 last_decrease_time = 3; // The time of the last reduction in reserved throughput.
 }
 
 message ReservedThroughput {
@@ -140,19 +140,19 @@ message SSEDetails {
 
 /* #############################################  CreateTable  ############################################# */
 /**
- * table_meta用于存储表中不可更改的schema属性，可以更改的ReservedThroughput和TableOptions独立出来，作为UpdateTable的参数。
- * 加入GlobalIndex和LocalIndex之后，结构会变为：
+ * table_meta is used to store the non-modifiable schema properties of a table. The modifiable ReservedThroughput and TableOptions are separated out as parameters for UpdateTable.
+ * After adding GlobalIndex and LocalIndex, the structure will become:
  * message CreateTableRequest {
  *         required TableMeta table_meta = 1;
  *         required ReservedThroughput reserved_throughput = 2;
  *         required TableOptions table_options = 3;
- *         repeated LocalIndex local_indexes = 4; // LocalIndex不再单独包含ReservedThroughput和TableOptions，其与主表共享配置。
- *         repeated GlobalIndex global_indexes = 5; // GlobalIndex内单独包含ReservedThroughput和TableOptions
+ *         repeated LocalIndex local_indexes = 4; // LocalIndex no longer separately includes ReservedThroughput and TableOptions; it shares configurations with the main table.
+ *         repeated GlobalIndex global_indexes = 5; // GlobalIndex separately includes ReservedThroughput and TableOptions
  * }
  */
 message CreateTableRequest {
     required TableMeta table_meta = 1;
-    required ReservedThroughput reserved_throughput = 2; // 未放在TableOptions内，原因是UpdateTableResponse中会返回ReservedThroughputDetails，而TableOptions没有类似的返回结构。
+    required ReservedThroughput reserved_throughput = 2; // Not placed in TableOptions because UpdateTableResponse returns ReservedThroughputDetails, and TableOptions does not have a similar return structure.
     optional TableOptions table_options = 3;
     repeated PartitionRange partitions = 4;
     optional StreamSpecification stream_spec = 5;
@@ -196,6 +196,7 @@ message DescribeTableResponse {
     repeated bytes shard_splits = 6;
     optional SSEDetails sse_details = 7;
     repeated IndexMeta index_metas = 8;
+    optional DescribeTableInnerInfo inner_info = 12;
 }
 /* ########################################################################################################### */
 
@@ -204,8 +205,8 @@ message ListTableRequest {
 }
 
 /**
- * 当前只返回一个简单的名称列表，需要讨论是否有业务场景需要获取除了表名之外的其他信息。
- * 其他信息可以包含预留吞吐量以及表的状态，这个信息只能是一个粗略的信息，表的详细信息还是需要通过DescribeTable来获取。
+ * Currently, only a simple list of names is returned. We need to discuss whether there are any business scenarios that require obtaining information other than the table name.
+ * The other information can include reserved throughput and table status; however, this information can only be rough. Detailed table information still needs to be obtained through DescribeTable.
  */
 message ListTableResponse {
     repeated string table_names = 1;
@@ -241,9 +242,9 @@ message UnloadTableResponse {
 /* ########################################################################################################## */
 
 /**
- * 时间戳的取值最小值为0，最大值为INT64.MAX
- * 1. 若要查询一个范围，则指定start_time和end_time
- * 2. 若要查询一个特定时间戳，则指定specific_time
+ * The minimum value for the timestamp is 0, and the maximum value is INT64.MAX.
+ * 1. To query a range, specify start_time and end_time.
+ * 2. To query a specific timestamp, specify specific_time.
  */
 message TimeRange {
     optional int64 start_time = 1;
@@ -265,16 +266,16 @@ message ReturnContent {
 }
 
 /**
- * 1. 支持用户指定版本时间戳范围或者特定的版本时间来读取指定版本的列
- * 2. 目前暂不支持行内的断点
+ * 1. Supports users specifying a version timestamp range or a specific version time to read the designated version of columns.
+ * 2. Currently, breakpoints within a row are not supported.
  */
 message GetRowRequest {
     required string table_name = 1;
     required bytes primary_key = 2; // encoded as InplaceRowChangeSet, but only has primary key
-    repeated string columns_to_get = 3; // 不指定则读出所有的列
+    repeated string columns_to_get = 3; // If not specified, all columns will be read.
     optional TimeRange time_range = 4;
     optional int32 max_versions = 5;
-    optional bool cache_blocks = 6 [default = true]; // 本次读出的数据是否进入BlockCache
+    optional bool cache_blocks = 6 [default = true]; // Whether the data read this time enters the BlockCache
     optional bytes filter = 7;
     optional string start_column = 8;
     optional string end_column = 9;
@@ -309,8 +310,8 @@ message UpdateRowResponse {
 
 
 /**
- * 这里允许用户为每列单独设置timestamp，而不是强制整行统一一个timestamp。
- * 原因是列都是用统一的结构，该结构本身是带timestamp的，其次强制统一timestamp增强了规范性但是丧失了灵活性，且该规范性没有明显的好处，反而带来了结构的复杂。
+ * Here, users are allowed to set the timestamp for each column individually, rather than being forced to use a uniform timestamp for the entire row.
+ * The reason is that all columns use a unified structure, which itself includes a timestamp. Enforcing a uniform timestamp increases standardization but reduces flexibility, and this standardization does not provide any obvious benefits while adding complexity to the structure.
  */
 message PutRowRequest {
     required string table_name = 1;
@@ -328,8 +329,8 @@ message PutRowResponse {
 
 /* #############################################  DeleteRow  ############################################# */
 /**
- * OTS只支持删除该行的所有列所有版本，不支持：
- *  1. 删除所有列的所有小于等于某个版本的所有版本
+ * OTS only supports deleting all versions of all columns in a row, and does not support:
+ *  1. Deleting all versions of all columns that are less than or equal to a certain version
  */
 message DeleteRowRequest {
     required string table_name = 1;
@@ -347,16 +348,16 @@ message DeleteRowResponse {
 
 /* #############################################  BatchGetRow  ############################################# */
 /**
- * HBase支持Batch操作的每行都拥有不同的查询参数，OTS不支持。
+ * In HBase, each row in a Batch operation can have different query parameters, which is not supported by OTS.
  */
 message TableInBatchGetRowRequest {
     required string table_name = 1;
     repeated bytes primary_key = 2; // encoded as InplaceRowChangeSet, but only has primary key
     repeated bytes token = 3;
-    repeated string columns_to_get = 4;  // 不指定则读出所有的列
+    repeated string columns_to_get = 4;  // If not specified, all columns will be read.
     optional TimeRange time_range = 5;
     optional int32 max_versions = 6;
-    optional bool cache_blocks = 7 [default = true]; // 本次读出的数据是否进入BlockCache
+    optional bool cache_blocks = 7 [default = true]; // Whether the data read this time enters the BlockCache
     optional bytes filter = 8;
     optional string start_column = 9;
     optional string end_column = 10;
@@ -434,21 +435,21 @@ enum Direction {
 }
 
 /**
- * HBase支持以下参数：
- *     1. TimeRange或指定time
- *     2. Filter（根据列值或列名来过滤）
- * 我们只支持给同版本的选择条件。
+ * HBase supports the following parameters:
+ *     1. TimeRange or specified time
+ *     2. Filter (for filtering by column value or column name)
+ * We only support selection conditions for the same version.
  */
 message GetRangeRequest {
     required string table_name = 1;
     required Direction direction = 2;
-    repeated string columns_to_get = 3;  // 不指定则读出所有的列
+    repeated string columns_to_get = 3;  // If not specified, all columns will be read.
     optional TimeRange time_range = 4;
     optional int32 max_versions = 5;
     optional int32 limit = 6;
     required bytes inclusive_start_primary_key = 7; // encoded as InplaceRowChangeSet, but only has primary key
     required bytes exclusive_end_primary_key = 8; // encoded as InplaceRowChangeSet, but only has primary key
-    optional bool cache_blocks = 9 [default = true]; // 本次读出的数据是否进入BlockCache
+    optional bool cache_blocks = 9 [default = true]; // Whether the data read this time is entered into BlockCache
     optional bytes filter = 10;
     optional string start_column = 11;
     optional string end_column = 12;
@@ -462,7 +463,7 @@ message GetRangeRequest {
 message GetRangeResponse {
     required ConsumedCapacity consumed = 1;
     required bytes rows = 2; // encoded as InplaceRowChangeSet
-    optional bytes next_start_primary_key = 3; // 若为空，则代表数据全部读取完毕. encoded as InplaceRowChangeSet, but only has primary key
+    optional bytes next_start_primary_key = 3; // If it is empty, it means all the data has been read. Encoded as InplaceRowChangeSet, but only contains the primary key.
     optional bytes next_token = 4;
     optional DataBlockType data_block_type = 5;
     optional CompressType compress_type = 6;
@@ -523,10 +524,18 @@ message GetShardIteratorResponse {
     optional string next_token = 2;
 }
 
+enum NewRowReturnPolicy {
+    NO_NEW_ROW = 1;
+    WITH_NEW_ROW = 2; // for row version table, return new row for update operation
+    NEW_ROW_ONLY = 3; // for row version table, only return new row for update operation
+}
+
 message GetStreamRecordRequest {
     required string shard_iterator = 1;
     optional int32 limit = 2;
     optional string table_name = 3;
+    optional NewRowReturnPolicy new_row_return_policy = 4;
+    optional bool return_sys_columns = 5;
 }
 
 enum ActionType {
@@ -536,15 +545,24 @@ enum ActionType {
 }
 
 message GetStreamRecordResponse {
+    message NewRowInfo {
+        optional bool has_new_row = 1; // Used to distinguish between a non-existent row and an empty row(only PK).
+        optional bytes columns = 2;
+    }
     message StreamRecord {
         required ActionType action_type = 1;
         required bytes record = 2;
         optional bytes origin_record = 3;
+        optional bytes table_name = 4;
+        optional int64 version_generator_value = 5;
+        optional NewRowInfo new_row_info = 6;
+        optional bytes sys_columns = 7;
     }
     repeated StreamRecord stream_records = 1;
     optional string next_shard_iterator = 2;
     optional ConsumedCapacity consumed = 3;
     optional bool may_more_record = 4;
+    optional int64 version_generator_value = 5;
 }
 
 /* +++++ ComputeSplitPointsBySize  +++++ */
@@ -624,6 +642,10 @@ message IndexMeta {
     required IndexUpdateMode index_update_mode = 4;
     required IndexType index_type = 5;
     optional IndexSyncPhase index_sync_phase = 6;
+}
+
+message DescribeTableInnerInfo {
+    optional string cluster_name = 1;
 }
 
 message CreateIndexRequest {

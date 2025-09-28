@@ -446,7 +446,7 @@ func (c *channelConn) processRecords(inCh chan *pipeResult) (bool, error) {
 
 func streamFullData(numRec int, size int, mayMoreRecord *bool) bool {
 	if mayMoreRecord != nil {
-		// server support tablegroup，using mayMoreRecord to determine backoff
+		// Server supports table groups, using mayMoreRecord to determine backoff
 		return *mayMoreRecord
 	}
 

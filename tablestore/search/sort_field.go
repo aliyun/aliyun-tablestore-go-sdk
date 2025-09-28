@@ -31,7 +31,7 @@ type FieldSort struct {
 	Order        *SortOrder
 	Mode         *SortMode
 	NestedFilter *NestedFilter
-	MissingValue interface{} // 当排序的字段某些行没有填充值时，排序行为支持三种方式：1、设置为FirstWhenMissing，当排序字段值缺省时候排在最前面；2、设置为LastWhenMissing，当排序字段值缺省时候排在最后面；3、自定义值，当排序字段值缺省时候使用指定的值进行排序。
+	MissingValue interface{} // When some rows of the sorting field have no fill values, the sorting behavior supports three methods: 1. Set to FirstWhenMissing, which places rows with missing sort field values at the front; 2. Set to LastWhenMissing, which places rows with missing sort field values at the back; 3. Customize a value, which uses a specified value for sorting when the sort field value is missing.
 	MissingField *string
 }
 

@@ -1,12 +1,14 @@
 package tablestore
 
 import (
+	"encoding/json"
+	"math"
+	"testing"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/assert"
-	"math"
-	"testing"
 )
 
 // ConvertFieldSchemaToPBFieldSchema
@@ -1227,6 +1229,339 @@ func TestParseFieldSchemaFromPb_Date(t *testing.T) {
 	assert.Equal(t, 0, len(fieldSchemas[1].DateFormats))
 }
 
+func TestIpField_PbConvert(t *testing.T) {
+	// build pb
+	pbFieldSchemas := []*otsprotocol.FieldSchema{
+		{
+			FieldName: proto.String("ip"),
+			FieldType: otsprotocol.FieldType_IP.Enum(),
+			IsArray:   proto.Bool(true),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+		{
+			FieldName: proto.String("ip2"),
+			FieldType: otsprotocol.FieldType_IP.Enum(),
+			IsArray:   proto.Bool(false),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+	// build go model
+	modelFieldSchemas := []*FieldSchema{
+		{
+			FieldName: proto.String("ip"),
+			FieldType: FieldType_IP,
+			IsArray:   proto.Bool(true),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+		{
+			FieldName: proto.String("ip2"),
+			FieldType: FieldType_IP,
+			IsArray:   proto.Bool(false),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+
+	// pb -> model
+	t.Log("pbFieldSchemas ==> ", pbFieldSchemas)
+	assert.Equal(t, pbFieldSchemas, convertFieldSchemaToPBFieldSchema(modelFieldSchemas))
+	t.Log("modelFieldSchemas ==> ", modelFieldSchemas)
+	assert.Equal(t, modelFieldSchemas, parseFieldSchemaFromPb(pbFieldSchemas))
+}
+
+func TestJsonField_PbConvert(t *testing.T) {
+	tests := []struct {
+		name           string
+		pbFieldSchemas []*otsprotocol.FieldSchema
+		goFieldSchemas []*FieldSchema
+	}{
+		{
+			name: "object_json->nested_json->nested->object_json",
+			pbFieldSchemas: []*otsprotocol.FieldSchema{
+				{
+					FieldName: proto.String("json_object_layer0"),
+					FieldType: otsprotocol.FieldType_JSON.Enum(),
+					JsonType:  otsprotocol.JsonType_OBJECT_JSON.Enum(),
+					FieldSchemas: []*otsprotocol.FieldSchema{
+						{
+							FieldName: proto.String("json_nested_layer1"),
+							FieldType: otsprotocol.FieldType_JSON.Enum(),
+							JsonType:  otsprotocol.JsonType_NESTED_JSON.Enum(),
+							FieldSchemas: []*otsprotocol.FieldSchema{
+								{
+									FieldName: proto.String("nested_layer2"),
+									FieldType: otsprotocol.FieldType_NESTED.Enum(),
+									FieldSchemas: []*otsprotocol.FieldSchema{
+										{
+											FieldName: proto.String("json_object_layer3"),
+											FieldType: otsprotocol.FieldType_JSON.Enum(),
+											JsonType:  otsprotocol.JsonType_OBJECT_JSON.Enum(),
+											FieldSchemas: []*otsprotocol.FieldSchema{
+												{
+													FieldName: proto.String("col_long"),
+													FieldType: otsprotocol.FieldType_LONG.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_double"),
+													FieldType: otsprotocol.FieldType_DOUBLE.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_keyword"),
+													FieldType: otsprotocol.FieldType_KEYWORD.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_boolean"),
+													FieldType: otsprotocol.FieldType_BOOLEAN.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_text"),
+													FieldType: otsprotocol.FieldType_TEXT.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(false),
+												},
+												{
+													FieldName:   proto.String("col_date"),
+													FieldType:   otsprotocol.FieldType_DATE.Enum(),
+													DateFormats: []string{"format1", "format2"},
+													Index:       proto.Bool(true),
+													Store:       proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_ip"),
+													FieldType: otsprotocol.FieldType_IP.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_geo"),
+													FieldType: otsprotocol.FieldType_GEO_POINT.Enum(),
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			goFieldSchemas: []*FieldSchema{
+				{
+
+					FieldName: proto.String("json_object_layer0"),
+					FieldType: FieldType_JSON,
+					JsonType:  JsonType_OBJECT.Enum(),
+					FieldSchemas: []*FieldSchema{
+						{
+							FieldName: proto.String("json_nested_layer1"),
+							FieldType: FieldType_JSON,
+							JsonType:  JsonType_NESTED.Enum(),
+							FieldSchemas: []*FieldSchema{
+								{
+									FieldName: proto.String("nested_layer2"),
+									FieldType: FieldType_NESTED,
+									FieldSchemas: []*FieldSchema{
+										{
+											FieldName: proto.String("json_object_layer3"),
+											FieldType: FieldType_JSON,
+											JsonType:  JsonType_OBJECT.Enum(),
+											FieldSchemas: []*FieldSchema{
+												{
+													FieldName: proto.String("col_long"),
+													FieldType: FieldType_LONG,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_double"),
+													FieldType: FieldType_DOUBLE,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_keyword"),
+													FieldType: FieldType_KEYWORD,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_boolean"),
+													FieldType: FieldType_BOOLEAN,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_text"),
+													FieldType: FieldType_TEXT,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(false),
+												},
+												{
+													FieldName:   proto.String("col_date"),
+													FieldType:   FieldType_DATE,
+													DateFormats: []string{"format1", "format2"},
+													Index:       proto.Bool(true),
+													Store:       proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_ip"),
+													FieldType: FieldType_IP,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+												{
+													FieldName: proto.String("col_geo"),
+													FieldType: FieldType_GEO_POINT,
+													Index:     proto.Bool(true),
+													Store:     proto.Bool(true),
+												},
+											},
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		// schema -> pb
+		t.Run("[SCHEMA2PB]"+tt.name, func(t *testing.T) {
+			fieldSchemas := parseFieldSchemaFromPb(tt.pbFieldSchemas)
+			assert.Equal(t, tt.goFieldSchemas, fieldSchemas)
+		})
+		// pb -> schema
+		t.Run("[PB2SCHEMA]"+tt.name, func(t *testing.T) {
+			fieldSchemas := convertFieldSchemaToPBFieldSchema(tt.goFieldSchemas)
+			assert.Equal(t, tt.pbFieldSchemas, fieldSchemas)
+		})
+	}
+}
+
+func TestJsonField_ModelToPb_DefaultValue(t *testing.T) {
+	jsonType := JsonType("anything")
+
+	modelSchema := []*FieldSchema{
+		{
+			FieldName: proto.String("json_object_layer0"),
+			FieldType: FieldType_JSON,
+			JsonType:  jsonType.Enum(), // an illegal input
+		},
+	}
+	expectedPbSchema := []*otsprotocol.FieldSchema{
+		{
+			FieldName: proto.String("json_object_layer0"),
+			FieldType: otsprotocol.FieldType_JSON.Enum(),
+			JsonType:  otsprotocol.JsonType_OBJECT_JSON.Enum(),
+		},
+	}
+
+	pbSchema := convertFieldSchemaToPBFieldSchema(modelSchema)
+	assert.Equal(t, expectedPbSchema, pbSchema)
+}
+
+func TestJsonFieldUnmarshal(t *testing.T) {
+	modelSchema := []*FieldSchema{
+		{
+
+			FieldName: proto.String("json_object_layer0"),
+			FieldType: FieldType_JSON,
+			JsonType:  JsonType_OBJECT.Enum(),
+			FieldSchemas: []*FieldSchema{
+				{
+					FieldName: proto.String("json_nested_layer1"),
+					FieldType: FieldType_JSON,
+					JsonType:  JsonType_NESTED.Enum(),
+					FieldSchemas: []*FieldSchema{
+						{
+							FieldName: proto.String("nested_layer2"),
+							FieldType: FieldType_NESTED,
+							FieldSchemas: []*FieldSchema{
+								{
+									FieldName: proto.String("json_object_layer3"),
+									FieldType: FieldType_JSON,
+									JsonType:  JsonType_OBJECT.Enum(),
+									FieldSchemas: []*FieldSchema{
+										{
+											FieldName: proto.String("col_long"),
+											FieldType: FieldType_LONG,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_double"),
+											FieldType: FieldType_DOUBLE,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_keyword"),
+											FieldType: FieldType_KEYWORD,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_boolean"),
+											FieldType: FieldType_BOOLEAN,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_text"),
+											FieldType: FieldType_TEXT,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(false),
+										},
+										{
+											FieldName:   proto.String("col_date"),
+											FieldType:   FieldType_DATE,
+											DateFormats: []string{"format1", "format2"},
+											Index:       proto.Bool(true),
+											Store:       proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_ip"),
+											FieldType: FieldType_IP,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+										{
+											FieldName: proto.String("col_geo"),
+											FieldType: FieldType_GEO_POINT,
+											Index:     proto.Bool(true),
+											Store:     proto.Bool(true),
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	marshal, err := json.Marshal(modelSchema)
+	assert.Nil(t, err)
+	var jsonSchema []*FieldSchema
+	assert.Nil(t, json.Unmarshal(marshal, &jsonSchema))
+	assert.Equal(t, modelSchema, jsonSchema)
+}
+
 func TestSearchQuery_LimitN1(t *testing.T) {
 	// set to -1
 	query := search.NewSearchQuery().
@@ -1445,8 +1780,8 @@ func Test_buildSearchHit(t *testing.T) {
 							Path: proto.String("nested"),
 							SearchHits: []*otsprotocol.SearchHit{
 								{
-									NestedDocOffset:    proto.Int32(0),
-									Score: proto.Float64(math.MaxFloat64),
+									NestedDocOffset: proto.Int32(0),
+									Score:           proto.Float64(math.MaxFloat64),
 									HighlightResult: &otsprotocol.HighlightResult{
 										HighlightFields: []*otsprotocol.HighlightField{
 											{
@@ -1462,8 +1797,8 @@ func Test_buildSearchHit(t *testing.T) {
 							Path: proto.String("nested1"),
 							SearchHits: []*otsprotocol.SearchHit{
 								{
-									NestedDocOffset:    proto.Int32(0),
-									Score: proto.Float64(math.MaxFloat64),
+									NestedDocOffset: proto.Int32(0),
+									Score:           proto.Float64(math.MaxFloat64),
 									HighlightResult: &otsprotocol.HighlightResult{
 										HighlightFields: []*otsprotocol.HighlightField{
 											{
@@ -1491,8 +1826,8 @@ func Test_buildSearchHit(t *testing.T) {
 						Path: "nested",
 						SearchHits: []*SearchHit{
 							{
-								NestedDocOffset:   proto.Int32(0),
-								Score: proto.Float64(math.MaxFloat64),
+								NestedDocOffset: proto.Int32(0),
+								Score:           proto.Float64(math.MaxFloat64),
 								HighlightResultItem: &HighlightResultItem{
 									HighlightFields: map[string]*HighlightField{
 										"nested.nested_col1": {
@@ -1508,8 +1843,8 @@ func Test_buildSearchHit(t *testing.T) {
 						Path: "nested1",
 						SearchHits: []*SearchHit{
 							{
-								NestedDocOffset:    proto.Int32(0),
-								Score: proto.Float64(math.MaxFloat64),
+								NestedDocOffset: proto.Int32(0),
+								Score:           proto.Float64(math.MaxFloat64),
 								HighlightResultItem: &HighlightResultItem{
 									HighlightFields: map[string]*HighlightField{
 										"nested1.nested1_col1": {

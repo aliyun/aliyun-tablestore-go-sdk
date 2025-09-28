@@ -3,10 +3,11 @@ package tablestore
 import (
 	"encoding/json"
 	"errors"
+	"strings"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/search"
 	"github.com/golang/protobuf/proto"
-	"strings"
 )
 
 type ColumnsToGet struct {
@@ -118,7 +119,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 
 		if value.Index != nil {
 			field.Index = proto.Bool(*value.Index)
-		} else if value.FieldType != FieldType_NESTED {
+		} else if value.FieldType != FieldType_NESTED && value.FieldType != FieldType_JSON {
 			field.Index = proto.Bool(true)
 		}
 		if value.IndexOptions != nil {
@@ -170,7 +171,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		}
 		if value.Store != nil {
 			field.Store = proto.Bool(*value.Store)
-		} else if value.FieldType != FieldType_NESTED {
+		} else if value.FieldType != FieldType_NESTED && value.FieldType != FieldType_JSON {
 			if *field.FieldType == otsprotocol.FieldType_TEXT {
 				field.Store = proto.Bool(false)
 			} else {
@@ -180,7 +181,7 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		if value.IsArray != nil {
 			field.IsArray = proto.Bool(*value.IsArray)
 		}
-		if value.FieldType == FieldType_NESTED {
+		if value.FieldType == FieldType_NESTED || value.FieldType == FieldType_JSON {
 			field.FieldSchemas = convertFieldSchemaToPBFieldSchema(value.FieldSchemas)
 		}
 		if value.IsVirtualField != nil {
@@ -202,6 +203,9 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		}
 		if value.VectorOptions != nil {
 			field.VectorOptions = convertToPBVectorOptions(value.VectorOptions)
+		}
+		if value.JsonType != nil {
+			field.JsonType = convertToPBJsonType(value.JsonType)
 		}
 
 		schemas = append(schemas, field)
@@ -308,11 +312,14 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		if value.DateFormats != nil {
 			field.DateFormats = value.DateFormats
 		}
-		if field.FieldType == FieldType_NESTED {
+		if field.FieldType == FieldType_NESTED || field.FieldType == FieldType_JSON {
 			field.FieldSchemas = parseFieldSchemaFromPb(value.FieldSchemas)
 		}
 		if value.VectorOptions != nil {
 			field.VectorOptions, _ = parseVectorOptionsFromPB(value.VectorOptions)
+		}
+		if value.JsonType != nil {
+			field.JsonType, _ = parseJsonTypeFromPB(value.JsonType)
 		}
 		schemas = append(schemas, field)
 	}
@@ -375,6 +382,8 @@ const (
 	FieldType_GEO_POINT FieldType = 7
 	FieldType_DATE      FieldType = 8
 	FieldType_VECTOR    FieldType = 9
+	FieldType_IP        FieldType = 11
+	FieldType_JSON      FieldType = 12
 )
 
 func (ft FieldType) String() string {
@@ -397,6 +406,10 @@ func (ft FieldType) String() string {
 		return "DATE"
 	case FieldType_VECTOR:
 		return "VECTOR"
+	case FieldType_IP:
+		return "IP"
+	case FieldType_JSON:
+		return "JSON"
 	default:
 		return string(ft)
 	}
@@ -422,6 +435,10 @@ func ToFieldType(fieldType string) (FieldType, error) {
 		return FieldType_DATE, nil
 	case "VECTOR":
 		return FieldType_VECTOR, nil
+	case "IP":
+		return FieldType_IP, nil
+	case "JSON":
+		return FieldType_JSON, nil
 	default:
 		return FieldType_LONG, errors.New("Invalid field type: " + fieldType)
 	}
@@ -550,9 +567,9 @@ func parseMetricTypeFromPB(pbMetricType *otsprotocol.VectorMetricType) (VectorMe
 }
 
 type VectorOptions struct {
-	VectorDataType       *VectorDataType
-	VectorMetricType     *VectorMetricType
-	Dimension            *int32
+	VectorDataType   *VectorDataType
+	VectorMetricType *VectorMetricType
+	Dimension        *int32
 }
 
 func convertToPBVectorOptions(vectorOptions *VectorOptions) *otsprotocol.VectorOptions {
@@ -598,6 +615,42 @@ func parseVectorOptionsFromPB(pbVectorOptions *otsprotocol.VectorOptions) (*Vect
 	return vectorOptions, nil
 }
 
+type JsonType string
+
+const (
+	JsonType_OBJECT JsonType = "OBJECT"
+	JsonType_NESTED JsonType = "NESTED"
+)
+
+func (x JsonType) Enum() *JsonType {
+	p := new(JsonType)
+	*p = x
+	return p
+}
+
+func convertToPBJsonType(jsonType *JsonType) *otsprotocol.JsonType {
+	switch *jsonType {
+	case JsonType_OBJECT:
+		return otsprotocol.JsonType_OBJECT_JSON.Enum()
+	case JsonType_NESTED:
+		return otsprotocol.JsonType_NESTED_JSON.Enum()
+	default:
+		return otsprotocol.JsonType_OBJECT_JSON.Enum()
+	}
+}
+
+func parseJsonTypeFromPB(pbJsonType *otsprotocol.JsonType) (*JsonType, error) {
+	switch *pbJsonType {
+	case otsprotocol.JsonType_OBJECT_JSON:
+		return JsonType_OBJECT.Enum(), nil
+	case otsprotocol.JsonType_NESTED_JSON:
+		return JsonType_NESTED.Enum(), nil
+	default:
+		jsonType := JsonType("unknown")
+		return &jsonType, errors.New("unknown proto json type " + pbJsonType.String())
+	}
+}
+
 type FieldSchema struct {
 	FieldName          *string
 	FieldType          FieldType
@@ -614,6 +667,7 @@ type FieldSchema struct {
 	SourceFieldNames   []string
 	DateFormats        []string
 	VectorOptions      *VectorOptions
+	JsonType           *JsonType
 }
 
 func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
@@ -639,6 +693,7 @@ func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
 	r.SourceFieldNames = copyFS.SourceFieldNames
 	r.DateFormats = copyFS.DateFormats
 	r.VectorOptions = copyFS.VectorOptions
+	r.JsonType = copyFS.JsonType
 
 	apJson, err := json.Marshal(r.AnalyzerParameter)
 	if err != nil {
@@ -699,8 +754,9 @@ type CreateSearchIndexResponse struct {
 }
 
 type DescribeSearchIndexRequest struct {
-	TableName string
-	IndexName string
+	TableName       string
+	IndexName       string
+	IncludeSyncStat *bool
 	ExtraRequestInfo
 }
 

@@ -247,6 +247,8 @@ message KnnVectorQuery {
     optional int32 top_k = 2;
     repeated float float32_query_vector = 4;
     optional Query filter = 5;
+    optional float min_score = 7;
+    optional int32 num_candidates = 8;
 }
 
 message Query {
@@ -333,6 +335,11 @@ message SearchQuery {
     optional Aggregations aggs = 10;
     optional GroupBys group_bys = 11;
     optional Highlight highlight = 12;
+    optional SearchFilter filter = 14;
+}
+
+message SearchFilter {
+    optional Query query = 1;
 }
 
 message Highlight {
@@ -381,7 +388,7 @@ message SearchRequest {
 }
 
 /**
- * Response部分：
+ * Response part:
  **/
 
 message SearchResponse {
@@ -437,11 +444,13 @@ enum FieldType {
   GEO_POINT = 7;
   DATE = 8;
   VECTOR = 9;
+  IP = 11;
+  JSON = 12;
 }
 
 enum DateTimeUnit {
     YEAR = 1;
-    QUARTER_YEAR = 2; // 一个季度
+    QUARTER_YEAR = 2; // A quarter
     MONTH = 3;
     WEEK = 4;
     DAY = 5;
@@ -485,6 +494,12 @@ message FieldSchema {
     repeated string date_formats = 13;
     optional bool enable_highlighting = 14;
     optional VectorOptions vector_options = 15;
+    optional JsonType json_type = 16;
+}
+
+enum JsonType {
+    OBJECT_JSON = 1;
+    NESTED_JSON = 2;
 }
 
 enum VectorDataType {
@@ -576,7 +591,7 @@ enum SyncPhase {
 
 message SyncStat {
     optional SyncPhase sync_phase = 1;
-    optional int64 current_sync_timestamp = 2; // 同步进度，参考TunnelService。
+    optional int64 current_sync_timestamp = 2; // Synchronize progress, refer to TunnelService.
 }
 
 message MeteringInfo {
@@ -589,6 +604,7 @@ message MeteringInfo {
 message DescribeSearchIndexRequest {
     optional string table_name = 1;
     optional string index_name = 2;
+    optional bool include_sync_stat = 3;
 }
 
 message DescribeSearchIndexResponse {

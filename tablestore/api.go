@@ -93,13 +93,13 @@ const (
 // RowsSerializeType is used for tests only.
 var RowsSerializeType = otsprotocol.RowsSerializeType_RST_FLAT_BUFFER
 
-// Constructor: to create the client of TableStore service.
-// 构造函数：创建表格存储服务的客户端。
+// NewClient Constructor: to create the client of TableStore service.
+// Constructor: Creates a client for the Table Store service.
 //
-// @param endPoint The address of TableStore service. 表格存储服务地址。
+// @param endPoint The address of the TableStore service.
 // @param instanceName
-// @param accessId The Access ID. 用于标示用户的ID。
-// @param accessKey The Access Key. 用于签名和验证的密钥。
+// @param accessId The Access ID. Used to identify the user's ID.
+// @param accessKey The Access Key. A key used for signing and verification.
 // @param options set client config
 func NewClient(endPoint, instanceName, accessKeyId, accessKeySecret string, options ...ClientOption) *TableStoreClient {
 	client := NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret, "", nil, options...)
@@ -117,18 +117,22 @@ var currentGetHttpClientFunc GetHttpClient = func() IHttpClient {
 	return &TableStoreHttpClient{}
 }
 
-// Constructor: to create the client of OTS service. 传入config
-// 构造函数：创建OTS服务的客户端。
+// Constructor: to create the client of OTS service. Pass in config.
+// Constructor: Create a client for the OTS service.
 func NewClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig, options ...ClientOption) *TableStoreClient {
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
+	return NewClientWithCredentialsProvider(endPoint, instanceName, provider, config, options...)
+}
+
+func NewClientWithCredentialsProvider(endPoint, instanceName string, provider common.CredentialsProvider, config *TableStoreConfig, options ...ClientOption) *TableStoreClient {
 	tableStoreClient := new(TableStoreClient)
 	tableStoreClient.internalClient = new(internalClient)
 	tableStoreClient.endPoint = endPoint
 	tableStoreClient.instanceName = instanceName
-	tableStoreClient.accessKeyId = accessKeyId
-	tableStoreClient.accessKeySecret = accessKeySecret
-	tableStoreClient.securityToken = securityToken
+	tableStoreClient.accessKeyId = provider.GetCredentials().GetAccessKeyID()
+	tableStoreClient.accessKeySecret = provider.GetCredentials().GetAccessKeySecret()
+	tableStoreClient.securityToken = provider.GetCredentials().GetSecurityToken()
 	tableStoreClient.KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc = true
-	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
 	tableStoreClient.credentialsProvider = provider
 	for _, option := range options {
 		option(tableStoreClient)
@@ -176,15 +180,19 @@ func NewTimeseriesClient(endPoint, instanceName, accessKeyId, accessKeySecret st
 }
 
 func NewTimeseriesClientWithConfig(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig, timeseriesConfiguration *TimeseriesConfiguration, options ...TimeseriesClientOption) *TimeseriesClient {
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
+	return NewTimeseriesClientWithCredentialsProvider(endPoint, instanceName, provider, config, timeseriesConfiguration, options...)
+}
+
+func NewTimeseriesClientWithCredentialsProvider(endPoint, instanceName string, provider common.CredentialsProvider, config *TableStoreConfig, timeseriesConfiguration *TimeseriesConfiguration, options ...TimeseriesClientOption) *TimeseriesClient {
 	timeseriesClient := new(TimeseriesClient)
 	timeseriesClient.internalClient = new(internalClient)
 	timeseriesClient.endPoint = endPoint
 	timeseriesClient.instanceName = instanceName
-	timeseriesClient.accessKeyId = accessKeyId
-	timeseriesClient.accessKeySecret = accessKeySecret
-	timeseriesClient.securityToken = securityToken
+	timeseriesClient.accessKeyId = provider.GetCredentials().GetAccessKeyID()
+	timeseriesClient.accessKeySecret = provider.GetCredentials().GetAccessKeySecret()
+	timeseriesClient.securityToken = provider.GetCredentials().GetSecurityToken()
 	timeseriesClient.KeepDefaultRetryStrategyWhileUsingCustomizedRetryFunc = true
-	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: securityToken}
 	timeseriesClient.credentialsProvider = provider
 	for _, option := range options {
 		option(timeseriesClient)
@@ -235,7 +243,7 @@ func NewClientWithExternalHeader(endPoint, instanceName, accessKeyId, accessKeyS
 
 type RetryNotify func(traceId, requestId string, err error, action string, backoffDuration time.Duration)
 
-// 请求服务端
+// Request to the server
 func (internalClient *internalClient) doRequestWithRetry(uri string, req, resp proto.Message, responseInfo *ResponseInfo, extraInfo ExtraRequestInfo) error {
 	end := time.Now().Add(internalClient.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", internalClient.endPoint, uri)
@@ -462,7 +470,7 @@ func generateBatchRequest(resp proto.Message, originRequest proto.Message, uri s
 			index := 0
 			for _, rowResult := range table.GetRows() {
 				if !rowResult.GetIsOk() {
-					// 只有所有失败的行可重试时，批量操作才可以重试
+					// A batch operation can be retried only when all failed rows are retryable.
 					if !ShouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
 						return nil, false, nil
 					}
@@ -504,7 +512,7 @@ func generateBatchRequest(resp proto.Message, originRequest proto.Message, uri s
 			index := 0
 			for _, rowResult := range table.GetRows() {
 				if !rowResult.GetIsOk() {
-					// 只有所有失败的行可重试时，批量操作才可以重试
+					// A batch operation can be retried only when all failed rows are retryable.
 					if !ShouldRetryViaErrorAndAction(rowResult.GetError().GetCode(), rowResult.GetError().GetMessage(), uri) {
 						return nil, false, nil
 					}
@@ -681,41 +689,30 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
 	hreq.Header.Set(xOtsContentmd5, md5Base64)
 
-	otshead := createOtsHeaders(akInfo.GetAccessKeySecret())
-	otshead.set(xOtsDate, date)
-	otshead.set(xOtsApiversion, ApiVersion)
-	otshead.set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
-
 	if extraInfo.userTraceID != nil && *extraInfo.userTraceID != "" {
 		hreq.Header.Set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
-		otshead.set(xOtsHeaderSDKTraceID, *extraInfo.userTraceID)
 	}
 	if extraInfo.requestExtension != nil && extraInfo.requestExtension.priority != nil {
 		hreq.Header.Set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
-		otshead.set(xOtsHeaderRequestPriority, strconv.Itoa(int(*extraInfo.requestExtension.priority)))
 	}
 	if extraInfo.requestExtension != nil && extraInfo.requestExtension.tag != nil && *extraInfo.requestExtension.tag != "" {
 		hreq.Header.Set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
-		otshead.set(xOtsHeaderRequestTag, *extraInfo.requestExtension.tag)
+	}
+	if extraInfo.requestExtension != nil && extraInfo.requestExtension.SearchTag != nil && *extraInfo.requestExtension.SearchTag != "" {
+		hreq.Header.Set(xOtsHeaderRequestSearchTag, *extraInfo.requestExtension.SearchTag)
 	}
 
 	if akInfo.GetSecurityToken() != "" {
 		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
-		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 	}
-	otshead.set(xOtsContentmd5, md5Base64)
-	otshead.set(xOtsInstanceName, internalClient.instanceName)
-	for key, value := range internalClient.externalHeader {
-		if strings.HasPrefix(key, xOtsPrefix) {
-			otshead.set(key, value)
-		}
-	}
-	sign, err := otshead.signature(uri, "POST", akInfo.GetAccessKeySecret())
 
+	AddExtraHeader(hreq, akInfo)
+
+	sign, err := GetSignature(uri, "POST", akInfo, hreq.Header)
 	if err != nil {
 		return nil, err, ""
 	}
-	hreq.Header.Set(xOtsSignature, sign)
+	AddSignatureHeader(hreq, akInfo, sign)
 
 	/* end set headers */
 	return internalClient.postReq(hreq, url)
@@ -742,10 +739,10 @@ func (tableStoreClient *TableStoreClient) SetRetryNotify(retryNotify RetryNotify
 // table API
 // Create a table with the CreateTableRequest, in which the table name and
 // primary keys are required.
-// 根据CreateTableRequest创建一个表，其中表名和主健列是必选项
+// Create a table according to CreateTableRequest, where the table name and primary key column are mandatory options.
 //
 // @param request of CreateTableRequest.
-// @return Void. 无返回值。
+// @return Void. No return value.
 func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableRequest) (*CreateTableResponse, error) {
 	if len(request.TableMeta.TableName) > maxTableNameLength {
 		return nil, errTableNameTooLong(request.TableMeta.TableName)
@@ -866,10 +863,10 @@ func (tableStoreClient *TableStoreClient) CreateTable(request *CreateTableReques
 
 // Create a timeseries table with CreateTimeseriesTableRequest. in which the timeseriesname
 // and tableOptions are required.
-// 根据CreateTimeseriesTableRequest创建一个时序表，其中表名和表选项是必选项
+// Create a timeseries table according to CreateTimeseriesTableRequest, where table name and table options are required.
 //
-// @param request of CreateTimeseriesTableRequest。
-// @return Void. 无返回值。
+// @param request of CreateTimeseriesTableRequest.
+// @return Void. No return value.
 func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateTimeseriesTableRequest) (*CreateTimeseriesTableResponse, error) {
 	req := new(otsprotocol.CreateTimeseriesTableRequest)
 	req.TableMeta = new(otsprotocol.TimeseriesTableMeta)
@@ -909,9 +906,9 @@ func (timeseriesClient *TimeseriesClient) CreateTimeseriesTable(request *CreateT
 }
 
 // Put a row in a timeseries table. The timeseriesTableName and TimeseriesRow are required.
-// 插入新的时序数据，其中时序表名和时序数据行(可多行)作为参数
+// Insert new time-series data, with the name of the time-series table and the time-series data row (can be multiple rows) as parameters.
 //
-// @param request of PutTimeseriesDataRequest。
+// @param request of PutTimeseriesDataRequest.
 // @return FailedRowResult
 func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseriesDataRequest) (*PutTimeseriesDataResponse, error) {
 	if request == nil || request.timeseriesTableName == "" || request.rows == nil || len(request.rows) == 0 {
@@ -987,7 +984,7 @@ func (timeseriesClient *TimeseriesClient) PutTimeseriesData(request *PutTimeseri
 
 // row API
 // Get the timeseries data of a row or some columns.
-// 获取某一时间线的一个或多个数据点
+// Get one or more data points from a certain timeline
 //
 // @param GetTimeseriesDataRequest
 // @return GetTimeseriesDataResponse
@@ -1065,7 +1062,7 @@ func (timeseriesClient *TimeseriesClient) GetTimeseriesData(request *GetTimeseri
 }
 
 // Get timeseries table meta infomation
-// 获取指定时序表的元数据
+// Get the metadata of the specified timeline table
 //
 // @param request of DescribeTimeseriesTableRequest.
 // @return TimeseriesTableMeta
@@ -1101,7 +1098,7 @@ func (timeseriesClient *TimeseriesClient) DescribeTimeseriesTable(request *Descr
 }
 
 // List all timeseries table name in this instance
-// 列出该实例中的所有时序表的元数据信息
+// List the metadata information of all timeliness tables in this instance.
 //
 // @param Void
 // @return []*TimeseriesTableMeta
@@ -1125,7 +1122,7 @@ func (timeseriesClient *TimeseriesClient) ListTimeseriesTable() (*ListTimeseries
 }
 
 // Delete a timeseries table
-// 删除一个时序表
+// Delete a time-series table
 //
 // @param DeleteTimeseriesTableRequest
 // return Void
@@ -1147,7 +1144,7 @@ func (timeseriesClient *TimeseriesClient) DeleteTimeseriesTable(request *DeleteT
 }
 
 // Query timeseries meta(measurement,tag,source) information in a timeseries table.
-// 查询一个时序表中的时序元数据(measurement，tag，source)信息。
+// Query the time series metadata (measurement, tag, source) information in a time series table.
 //
 // @param request of QueryTimeseriesMetaRequest
 // @return meta information of one or more timeline: QueryTimeseriesMetaResponse
@@ -1197,7 +1194,7 @@ func (timeseriesClient *TimeseriesClient) QueryTimeseriesMeta(request *QueryTime
 }
 
 // update timeInus parameter for a timeseries table.
-// 更新一个时序表的TTL参数
+// Update the TTL parameter of a time-series table
 //
 // @param UpdateTimeseriesTableRequest
 // @return Void
@@ -1223,7 +1220,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesTable(request *UpdateT
 }
 
 // update timeseries attributes for time line.
-// 更新时间线的属性信息
+// Update the property information of the timeline
 //
 // @param UpdateTimeseriesMetaRequest
 // @return UpdateTimeseriesMetaResponse
@@ -1253,8 +1250,9 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesMeta(request *UpdateTi
 			return nil, err
 		}
 
-		if curTimeseriesMeta.GetAttributes() != nil {
-			Attribute, err := BuildTagString(curTimeseriesMeta.GetAttributes())
+		curAttrs := curTimeseriesMeta.GetAttributes()
+		if curAttrs != nil {
+			Attribute, err := BuildTagString(curAttrs)
 			if err != nil {
 				return nil, err
 			}
@@ -1286,7 +1284,7 @@ func (timeseriesClient *TimeseriesClient) UpdateTimeseriesMeta(request *UpdateTi
 }
 
 // delete timeseries meta
-// 删除时间线元数据
+// Delete timeline metadata
 //
 // @param DeleteTimeseriesMetaRequest
 // @return DeleteTimeseriesMetaResponse
@@ -1528,10 +1526,10 @@ func (tableStoreClient *TableStoreClient) DeleteIndex(request *DeleteIndexReques
 }
 
 // List all tables. If done, all table names will be returned.
-// 列出所有的表，如果操作成功，将返回所有表的名称。
+// List all tables, and if the operation is successful, it will return the names of all tables.
 //
-// @param tableNames The returned table names. 返回的表名集合。
-// @return Void. 无返回值。
+// @param tableNames The returned table names. Collection of returned table names.
+// @return Void. No return value.
 func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error) {
 	resp := new(otsprotocol.ListTableResponse)
 	response := &ListTableResponse{}
@@ -1544,10 +1542,10 @@ func (tableStoreClient *TableStoreClient) ListTable() (*ListTableResponse, error
 }
 
 // Delete a table and all its views will be deleted.
-// 删除一个表
+// Delete a table
 //
-// @param tableName The table name. 表名。
-// @return Void. 无返回值。
+// @param tableName The table name.
+// @return Void. No return value.
 func (tableStoreClient *TableStoreClient) DeleteTable(request *DeleteTableRequest) (*DeleteTableResponse, error) {
 	req := new(otsprotocol.DeleteTableRequest)
 	req.TableName = proto.String(request.TableName)
@@ -1656,6 +1654,11 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 		}
 
 		response.SSEDetails = sseDetail
+	}
+	if resp.GetInnerInfo() != nil {
+		response.DescribeTableInnerInfo = &DescribeTableInnerInfo{
+			ClusterName: resp.GetInnerInfo().GetClusterName(),
+		}
 	}
 
 	return response, nil
@@ -1771,11 +1774,11 @@ func (tableStoreClient *TableStoreClient) DeleteDefinedColumn(request *DeleteDef
 
 // Put or update a row in a table. The operation is determined by CheckingType,
 // which has three options: NO, UPDATE, INSERT. The transaction id is optional.
-// 插入或更新行数据。操作针对数据的存在性包含三种检查类型：NO(不检查)，UPDATE
-// （更新，数据必须存在）和INSERT（插入，数据必须不存在）。事务ID是可选项。
+// Insert or update row data. The operation includes three types of existence checks: NO (no check), UPDATE
+// (Update, data must exist) and INSERT (Insert, data must not exist). The transaction ID is optional.
 //
-// @param builder The builder for putting a row. 插入或更新数据的Builder。
-// @return Void. 无返回值。
+// @param builder The builder for inserting or updating row data.
+// @return Void. No return value.
 func (tableStoreClient *TableStoreClient) PutRow(request *PutRowRequest) (*PutRowResponse, error) {
 	if request == nil {
 		return nil, nil
@@ -2489,7 +2492,21 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 	if req.TableName != nil {
 		pbReq.TableName = req.TableName
 	}
-
+	if req.ReturnSysColumns != nil {
+		pbReq.ReturnSysColumns = req.ReturnSysColumns
+	}
+	if req.NewRowReturnPolicy != nil {
+		switch *req.NewRowReturnPolicy {
+		case NO_NEW_ROW:
+			pbReq.NewRowReturnPolicy = otsprotocol.NewRowReturnPolicy_NO_NEW_ROW.Enum()
+		case WITH_NEW_ROW:
+			pbReq.NewRowReturnPolicy = otsprotocol.NewRowReturnPolicy_WITH_NEW_ROW.Enum()
+		case NEW_ROW_ONLY:
+			pbReq.NewRowReturnPolicy = otsprotocol.NewRowReturnPolicy_NEW_ROW_ONLY.Enum()
+		default:
+			return nil, errors.New("unknown NewRowReturnPolicy")
+		}
+	}
 	pbResp := otsprotocol.GetStreamRecordResponse{}
 	resp := GetStreamRecordResponse{}
 	if err := client.doRequestWithRetry(getStreamRecordUri, pbReq, &pbResp, &resp.ResponseInfo, req.ExtraRequestInfo); err != nil {
@@ -2507,6 +2524,9 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 
 	if pbResp.NextShardIterator != nil {
 		resp.NextShardIterator = (*ShardIterator)(pbResp.NextShardIterator)
+	}
+	if pbResp.VersionGeneratorValue != nil {
+		resp.VersionGeneratorValue = pbResp.VersionGeneratorValue
 	}
 	records := make([]*StreamRecord, len(pbResp.StreamRecords))
 	for i, pbRecord := range pbResp.StreamRecords {
@@ -2541,6 +2561,12 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 		Assert(plainRow.extension != nil,
 			"extension in a stream record is required.")
 		record.Info = plainRow.extension
+		if pbRecord.TableName != nil {
+			record.TableName = string(pbRecord.TableName)
+		}
+		if pbRecord.VersionGeneratorValue != nil {
+			record.VersionGeneratorValue = pbRecord.VersionGeneratorValue
+		}
 		record.Columns = make([]*RecordColumn, len(plainRow.cells))
 		for i, plainCell := range plainRow.cells {
 			cell := RecordColumn{}
@@ -2567,7 +2593,6 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 				break
 			}
 		}
-
 		if pbRecord.GetOriginRecord() != nil {
 			originPlainRows, err := readRowsWithHeader(bytes.NewReader(pbRecord.GetOriginRecord()))
 			if err != nil {
@@ -2604,7 +2629,19 @@ func (client TableStoreClient) GetStreamRecord(req *GetStreamRecordRequest) (*Ge
 				}
 			}
 		}
-
+		if pbRecord.GetSysColumns() != nil {
+			record.SysColumnsPlainBuffer = pbRecord.GetSysColumns()
+		}
+		if pbRecord.GetNewRowInfo() != nil {
+			record.NewRowInfo = &StreamRecordNewRowInfo{}
+			if pbRecord.GetNewRowInfo().HasNewRow == nil {
+				return nil, errors.New("HasNewRow is required")
+			}
+			record.NewRowInfo.HasNewRow = *pbRecord.GetNewRowInfo().HasNewRow
+			if pbRecord.GetNewRowInfo().GetColumns() != nil {
+				record.NewRowInfo.ColumnsPlainBuffer = pbRecord.GetNewRowInfo().GetColumns()
+			}
+		}
 	}
 	resp.Records = records
 	return &resp, nil

@@ -165,7 +165,7 @@ func TestHighlight_UnmarshalJSON(t *testing.T) {
 	assert.Equal(t, highlight.FieldHighlightParameters["highlight_field1"].PreTag, parsedHighlight.FieldHighlightParameters["highlight_field1"].PreTag)
 	assert.Equal(t, highlight.FieldHighlightParameters["highlight_field1"].PostTag, parsedHighlight.FieldHighlightParameters["highlight_field1"].PostTag)
 
-	// 高亮参数json传入格式
+	// JSON input format for highlight parameters
 	highlightJson := `{
         "HighlightEncoder": "html_mode",
         "FieldHighlightParameters": {

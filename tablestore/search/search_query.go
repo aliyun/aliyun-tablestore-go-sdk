@@ -32,6 +32,7 @@ type searchQuery struct {
 	Token         []byte
 	Aggregations  []Aggregation `json:"-"`
 	GroupBys      []GroupBy     `json:"-"`
+	SearchFilter  *SearchFilter `json:"SearchFilter"`
 
 	// for json marshal and unmarshal
 	QueryAlias       queryAlias         `json:"Query"`
@@ -79,6 +80,7 @@ func (q *searchQuery) UnmarshalJSON(data []byte) (err error) {
 	q.Sort = sqAlias.Sort
 	q.GetTotalCount = sqAlias.GetTotalCount
 	q.Token = sqAlias.Token
+	q.SearchFilter = sqAlias.SearchFilter
 
 	// aggregations
 	if sqAlias.AggregationAlias != nil {
@@ -332,6 +334,11 @@ func (s *searchQuery) SetToken(token []byte) *searchQuery {
 	return s
 }
 
+func (q *searchQuery) SetSearchFilter(searchFilter *SearchFilter) *searchQuery {
+	q.SearchFilter = searchFilter
+	return q
+}
+
 func (s *searchQuery) Serialize() ([]byte, error) {
 	searchQuery := &otsprotocol.SearchQuery{}
 	if s.Offset != nil {
@@ -395,6 +402,14 @@ func (s *searchQuery) Serialize() ([]byte, error) {
 			pbGroupBys.GroupBys = append(pbGroupBys.GroupBys, pbGroupBy)
 		}
 		searchQuery.GroupBys = pbGroupBys
+	}
+
+	if s.SearchFilter != nil {
+		pbFilter, err := s.SearchFilter.ProtoBuffer()
+		if err != nil {
+			return nil, err
+		}
+		searchQuery.Filter = pbFilter
 	}
 
 	data, err := proto.Marshal(searchQuery)

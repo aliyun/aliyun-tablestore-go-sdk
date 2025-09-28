@@ -53,7 +53,7 @@ message TaskSyncStat {
         INCR = 2;
     }
     optional TaskSyncPhase task_sync_phase = 1;
-    optional int64 current_sync_timestamp = 2; // 同步进度，参考TunnelService。
+    optional int64 current_sync_timestamp = 2; // Synchronize progress, refer to TunnelService.
     optional ErrorType error_code = 3; // UnAuthorized/InvalidOssBucket...
     optional string detail = 4;
 }

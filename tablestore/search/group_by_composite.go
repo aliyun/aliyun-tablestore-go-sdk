@@ -5,9 +5,9 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-// GroupByComposite 支持组合多种GroupBy以扁平模式返回分组结果，并且可通过NextToken翻页。
-// 目前source中可组合的GroupBy类型包括：GroupByField/GroupByHistogram/GroupByDateHistogram。
-// source中的GroupBy存在参数限制。
+// GroupByComposite supports combining multiple GroupBy to return grouped results in a flat mode, and pagination is available through NextToken.
+// The GroupBy types that can currently be combined in the source include: GroupByField/GroupByHistogram/GroupByDateHistogram.
+// The GroupBy in the source has parameter limitations.
 type GroupByComposite struct {
 	GroupByName       string
 	SourceGroupByList []GroupBy

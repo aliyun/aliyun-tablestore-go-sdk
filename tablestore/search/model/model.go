@@ -410,27 +410,27 @@ type DefinedColumnType int32
 
 const (
 	/**
-	 * 64位整数。
+	 * 64-bit integer.
 	 */
 	DefinedColumn_INTEGER DefinedColumnType = 1
 
 	/**
-	 * 浮点数。
+	 * Floating-point number.
 	 */
 	DefinedColumn_DOUBLE DefinedColumnType = 2
 
 	/**
-	 * 布尔值。
+	 * Boolean value.
 	 */
 	DefinedColumn_BOOLEAN DefinedColumnType = 3
 
 	/**
-	 * 字符串。
+	 * String.
 	 */
 	DefinedColumn_STRING DefinedColumnType = 4
 
 	/**
-	 * BINARY。
+	 * BINARY.
 	 */
 	DefinedColumn_BINARY DefinedColumnType = 5
 )

@@ -135,6 +135,8 @@ func getBackoffConfForDiffUri(uri string, duration time.Duration) (time.Duration
 	switch uri {
 	case readRecordsUri:
 		return initRetryIntervalForDataApi, maxRetryIntervalForDataApi, duration
+	case getRpoUri, getRpoByOffsetUri:
+		return initRetryIntervalForRpoApi, maxRetryIntervalForRpoApi, retryMaxElapsedTimeForRpoApi
 	default:
 		return initRetryInterValForMetaApi, maxRetryIntervalForMetaApi, retryMaxElapsedTimeForMetaApi
 	}

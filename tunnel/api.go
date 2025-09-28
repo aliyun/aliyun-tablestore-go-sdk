@@ -7,11 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
-	"github.com/golang/protobuf/proto"
-	"github.com/satori/go.uuid"
 	"io"
 	"io/ioutil"
 	"net"
@@ -19,6 +14,12 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/cenkalti/backoff"
+	"github.com/golang/protobuf/proto"
+	"github.com/satori/go.uuid"
 )
 
 const (
@@ -30,6 +31,7 @@ const (
 	deleteTunnelUri   = "/tunnel/delete"
 	listTunnelUri     = "/tunnel/list"
 	describeTunnelUri = "/tunnel/describe"
+	switchTunnelUri   = "/tunnel/switch"
 	connectUri        = "/tunnel/connect"
 	heartbeatUri      = "/tunnel/heartbeat"
 	shutdownUri       = "/tunnel/shutdown"
@@ -42,12 +44,16 @@ const (
 )
 
 var (
-	initRetryIntervalForDataApi = 16 * time.Millisecond
+	initRetryIntervalForDataApi = 100 * time.Millisecond
 	maxRetryIntervalForDataApi  = 3 * time.Second
 
-	initRetryInterValForMetaApi   = 100 * time.Millisecond
-	maxRetryIntervalForMetaApi    = 2 * time.Second
+	initRetryInterValForMetaApi   = 200 * time.Millisecond
+	maxRetryIntervalForMetaApi    = 5 * time.Second
 	retryMaxElapsedTimeForMetaApi = 35 * time.Second
+
+	initRetryIntervalForRpoApi   = 500 * time.Millisecond
+	maxRetryIntervalForRpoApi    = 2 * time.Second
+	retryMaxElapsedTimeForRpoApi = 3 * time.Second
 )
 
 type ClientOption func(api *TunnelApi)
@@ -56,6 +62,7 @@ type TunnelMetaApi interface {
 	CreateTunnel(req *CreateTunnelRequest) (resp *CreateTunnelResponse, err error)
 	ListTunnel(req *ListTunnelRequest) (resp *ListTunnelResponse, err error)
 	DescribeTunnel(req *DescribeTunnelRequest) (resp *DescribeTunnelResponse, err error)
+	SwitchTunnel(req *SwitchTunnelRequest) (resp *SwitchTunnelResponse, err error)
 	DeleteTunnel(req *DeleteTunnelRequest) (resp *DeleteTunnelResponse, err error)
 	GetRpo(req *GetRpoRequest) (resp *GetRpoResponse, err error)
 	GetRpoByOffset(req *GetRpoRequest) (resp *GetRpoResponse, err error)
@@ -82,15 +89,19 @@ func NewTunnelApi(endpoint, instanceName, accessKeyId, accessKeySecret string, c
 }
 
 func NewTunnelApiWithToken(endpoint, instanceName, accessKeyId, accessKeySecret, token string, conf *TunnelConfig, options ...ClientOption) *TunnelApi {
+	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: token}
+	return NewTunnelApiWithCredentialsProvider(endpoint, instanceName, provider, conf, options...)
+}
+
+func NewTunnelApiWithCredentialsProvider(endpoint, instanceName string, provider common.CredentialsProvider, conf *TunnelConfig, options ...ClientOption) *TunnelApi {
 	tunnelApi := &TunnelApi{
 		endpoint:        endpoint,
 		instanceName:    instanceName,
-		accessKeyId:     accessKeyId,
-		accessKeySecret: accessKeySecret,
-		securityToken:   token,
+		accessKeyId:     provider.GetCredentials().GetAccessKeyID(),
+		accessKeySecret: provider.GetCredentials().GetAccessKeyID(),
+		securityToken:   provider.GetCredentials().GetSecurityToken(),
 	}
 
-	provider := &common.DefaultCredentialsProvider{AccessKeyID: accessKeyId, AccessKeySecret: accessKeySecret, SecurityToken: token}
 	tunnelApi.credentialsProvider = provider
 	for _, option := range options {
 		option(tunnelApi)
@@ -113,7 +124,7 @@ func NewTunnelApiWithExternalHeader(endpoint, instanceName, accessKeyId, accessK
 	return tunnelApi
 }
 
-// 请求服务端
+// Request to the server
 func (api *TunnelApi) doRequest(uri string, req, resp proto.Message) (string, int, error) {
 	//end := time.Now().Add(api.config.MaxRetryTime)
 	url := fmt.Sprintf("%s%s", api.endpoint, uri)
@@ -187,32 +198,20 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 	md5Base64 := base64.StdEncoding.EncodeToString(md5Byte[:16])
 	hreq.Header.Set(xOtsContentmd5, md5Base64)
 
-	otshead := createOtsHeaders(akInfo.GetAccessKeySecret())
-	otshead.set(xOtsDate, date)
-	otshead.set(xOtsApiversion, apiVersion)
-	otshead.set(xOtsAccesskeyid, akInfo.GetAccessKeyID())
 	if akInfo.GetSecurityToken() != "" {
 		hreq.Header.Set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
-		otshead.set(xOtsHeaderStsToken, akInfo.GetSecurityToken())
 	}
 	traceId := uuid.NewV4()
 	hreq.Header.Set(xOtsHeaderTraceID, traceId.String())
-	otshead.set(xOtsHeaderTraceID, traceId.String())
 
-	otshead.set(xOtsContentmd5, md5Base64)
-	otshead.set(xOtsInstanceName, api.instanceName)
-	for key, value := range api.externalHeader {
-		if strings.HasPrefix(key, xOtsPrefix) {
-			otshead.set(key, value)
-		}
-	}
+	AddExtraHeader(hreq, akInfo)
 
-	sign, err := otshead.signature(uri, "POST", akInfo.GetAccessKeySecret())
+	sign, err := GetSignature(uri, "POST", akInfo, hreq.Header)
 
 	if err != nil {
 		return nil, err, ""
 	}
-	hreq.Header.Set(xOtsSignature, sign)
+	AddSignatureHeader(hreq, akInfo, sign)
 
 	/* end set headers */
 	return api.postReq(hreq, url)
@@ -286,8 +285,9 @@ func (api *TunnelApi) CreateTunnel(req *CreateTunnelRequest) (*CreateTunnelRespo
 
 func (api *TunnelApi) DeleteTunnel(req *DeleteTunnelRequest) (*DeleteTunnelResponse, error) {
 	deleteTunnelRequest := &protocol.DeleteTunnelRequest{
-		TableName:  &req.TableName,
-		TunnelName: &req.TunnelName,
+		TableName:    &req.TableName,
+		TunnelName:   &req.TunnelName,
+		OnlyPhysical: &req.OnlyPhysical,
 	}
 	deleteTunnelResponse := new(protocol.DeleteTunnelResponse)
 	traceId, _, err := api.doRequest(deleteTunnelUri, deleteTunnelRequest, deleteTunnelResponse)
@@ -299,7 +299,8 @@ func (api *TunnelApi) DeleteTunnel(req *DeleteTunnelRequest) (*DeleteTunnelRespo
 
 func (api *TunnelApi) ListTunnel(req *ListTunnelRequest) (*ListTunnelResponse, error) {
 	listTunnelRequest := &protocol.ListTunnelRequest{
-		TableName: &req.TableName,
+		TableName:    &req.TableName,
+		OnlyPhysical: &req.OnlyPhysical,
 	}
 	listTunnelResponse := new(protocol.ListTunnelResponse)
 	traceId, _, err := api.doRequest(listTunnelUri, listTunnelRequest, listTunnelResponse)
@@ -331,8 +332,9 @@ func (api *TunnelApi) ListTunnel(req *ListTunnelRequest) (*ListTunnelResponse, e
 
 func (api *TunnelApi) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunnelResponse, error) {
 	describeTunnelRequest := &protocol.DescribeTunnelRequest{
-		TableName:  &req.TableName,
-		TunnelName: &req.TunnelName,
+		TableName:    &req.TableName,
+		TunnelName:   &req.TunnelName,
+		OnlyPhysical: &req.OnlyPhysical,
 	}
 	describeTunnelResponse := new(protocol.DescribeTunnelResponse)
 	traceId, _, err := api.doRequest(describeTunnelUri, describeTunnelRequest, describeTunnelResponse)
@@ -372,6 +374,24 @@ func (api *TunnelApi) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunne
 		}
 		channelInfo.ChannelRPO = c.GetChannelRpo()
 		resp.Channels = append(resp.Channels, channelInfo)
+	}
+	return resp, nil
+}
+
+func (api *TunnelApi) SwitchTunnel(req *SwitchTunnelRequest) (*SwitchTunnelResponse, error) {
+	switchTunnelRequest := &protocol.SwitchTunnelRequest{
+		CurrentPrimaryCluster:   &req.CurrentPrimaryCluster,
+		CurrentSecondaryCluster: &req.CurrentSecondaryCluster,
+		LogicalTunnelID:         &req.LogicalTunnelID,
+		PhysicalTunnelID:        &req.PhysicalTunnelID,
+	}
+	switchTunnelResponse := new(protocol.SwitchTunnelResponse)
+	traceId, _, err := api.doRequest(switchTunnelUri, switchTunnelRequest, switchTunnelResponse)
+	if err != nil {
+		return nil, err
+	}
+	resp := &SwitchTunnelResponse{
+		ResponseInfo: ResponseInfo{traceId},
 	}
 	return resp, nil
 }
@@ -483,7 +503,7 @@ func (api *TunnelApi) GetCheckpoint(tunnelId, clientId string, channelId string)
 	return *getCheckpointResponse.Checkpoint, *getCheckpointResponse.SequenceNumber, nil
 }
 
-//add for oss data lake sync part
+// add for oss data lake sync part
 func (api *TunnelApi) ReadRows(tunnelId, clientId string, channelId string, token string) ([]*protocol.Record, string, string, int, error) {
 	readRecordsRequest := &protocol.ReadRecordsRequest{
 		TunnelId:  &tunnelId,
@@ -596,6 +616,9 @@ func shouldRetry(err error) bool {
 	}
 	if err == io.EOF || err == io.ErrUnexpectedEOF ||
 		strings.Contains(err.Error(), io.EOF.Error()) || //retry on special net error contains EOF or reset
+		strings.Contains(err.Error(), "server closed idle connection") ||
+		strings.Contains(err.Error(), "connection refused") ||
+		strings.Contains(err.Error(), "connection reset by peer") ||
 		strings.Contains(err.Error(), "Connection reset by peer") {
 		return true
 	}

@@ -10,21 +10,21 @@ import (
 )
 
 /*
-CreateTimeseriesTableSample 创建一个时序表，其中表名为：timeseriesTableName，TTL为：timetolive。
+CreateTimeseriesTableSample creates a time series table, where the table name is: timeseriesTableName, and the TTL is: timetolive.
 */
 func CreateTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string, timetoLive int64) {
 	fmt.Println("[Info]: Begin to create timeseries table: ", timeseriesTableName)
 
-	timeseriesTableOptions := tablestore.NewTimeseriesTableOptions(timetoLive) // 构造表选项
+	timeseriesTableOptions := tablestore.NewTimeseriesTableOptions(timetoLive) // Construct table options
 
-	// 构造表元数据信息
-	timeseriesTableMeta := tablestore.NewTimeseriesTableMeta(timeseriesTableName) // 设置表名
-	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)         // 设置表选项
+	// Construct table metadata information
+	timeseriesTableMeta := tablestore.NewTimeseriesTableMeta(timeseriesTableName) // Set the table name
+	timeseriesTableMeta.SetTimeseriesTableOptions(timeseriesTableOptions)         // Set table options
 
-	createTimeseriesTableRequest := tablestore.NewCreateTimeseriesTableRequest() // 构造创建时序表请求
+	createTimeseriesTableRequest := tablestore.NewCreateTimeseriesTableRequest() // Construct a request to create a time-series table.
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(timeseriesTableMeta)
 
-	createTimeseriesTableResponse, err := client.CreateTimeseriesTable(createTimeseriesTableRequest) // 调用client创建时序表
+	createTimeseriesTableResponse, err := client.CreateTimeseriesTable(createTimeseriesTableRequest) // Call the client to create a time-series table
 	if err != nil {
 		fmt.Println("[Error]: Failed to create timeseries table with error: ", err)
 		return
@@ -32,12 +32,12 @@ func CreateTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseries
 	fmt.Println("[Info]: CreateTimeseriesTable finished ! RequestId: ", createTimeseriesTableResponse.RequestId)
 }
 
-/**
-* DescribeTimeseriesTableSample 获取时序表timeseriesTableName的元数据信息。
- */
+/*
+DescribeTimeseriesTableSample gets the metadata information of the timeseries table timeseriesTableName.
+*/
 func DescribeTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to require timeseries table description ！")
-	describeTimeseriesTableRequest := tablestore.NewDescribeTimeseriesTableRequset(timeseriesTableName) // 构造请求，并设置请求表名
+	describeTimeseriesTableRequest := tablestore.NewDescribeTimeseriesTableRequset(timeseriesTableName) // Construct the request and set the table name for the request.
 
 	describeTimeseriesTableResponse, err := client.DescribeTimeseriesTable(describeTimeseriesTableRequest)
 	if err != nil {
@@ -50,7 +50,7 @@ func DescribeTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseri
 }
 
 /**
-* ListTimeseriesTableSample 列出实例中所有时序表的元数据信息
+* ListTimeseriesTableSample lists the metadata information of all timeseries tables in the instance.
  */
 func ListTimeseriesTableSample(client *tablestore.TimeseriesClient) {
 	fmt.Println("[Info]: Begin to list timeseries table !")
@@ -67,13 +67,13 @@ func ListTimeseriesTableSample(client *tablestore.TimeseriesClient) {
 }
 
 /*
-DeleteTimeseriesTableSample 删除实例中表名为timeseriesTableName的时序表
+DeleteTimeseriesTableSample deletes the timeseries table with the name 'timeseriesTableName' in the instance.
 */
 func DeleteTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to delete timeseries table !")
-	// 构造删除时序表请求
+	// Construct a delete request for the time-series table
 	deleteTimeseriesTableRequest := tablestore.NewDeleteTimeseriesTableRequest(timeseriesTableName)
-	// 调用时序客户端删除时序表
+	// Call the time series client to delete a time series table
 	deleteTimeseriesTableResponse, err := client.DeleteTimeseriesTable(deleteTimeseriesTableRequest)
 	if err != nil {
 		fmt.Println("[Error]: Delete timeseries table failed with error: ", err)
@@ -83,18 +83,18 @@ func DeleteTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseries
 }
 
 /**
-* UpdateTimeseriesTableSample 更新时序表的TTL参数
+* UpdateTimeseriesTableSample updates the TTL parameter of a timeseries table
  */
 func UpdateTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to update timeseries table !")
-	// 构造时序表TTL参数选项
+	// Construct the TTL parameter options for the time-series table.
 	timeseriesTableOptions := tablestore.NewTimeseriesTableOptions(964000)
 
-	// 构造更新请求
+	// Construct an update request
 	updateTimeseriesTableRequest := tablestore.NewUpdateTimeseriesTableRequest(timeseriesTableName)
 	updateTimeseriesTableRequest.SetTimeseriesTableOptions(timeseriesTableOptions)
 
-	// 调用时序客户端更新时序表
+	// Call the timeline client to update the timeline table
 	updateTimeseriesTableResponse, err := client.UpdateTimeseriesTable(updateTimeseriesTableRequest)
 	if err != nil {
 		fmt.Println("[Error]: Update timeseries table failed with error: ", err)
@@ -105,12 +105,12 @@ func UpdateTimeseriesTableSample(client *tablestore.TimeseriesClient, timeseries
 }
 
 /**
-* PutTimeseriesDataSample 向时序表中写入一个或多个时序数据。
+* PutTimeseriesDataSample writes one or more time series data entries into a time series table.
  */
 func PutTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to PutTimeseriesDataSample !")
 
-	// 构造时序数据行timeseriesRow
+	// Construct the timeseries data row `timeseriesRow`
 	timeseriesKey := tablestore.NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("CPU")
 	timeseriesKey.SetDataSource("127.0.0.1")
@@ -122,7 +122,7 @@ func PutTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTabl
 	timeseriesRow.AddField("temperature", tablestore.NewColumnValue(tablestore.ColumnType_INTEGER, 98))
 	timeseriesRow.AddField("status", tablestore.NewColumnValue(tablestore.ColumnType_STRING, "ok"))
 
-	// 构造时序数据行timeseriesRow1
+	// Construct the timeseries data row timeseriesRow1
 	timeseriesKey1 := tablestore.NewTimeseriesKey()
 	timeseriesKey1.SetMeasurementName("NETWORK")
 	timeseriesKey1.SetDataSource("127.0.0.1")
@@ -137,11 +137,11 @@ func PutTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTabl
 	timeseriesRow1.AddField("status", tablestore.NewColumnValue(tablestore.ColumnType_BOOLEAN, true))
 	timeseriesRow1.AddField("lossrate", tablestore.NewColumnValue(tablestore.ColumnType_DOUBLE, float64(1.9098)))
 
-	// 构造put时序数据请求
+	// Construct the put sequential data request
 	putTimeseriesDataRequest := tablestore.NewPutTimeseriesDataRequest(timeseriesTableName)
 	putTimeseriesDataRequest.AddTimeseriesRows(timeseriesRow, timeseriesRow1)
 
-	// 调用时序客户端写入时序数据
+	// Call the time series client to write time series data
 	putTimeseriesDataResponse, err := client.PutTimeseriesData(putTimeseriesDataRequest)
 	if err != nil {
 		fmt.Println("[Error]: Put timeseries data Failed with error: ", err)
@@ -159,25 +159,25 @@ func PutTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTabl
 }
 
 /**
-* GetTimeseriesDataSample 根据timeseriesKey获取时序表中指定的时间线数据
+* GetTimeseriesDataSample retrieves the specified timeline data from the time series table based on the timeseriesKey.
  */
 func GetTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to get timeseries data !")
 
-	// 构造待查询时间线的timeseriesKey
+	// Construct the timeseriesKey for the timeline to be queried.
 	timeseriesKey := tablestore.NewTimeseriesKey()
 	timeseriesKey.SetMeasurementName("NETWORK")
 	timeseriesKey.SetDataSource("127.0.0.1")
 	timeseriesKey.AddTag("City", "Hangzhou")
 	timeseriesKey.AddTag("Region", "Xihu")
 
-	// 构造get请求
+	// Construct a GET request
 	getTimeseriesDataRequest := tablestore.NewGetTimeseriesDataRequest(timeseriesTableName)
 	getTimeseriesDataRequest.SetTimeseriesKey(timeseriesKey)
-	getTimeseriesDataRequest.SetTimeRange(0, time.Now().UnixNano()/1000) // 指定查询时间线的范围
+	getTimeseriesDataRequest.SetTimeRange(0, time.Now().UnixNano()/1000) // Specify the range of the query timeline
 	getTimeseriesDataRequest.SetLimit(-1)
 
-	// 调用时序客户端接口获取时间线数据
+	// Call the timeline client interface to obtain timeline data.
 	getTimeseriesResp, err := client.GetTimeseriesData(getTimeseriesDataRequest)
 	if err != nil {
 		fmt.Println("[Error]: Get timeseries data Failed with error: ", err)
@@ -197,28 +197,28 @@ func GetTimeseriesDataSample(client *tablestore.TimeseriesClient, timeseriesTabl
 }
 
 /**
-* QueryTimeseriesMetaSample 根据指定条件查询数据表中特定时间线的measurement、source、tag信息，其中查询条件可组合。
+ * QueryTimeseriesMetaSample queries the measurement, source, and tag information of specific timelines in a data table based on specified conditions, where the query conditions can be combined.
  */
 func QueryTimeseriesMetaSample(client *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to query timeseries table meta !")
 
-	// 构造多个单查询条件
+	// Construct multiple single query conditions
 	measurementMetaQueryCondition := tablestore.NewMeasurementQueryCondition(tablestore.OP_GREATER_EQUAL, "")
 	datasourceMetaQueryCondition := tablestore.NewDataSourceMetaQueryCondition(tablestore.OP_GREATER_EQUAL, "")
 	tagMetaQueryCondition := tablestore.NewTagMetaQueryCondition(tablestore.OP_GREATER_THAN, "City", "")
 
-	// 构造组合条件
+	// Construct compound conditions
 	compsiteMetaQueryCondition := tablestore.NewCompositeMetaQueryCondition(tablestore.OP_AND)
 	compsiteMetaQueryCondition.AddSubConditions(measurementMetaQueryCondition)
 	compsiteMetaQueryCondition.AddSubConditions(datasourceMetaQueryCondition)
 	compsiteMetaQueryCondition.AddSubConditions(tagMetaQueryCondition)
 
-	// 构造query请求
+	// Construct the query request
 	queryTimeseriesMetaRequest := tablestore.NewQueryTimeseriesMetaRequest(timeseriesTableName)
 	queryTimeseriesMetaRequest.SetCondition(compsiteMetaQueryCondition)
 	queryTimeseriesMetaRequest.SetLimit(-1)
 
-	// 调用客户端执行查询请求
+	// Call the client to execute the query request
 	queryTimeseriesTableResponse, err := client.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	if err != nil {
 		fmt.Println("[Error]: Query timeseries table meta failed with error: ", err)
@@ -236,7 +236,7 @@ func QueryTimeseriesMetaSample(client *tablestore.TimeseriesClient, timeseriesTa
 }
 
 /**
-* UpdateTimeseriesMetaSample 更新时间线中的Attributes信息。
+* UpdateTimeseriesMetaSample updates the Attributes information in the timeline.
  */
 func UpdateTimeseriesMetaSample(tsClient *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to update timeseries meta !")
@@ -276,18 +276,18 @@ func UpdateTimeseriesMetaSample(tsClient *tablestore.TimeseriesClient, timeserie
 	fmt.Println("[Info]: UpdateTimeseriesMetaSample finished !")
 }
 
-// CreateTimeseriesTableWithAnalyticalStoreSample 创建时序表，并且创建分析存储
+// CreateTimeseriesTableWithAnalyticalStoreSample creates a timeseries table and also creates an analytical store.
 func CreateTimeseriesTableWithAnalyticalStoreSample(tsClient *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to create timeseries table with analytical store !")
 
-	// 创建时序表
+	// Create a time-series table
 	meta := tablestore.NewTimeseriesTableMeta(timeseriesTableName)
 	meta.SetTimeseriesTableOptions(tablestore.NewTimeseriesTableOptions(-1))
 	createTimeseriesTableRequest := tablestore.NewCreateTimeseriesTableRequest()
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
 	createTimeseriesTableRequest.SetAnalyticalStores([]*tablestore.TimeseriesAnalyticalStore{{
-		StoreName:  "custom_analytical_store", // 分析存储名称
-		TimeToLive: proto.Int32(-1),           // 分析存储数据的过期时间，单位为秒，-1表示永不过期
+		StoreName:  "custom_analytical_store", // Analyze the storage name
+		TimeToLive: proto.Int32(-1),           // Analyze the expiration time of stored data, in seconds, -1 means never expires
 	}})
 	_, err := tsClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	if err != nil {
@@ -298,7 +298,7 @@ func CreateTimeseriesTableWithAnalyticalStoreSample(tsClient *tablestore.Timeser
 	fmt.Println("[Info]: Create timeseries table with analytical store succeed !")
 }
 
-// DescribeTimeseriesAnalyticalStoresSample 列出时序表下面所有的分析存储，并且打印出分析存储的同步状态和存储大小
+// DescribeTimeseriesAnalyticalStoresSample lists all analytical stores under the timeseries table and prints the synchronization status and storage size of the analytical stores.
 func DescribeTimeseriesAnalyticalStoresSample(tsClient *tablestore.TimeseriesClient, timeseriesTableName string) {
 	fmt.Println("[Info]: Begin to describe timeseries analytical stores !")
 

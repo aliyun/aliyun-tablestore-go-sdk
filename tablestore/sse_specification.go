@@ -2,7 +2,7 @@ package tablestore
 
 import "errors"
 
-// 表示服务器端加密的秘钥类型
+// Indicates the type of server-side encryption key
 type SSEKeyType int
 
 func (t *SSEKeyType) String() string {
@@ -17,25 +17,25 @@ func (t *SSEKeyType) String() string {
 }
 
 const (
-	// 使用KMS的服务主密钥
+	// Use the service master key of KMS
 	SSE_KMS_SERVICE SSEKeyType = iota
 
-	// 使用KMS的用户主密钥，支持用户自定义秘钥上传
+	// Use the KMS customer master key, supporting user-defined key upload.
 	SSE_BYOK
 )
 
 type SSESpecification struct {
-	// 是否开启服务器端加密
+	// Whether to enable server-side encryption
 	Enable bool
 
-	// 当开启服务器端加密时，该参数用于设置秘钥类型
+	// When server-side encryption is enabled, this parameter is used to set the key type.
 	KeyType *SSEKeyType
 
-	// 当开启服务器端加密且秘钥类型为BYOK时，该参数用于指定KMS用户主密钥的id
+	// When server-side encryption is enabled and the key type is BYOK, this parameter is used to specify the id of the KMS user master key.
 	KeyId *string
 
-	// 当开启服务器端加密且秘钥类型为BYOK时，需要通过STS服务授权表格存储获取临时访问令牌访问传入的KMS用户主密钥，
-	// 该参数用于指定为此创建的RAM角色的全局资源描述符
+	// When server-side encryption is enabled and the key type is BYOK, you need to authorize Table Store to obtain a temporary access token through the STS service to access the KMS user master key.
+	// This parameter is used to specify the global resource descriptor for the RAM role created for this purpose.
 	RoleArn *string
 }
 
@@ -85,17 +85,17 @@ func (sse *SSESpecification) SetRoleArn(roleArn string) {
 }
 
 type SSEDetails struct {
-	// 是否开启服务器端加密
+	// Whether to enable server-side encryption
 	Enable bool
 
-	// 秘钥类型, 开启服务器端加密时有效
+	// Key type, valid when server-side encryption is enabled
 	KeyType SSEKeyType
 
-	// 主密钥在KMS中的id, 可以根据keyId在KMS系统中对秘钥的使用情况进行审计
-	// 开启服务器端加密时有效
+	// The ID of the master key in KMS, you can audit the usage of the key in the KMS system based on the keyId.
+	// Valid when server-side encryption is enabled
 	KeyId string
 
-	// 授权表格存储临时访问KMS用户主密钥的全局资源描述符
-	// 开启服务器端加密且秘钥类型为SSE_BYOK时有效
+	// Authorizes the global resource descriptor for temporarily accessing the KMS user's main key in Table Store.
+	// Valid when server-side encryption is enabled and the key type is SSE_BYOK.
 	RoleArn string
 }

@@ -90,6 +90,11 @@ func main() {
 	sample.WriteDataForVectorQuery(client, "vector_query_sample_table")
 	sample.VectorQuerySample(client, "vector_query_sample_table", "vector_query_sample_index")
 
+	// SearchIndex: Json Field Creating And Query
+	sample.CreateSearchIndexWithJsonField(client, "json_field_sample_table", "json_field_sample_index")
+	sample.WriteDataForJsonField(client, "json_field_sample_table")
+	sample.JsonQuerySample(client, "json_field_sample_table", "json_field_sample_index")
+
 	// update searchIndex schema
 	sample.UpdateSearchIndexSchema(client, "go_sdk_test_table", "go_sdk_test_index", "go_sdk_test_index_reindex")
 

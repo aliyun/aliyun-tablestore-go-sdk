@@ -48,8 +48,8 @@ const initMapLen int = 8
 // The TableStoreClient, which will connect OTS service for authorization, create/list/
 // delete tables/table groups, to get/put/delete a row.
 // Note: TableStoreClient is thread-safe.
-// TableStoreClient的功能包括连接OTS服务进行验证、创建/列出/删除表或表组、插入/获取/
-// 删除/更新行数据
+// The functions of TableStoreClient include connecting to the OTS service for authentication, creating/listing/deleting tables or table groups, inserting/retrieving/
+// Delete/Update row data
 type TableStoreClient struct {
 	*internalClient
 }
@@ -195,12 +195,13 @@ type DescribeTableRequest struct {
 }
 
 type DescribeTableResponse struct {
-	TableMeta          *TableMeta
-	TableOption        *TableOption
-	ReservedThroughput *ReservedThroughput
-	StreamDetails      *StreamDetails
-	IndexMetas         []*IndexMeta
-	SSEDetails         *SSEDetails
+	TableMeta              *TableMeta
+	TableOption            *TableOption
+	ReservedThroughput     *ReservedThroughput
+	StreamDetails          *StreamDetails
+	IndexMetas             []*IndexMeta
+	SSEDetails             *SSEDetails
+	DescribeTableInnerInfo *DescribeTableInnerInfo
 	ResponseInfo
 }
 
@@ -615,8 +616,8 @@ type BatchGetRowResponse struct {
 	ResponseInfo
 }
 
-// IsAtomic设置是否为批量原子写
-// 如果设置了批量原子写，需要保证写入到同一张表格中的分区键相同，否则会写入失败
+// IsAtomic sets whether it is a batch atomic write
+// If batch atomic write is set, ensure that the partition keys written to the same table are the same, otherwise the write will fail.
 type BatchWriteRowRequest struct {
 	RowChangesGroupByTable map[string][]RowChange
 	IsAtomic               bool
@@ -682,14 +683,14 @@ type RangeRowQueryCriteria struct {
 	EndColumn       *string
 	TransactionId   *string
 
-	// DataBlockType指定对服务器端返回的数据编码格式，未设置相当于DataBlockType.PLAIN_BUFFER.
+	// DataBlockType specifies the encoding format for the data returned by the server. If not set, it defaults to DataBlockType.PLAIN_BUFFER.
 	DataBlockType DataBlockType
 
-	// 当columnsToGet不为空，且不包含所有主键列时，ReturnSpecifiedPkOnly为false时会返回全部主键列,
-	// 若为true，则只返回columnsToGet中指定的主键列.
+	// When columnsToGet is not empty and does not include all primary key columns, if ReturnSpecifiedPkOnly is false, all primary key columns will be returned.
+	// If true, only the primary key columns specified in columnsToGet are returned.
 	ReturnSpecifiedPkOnly bool
 
-	// CompressType指定服务端返回的数据的压缩类型，未设置相当于CompressType.NONE.
+	// CompressType specifies the compression type of the data returned by the service. If not set, it is equivalent to CompressType.NONE.
 	CompressType CompressType
 }
 
@@ -778,6 +779,11 @@ type StreamDetails struct {
 	OriginColumnsToGet []string  //origin columns to get for stream data
 }
 
+// DescribeTableInnerInfo Information about DescribeTable that is only visible internally
+type DescribeTableInnerInfo struct {
+	ClusterName string // the cluster name of the table.
+}
+
 type DescribeStreamRequest struct {
 	StreamId              *StreamId // required
 	InclusiveStartShardId *ShardId  // optional
@@ -810,18 +816,29 @@ type GetShardIteratorResponse struct {
 	ResponseInfo
 }
 
+type NewRowReturnPolicy int32
+
+const (
+	NO_NEW_ROW   NewRowReturnPolicy = 0
+	WITH_NEW_ROW NewRowReturnPolicy = 1
+	NEW_ROW_ONLY NewRowReturnPolicy = 2
+)
+
 type GetStreamRecordRequest struct {
-	ShardIterator *ShardIterator // required
-	Limit         *int32         // optional. max records which will reside in response
-	TableName     *string
+	ShardIterator      *ShardIterator // required
+	Limit              *int32         // optional. max records which will reside in response
+	TableName          *string
+	ReturnSysColumns   *bool
+	NewRowReturnPolicy *NewRowReturnPolicy
 	ExtraRequestInfo
 }
 
 type GetStreamRecordResponse struct {
-	Records           []*StreamRecord
-	NextShardIterator *ShardIterator // optional. an indicator to be used to read more records in this shard
-	CapacityUnit      *ConsumedCapacityUnit
-	MayMoreRecord     *bool
+	Records               []*StreamRecord
+	NextShardIterator     *ShardIterator // optional. an indicator to be used to read more records in this shard
+	CapacityUnit          *ConsumedCapacityUnit
+	MayMoreRecord         *bool
+	VersionGeneratorValue *int64
 	ResponseInfo
 }
 
@@ -866,22 +883,64 @@ type StreamShard struct {
 	MotherShard *ShardId // optional
 }
 
-type StreamRecord struct {
-	Type          ActionType
-	Info          *RecordSequenceInfo // required
-	PrimaryKey    *PrimaryKey         // required
-	Columns       []*RecordColumn
-	OriginColumns []*RecordColumn
+func ParsePlainbufferToNormalColumns(plainbuffer []byte) ([]*AttributeColumn, error) {
+	if plainbuffer == nil {
+		return []*AttributeColumn{}, nil
+	}
+	rows, err := readRowsWithHeader(bytes.NewReader(plainbuffer))
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) != 1 {
+		return nil, errors.New("there must be exactly one row in a StringRecord")
+	}
+	result := make([]*AttributeColumn, len(rows[0].cells))
+	for idx, plainCell := range rows[0].cells {
+		cell := AttributeColumn{}
+		result[idx] = &cell
+		cell.ColumnName = string(plainCell.cellName)
+		if plainCell.cellValue == nil {
+			return nil, errors.New("column value is missing")
+		}
+		cell.Value = plainCell.cellValue.Value
+		cell.Timestamp = plainCell.cellTimestamp
+	}
+	return result, nil
 }
 
-func (this *StreamRecord) String() string {
+type StreamRecordNewRowInfo struct {
+	HasNewRow          bool
+	ColumnsPlainBuffer []byte
+}
+
+func (r *StreamRecordNewRowInfo) GetColumns() ([]*AttributeColumn, error) {
+	return ParsePlainbufferToNormalColumns(r.ColumnsPlainBuffer)
+}
+
+type StreamRecord struct {
+	Type                  ActionType
+	Info                  *RecordSequenceInfo // required
+	PrimaryKey            *PrimaryKey         // required
+	Columns               []*RecordColumn
+	OriginColumns         []*RecordColumn
+	TableName             string
+	SysColumnsPlainBuffer []byte
+	NewRowInfo            *StreamRecordNewRowInfo
+	VersionGeneratorValue *int64
+}
+
+func (r *StreamRecord) String() string {
 	return fmt.Sprintf(
 		"{\"Type\":%s, \"PrimaryKey\":%s, \"Info\":%s, \"Columns\":%s, \"OriginColumns\":%s}",
-		this.Type,
-		*this.PrimaryKey,
-		this.Info,
-		this.Columns,
-		this.OriginColumns)
+		r.Type,
+		*r.PrimaryKey,
+		r.Info,
+		r.Columns,
+		r.OriginColumns)
+}
+
+func (r *StreamRecord) GetSysColumns() ([]*AttributeColumn, error) {
+	return ParsePlainbufferToNormalColumns(r.SysColumnsPlainBuffer)
 }
 
 type ActionType int
@@ -975,27 +1034,27 @@ type DefinedColumnType int32
 
 const (
 	/**
-	 * 64位整数。
+	 * 64-bit integer.
 	 */
 	DefinedColumn_INTEGER DefinedColumnType = 1
 
 	/**
-	 * 浮点数。
+	 * Floating point number.
 	 */
 	DefinedColumn_DOUBLE DefinedColumnType = 2
 
 	/**
-	 * 布尔值。
+	 * Boolean value.
 	 */
 	DefinedColumn_BOOLEAN DefinedColumnType = 3
 
 	/**
-	 * 字符串。
+	 * String.
 	 */
 	DefinedColumn_STRING DefinedColumnType = 4
 
 	/**
-	 * BINARY。
+	 * BINARY.
 	 */
 	DefinedColumn_BINARY DefinedColumnType = 5
 )
@@ -2228,9 +2287,10 @@ func (compositeMetaQueryCondition *CompositeMetaQueryCondition) GetOperator() Me
 }
 
 type TimeseriesMeta struct {
-	timeseriesKey  *TimeseriesKey
-	attributes     map[string]string
-	updateTimeInUs int64
+	timeseriesKey    *TimeseriesKey
+	attributes       map[string]string
+	updateTimeInUs   int64
+	ignoreAttributes bool
 }
 
 func NewTimeseriesMeta(timeseriesKey *TimeseriesKey) *TimeseriesMeta {
@@ -2258,7 +2318,19 @@ func (timeseriesMeta *TimeseriesMeta) AddAttributes(attributes map[string]string
 	}
 }
 
+func (timeseriesMeta *TimeseriesMeta) AddAttributesWithIgnoreFlag(attributes map[string]string, ignore bool) {
+	timeseriesMeta.ignoreAttributes = ignore
+	if !ignore {
+		for key, value := range attributes {
+			timeseriesMeta.attributes[key] = value
+		}
+	}
+}
+
 func (timeseriesMeta *TimeseriesMeta) GetAttributes() map[string]string {
+	if timeseriesMeta.ignoreAttributes {
+		return nil
+	}
 	attributes := map[string]string{}
 	for key, value := range timeseriesMeta.attributes {
 		attributes[key] = value
@@ -2486,8 +2558,9 @@ const (
 )
 
 type RequestExtension struct {
-	priority *Priority
-	tag      *string
+	priority  *Priority
+	tag       *string
+	SearchTag *string
 }
 
 func (re *RequestExtension) SetPriority(priority Priority) {
@@ -2496,6 +2569,10 @@ func (re *RequestExtension) SetPriority(priority Priority) {
 
 func (re *RequestExtension) SetTag(tag string) {
 	re.tag = &tag
+}
+
+func (re *RequestExtension) SetSearchTag(searchTag string) {
+	re.SearchTag = &searchTag
 }
 
 type CreateTimeseriesLastpointIndexRequest struct {
