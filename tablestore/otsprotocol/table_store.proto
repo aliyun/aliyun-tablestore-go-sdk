@@ -51,6 +51,7 @@ message TableOptions {
     optional int64 deviation_cell_version_in_sec = 5; // 可以动态修改
     optional bool allow_update = 6;
     optional bool update_full_row = 7; // 不可动态修改
+    optional bool LocalTransaction = 8; // 不可动态修改
 }
 
 message TableMeta {

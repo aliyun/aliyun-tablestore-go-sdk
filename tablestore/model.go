@@ -13,11 +13,12 @@ import (
 	"strings"
 	"time"
 
+	"sync"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 	lruCache "github.com/hashicorp/golang-lru"
-	"sync"
 )
 
 type internalClient struct {
@@ -173,6 +174,7 @@ type TableOption struct {
 	DeviationCellVersionInSec int64
 	AllowUpdate               *bool
 	UpdateFullRow             *bool // generally, this option can not be updated
+	LocalTransaction          *bool
 }
 
 type ReservedThroughput struct {
@@ -372,7 +374,7 @@ type VariantType int32
 const (
 	Variant_INTEGER VariantType = 0
 	Variant_DOUBLE  VariantType = 1
-	//VT_BOOLEAN = 2;
+	// VT_BOOLEAN = 2;
 	Variant_STRING VariantType = 3
 )
 
@@ -384,7 +386,7 @@ type ValueTransferRule struct {
 type SingleColumnCondition struct {
 	Comparator        *ComparatorType
 	ColumnName        *string
-	ColumnValue       interface{} //[]byte
+	ColumnValue       interface{} // []byte
 	FilterIfMissing   bool
 	LatestVersionOnly bool
 	TransferRule      *ValueTransferRule
@@ -767,7 +769,7 @@ type ListStreamResponse struct {
 type StreamSpecification struct {
 	EnableStream       bool
 	ExpirationTime     int32    // must be positive. in hours
-	OriginColumnsToGet []string //origin columns to get for stream data
+	OriginColumnsToGet []string // origin columns to get for stream data
 }
 
 type StreamDetails struct {
@@ -775,7 +777,7 @@ type StreamDetails struct {
 	StreamId           *StreamId // nil when stream is disabled.
 	ExpirationTime     int32     // in hours
 	LastEnableTime     int64     // the last time stream is enabled, in usec
-	OriginColumnsToGet []string  //origin columns to get for stream data
+	OriginColumnsToGet []string  // origin columns to get for stream data
 }
 
 type DescribeStreamRequest struct {

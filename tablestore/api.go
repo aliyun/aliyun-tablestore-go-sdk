@@ -546,7 +546,7 @@ func (internalClient *internalClient) getNextPause(err error, count uint, end ti
 	if otsErr, ok := err.(*OtsError); ok {
 		retry = internalClient.shouldRetry(otsErr.Code, otsErr.Message, action, otsErr.HttpStatusCode)
 	} else {
-		if err == io.EOF || err == io.ErrUnexpectedEOF || //retry on special net error contains EOF or reset
+		if err == io.EOF || err == io.ErrUnexpectedEOF || // retry on special net error contains EOF or reset
 			strings.Contains(err.Error(), io.EOF.Error()) ||
 			strings.Contains(err.Error(), "server closed idle connection") ||
 			strings.Contains(err.Error(), "Connection reset by peer") ||
@@ -1684,6 +1684,9 @@ func (tableStoreClient *TableStoreClient) UpdateTable(request *UpdateTableReques
 		}
 		if request.TableOption.UpdateFullRow != nil {
 			req.TableOptions.UpdateFullRow = proto.Bool(*request.TableOption.UpdateFullRow)
+		}
+		if request.TableOption.LocalTransaction != nil {
+			req.TableOptions.LocalTransaction = proto.Bool(*request.TableOption.LocalTransaction)
 		}
 
 		if request.TableOption.DeviationCellVersionInSec > 0 {
