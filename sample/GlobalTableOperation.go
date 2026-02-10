@@ -91,3 +91,20 @@ func CreateTableWithGlobalIndexSample(client *tablestore.TableStoreClient, table
 		fmt.Println("DescribeTableSample finished. indexinfo:", describ.IndexMetas[0], len(describ.IndexMetas))
 	}
 }
+
+func CreateGlobalTableSample(client *tablestore.TableStoreClient, baseTable tablestore.BaseTable, placement tablestore.Placement) {
+	CreateTableSample(client, baseTable.TableName)
+	r := new(tablestore.CreateGlobalTableRequest)
+	r.BaseTable = &baseTable
+	r.Placements = []*tablestore.Placement{
+		&placement,
+	}
+	r.SyncMode = tablestore.SyncMode_Row
+	r.ServeMode = tablestore.ServeMode_PrimarySecondary
+	_, err := client.CreateGlobalTable(r)
+	if err != nil {
+		fmt.Println("failed to create global table with error:", err)
+	} else {
+		fmt.Println("Create global table finished.")
+	}
+}

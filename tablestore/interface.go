@@ -14,6 +14,13 @@ type TableStoreApi interface {
 	BatchWriteRow(request *BatchWriteRowRequest) (*BatchWriteRowResponse, error)
 	GetRange(request *GetRangeRequest) (*GetRangeResponse, error)
 
+	// global table related
+	CreateGlobalTable(request *CreateGlobalTableRequest) (*CreateGlobalTableResponse, error)
+	BindGlobalTable(request *BindGlobalTableRequest) (*BindGlobalTableResponse, error)
+	UnbindGlobalTable(request *UnbindGlobalTableRequest) (*UnbindGlobalTableResponse, error)
+	DescribeGlobalTable(request *DescribeGlobalTableRequest) (*DescribeGlobalTableResponse, error)
+	UpdateGlobalTable(request *UpdateGlobalTableRequest) (*UpdateGlobalTableResponse, error)
+
 	// stream related
 	ListStream(request *ListStreamRequest) (*ListStreamResponse, error)
 	DescribeStream(request *DescribeStreamRequest) (*DescribeStreamResponse, error)

@@ -153,9 +153,12 @@ type DeleteTableResponse struct {
 }
 
 type TableMeta struct {
-	TableName      string
-	SchemaEntry    []*PrimaryKeySchema
-	DefinedColumns []*DefinedColumnSchema
+	TableName           string
+	TableId             *string
+	GlobalTableId       *string
+	GlobalTableSourceId *string
+	SchemaEntry         []*PrimaryKeySchema
+	DefinedColumns      []*DefinedColumnSchema
 }
 
 type PrimaryKeySchema struct {
@@ -240,6 +243,151 @@ type DeleteDefinedColumnResponse struct {
 	ResponseInfo
 }
 
+type BaseTable struct {
+	RegionId     string
+	InstanceName string
+	TableName    string
+}
+type Placement struct {
+	RegionId     string
+	InstanceName string
+	Writable     bool
+}
+type SyncMode string
+
+const (
+	SyncMode_Row    SyncMode = "row"
+	SyncMode_Column SyncMode = "column"
+)
+
+type ServeMode string
+
+const (
+	ServeMode_PrimarySecondary ServeMode = "primary_secondary"
+	ServeMode_PeerToPeer       ServeMode = "peer_to_peer"
+)
+
+type CreateGlobalTableRequest struct {
+	ExtraRequestInfo
+	BaseTable  *BaseTable
+	Placements []*Placement
+	SyncMode   SyncMode
+	ServeMode  ServeMode
+}
+type CreateGlobalTableResponse struct {
+	ResponseInfo
+	GlobalTableId string
+}
+
+type BindGlobalTableRequest struct {
+	ExtraRequestInfo
+	GlobalTableId   string
+	GlobalTableName string
+	Placements      []*Placement
+}
+
+type BindGlobalTableResponse struct {
+	ResponseInfo
+}
+
+type Removal struct {
+	RegionId     string
+	InstanceName string
+}
+type UnbindGlobalTableRequest struct {
+	ExtraRequestInfo
+	GlobalTableId   string
+	GlobalTableName string
+	Removals        []*Removal
+	// IsForce is not safe for global table data sync, only used in testing
+	IsForce *bool
+}
+
+type UnbindGlobalTableResponse struct {
+	ResponseInfo
+}
+
+type PhyTableStatus string
+
+const (
+	PhyTableStatus_Pending   PhyTableStatus = "pending"
+	PhyTableStatus_Init      PhyTableStatus = "init"
+	PhyTableStatus_Syncdata  PhyTableStatus = "syncdata"
+	PhyTableStatus_Ready     PhyTableStatus = "ready"
+	PhyTableStatus_Active    PhyTableStatus = "active"
+	PhyTableStatus_Unbinding PhyTableStatus = "unbinding"
+	PhyTableStatus_Unbound   PhyTableStatus = "unbound"
+)
+
+type PhyTableSyncStage string
+
+const (
+	PhyTableSyncStage_Init PhyTableSyncStage = "init"
+	PhyTableSyncStage_Full PhyTableSyncStage = "full"
+	PhyTableSyncStage_Incr PhyTableSyncStage = "incr"
+)
+
+type PhyTable struct {
+	RegionId        string
+	InstanceName    string
+	TableName       string
+	Status          *PhyTableStatus
+	StatusTimestamp *int64
+	Writable        bool
+	Role            string
+	TableId         *string
+	//TableHashKey    *int32
+	//Endpoint        *string
+	Stage *PhyTableSyncStage
+	//MetaVersion     *int64
+	RpoNanos *int64
+	IsFailed bool
+	Message  *string
+}
+type DescribeGlobalTableRequest struct {
+	ExtraRequestInfo
+	GlobalTableId   string
+	GlobalTableName string
+	PhyTable        *PhyTable
+	ReturnRpo       *bool
+}
+
+type DescribeGlobalTableResponse struct {
+	ResponseInfo
+	GlobalTableId string
+	Status        GlobalTableStatus
+	PhyTables     []*PhyTable
+	ServeMode     ServeMode
+}
+type GlobalTableStatus string
+
+const (
+	GlobalTableStatus_Init   GlobalTableStatus = "init"
+	GlobalTableStatus_Reconf GlobalTableStatus = "reconf"
+	GlobalTableStatus_Active GlobalTableStatus = "active"
+)
+
+type UpdateGlobalTableRequest struct {
+	ExtraRequestInfo
+	GlobalTableId   string
+	GlobalTableName string
+
+	PhyTable UpdatePhyTable
+}
+
+type UpdatePhyTable struct {
+	RegionId     string
+	InstanceName string
+	TableName    string
+
+	Writable        *bool
+	PrimaryEligible *bool
+}
+
+type UpdateGlobalTableResponse struct {
+	ResponseInfo
+}
+
 type ConsumedCapacityUnit struct {
 	Read  int32
 	Write int32
@@ -271,8 +419,8 @@ const (
 )
 
 const (
-	DefaultRetryInterval = 10
-	MaxRetryInterval     = 320
+	DefaultRetryInterval = 50
+	MaxRetryInterval     = 1000
 )
 
 type PrimaryKeyOption int32
@@ -1206,9 +1354,7 @@ type CreateTimeseriesTableRequest struct {
 }
 
 func NewCreateTimeseriesTableRequest() *CreateTimeseriesTableRequest {
-	return &CreateTimeseriesTableRequest{
-		enableAnalyticalStore: true,
-	}
+	return new(CreateTimeseriesTableRequest)
 }
 
 func (createTimeseriesTableRequest *CreateTimeseriesTableRequest) SetTimeseriesTableMeta(timeseriesTableMeta *TimeseriesTableMeta) {

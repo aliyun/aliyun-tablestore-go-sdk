@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"hash"
+	"sync"
 	"time"
 )
 
@@ -61,6 +62,8 @@ type CredentialsV4 interface {
 	Credentials
 	GetRegion() string
 	GetSigningDate() string
+	GetKeyDatePair() (string, string)
+	GetSnapshot() *V4CredentialsSnapshot
 }
 
 type V4Credentials struct {
@@ -71,6 +74,7 @@ type V4Credentials struct {
 	SigningDate                  string
 	V4SigningAccessKey           string
 	autoUpdateV4SigningAccessKey bool
+	mu                           sync.RWMutex
 }
 
 func (v4Cre *V4Credentials) GetAccessKeyID() string {
@@ -98,14 +102,76 @@ func (v4Cre *V4Credentials) GetCredentials() Credentials {
 	return v4Cre
 }
 
+func (v4Cre *V4Credentials) GetKeyDatePair() (string, string) {
+	v4Cre.mu.RLock()
+	defer v4Cre.mu.RUnlock()
+	return v4Cre.V4SigningAccessKey, v4Cre.SigningDate
+}
+
+func (v4Cre *V4Credentials) GetSnapshot() *V4CredentialsSnapshot {
+	keySnapshot, dateSnapshot := v4Cre.GetKeyDatePair()
+	return &V4CredentialsSnapshot{
+		AccessKeyID:        v4Cre.GetAccessKeyID(),
+		AccessKeySecret:    v4Cre.GetAccessKeySecret(),
+		Region:             v4Cre.GetRegion(),
+		SigningDate:        dateSnapshot,
+		V4SigningAccessKey: keySnapshot,
+	}
+}
+
 func (v4Cre *V4Credentials) UpdateV4Signature() {
 	if v4Cre.autoUpdateV4SigningAccessKey {
-		dataNow := GetFormattedDate()
-		if dataNow != v4Cre.SigningDate {
-			v4Cre.SigningDate = dataNow
-			v4Cre.V4SigningAccessKey = FinalSigningKeyString(v4Cre.AccessKeySecret, v4Cre.SigningDate, v4Cre.Region, product, signingKeySignMethod)
+		dateNow := GetFormattedDate()
+		if dateNow != v4Cre.SigningDate {
+			v4Cre.mu.Lock()
+			defer v4Cre.mu.Unlock()
+			if dateNow != v4Cre.SigningDate {
+				v4Cre.SigningDate = dateNow
+				v4Cre.V4SigningAccessKey = FinalSigningKeyString(v4Cre.AccessKeySecret, v4Cre.SigningDate, v4Cre.Region, product, signingKeySignMethod)
+			}
 		}
 	}
+}
+
+type V4CredentialsSnapshot struct {
+	AccessKeyID        string
+	AccessKeySecret    string
+	V4SigningStsToken  string
+	Region             string
+	SigningDate        string
+	V4SigningAccessKey string
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetAccessKeyID() string {
+	return v4Cre.AccessKeyID
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetAccessKeySecret() string {
+	return v4Cre.V4SigningAccessKey
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetSecurityToken() string {
+	return v4Cre.V4SigningStsToken
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetRegion() string {
+	return v4Cre.Region
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetSigningDate() string {
+	return v4Cre.SigningDate
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetCredentials() Credentials {
+	return v4Cre
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetKeyDatePair() (string, string) {
+	return v4Cre.V4SigningAccessKey, v4Cre.SigningDate
+}
+
+func (v4Cre *V4CredentialsSnapshot) GetSnapshot() *V4CredentialsSnapshot {
+	return v4Cre
 }
 
 func GetFormattedDate() string {

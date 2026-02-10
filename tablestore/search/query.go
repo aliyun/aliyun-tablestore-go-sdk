@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 )
 
@@ -29,6 +30,7 @@ const (
 	QueryType_ExistsQuery         QueryType = 16
 	QueryType_KnnVectorQuery      QueryType = 17
 	QueryType_FunctionsScoreQuery QueryType = 18
+	QueryType_DisMaxQuery         QueryType = 20
 )
 
 func (q QueryType) String() string {
@@ -69,6 +71,8 @@ func (q QueryType) String() string {
 		return "KnnVectorQuery"
 	case QueryType_FunctionsScoreQuery:
 		return "FunctionsScoreQuery"
+	case QueryType_DisMaxQuery:
+		return "DisMaxQuery"
 	}
 
 	return ""
@@ -149,6 +153,10 @@ func UnmarshalQuery(name string, data json.RawMessage) (Query, error) {
 		q := &FunctionsScoreQuery{}
 		err = json.Unmarshal(data, q)
 		return q, err
+	case "DisMaxQuery":
+		q := &DisMaxQuery{}
+		err = json.Unmarshal(data, q)
+		return q, err
 	}
 
 	return nil, errors.New(fmt.Sprintf("Unknown query type: %s.", name))
@@ -192,6 +200,8 @@ func ToQueryType(q string) QueryType {
 		return QueryType_KnnVectorQuery
 	case "FunctionsScoreQuery":
 		return QueryType_FunctionsScoreQuery
+	case "DisMaxQuery":
+		return QueryType_DisMaxQuery
 	}
 
 	return QueryType_None
@@ -242,6 +252,8 @@ func (q QueryType) ToPB() *otsprotocol.QueryType {
 		return otsprotocol.QueryType_KNN_VECTOR_QUERY.Enum()
 	case QueryType_FunctionsScoreQuery:
 		return otsprotocol.QueryType_FUNCTIONS_SCORE_QUERY.Enum()
+	case QueryType_DisMaxQuery:
+		return otsprotocol.QueryType_DIS_MAX_QUERY.Enum()
 	default:
 		panic("unexpected")
 	}

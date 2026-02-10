@@ -859,29 +859,37 @@ func FieldSort_missingField(client *tablestore.TableStoreClient, tableName strin
 	}
 }
 
-/**
- * Query the values in the Col_Keyword column of the table that match "hangzhou", and return the total number of matching rows and some successfully matched rows.
+// MatchQuery
+/* Query the values in the Col_Text column of the table that match "hangzhou shanghai beijing", and return the total number of matching rows and some successfully matched rows.
  */
 func MatchQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	// Example 1: Basic MatchQuery
+	fmt.Println("=== Basic MatchQuery ===")
 	searchRequest := &tablestore.SearchRequest{}
 	searchRequest.SetTableName(tableName)
 	searchRequest.SetIndexName(indexName)
-	query := &search.MatchQuery{}   // Set the query type to MatchQuery
-	query.FieldName = "Col_Keyword" // Set the field to match
-	query.Text = "hangzhou"         // Set the value to match
+
+	query := &search.MatchQuery{}            // Set the query type to MatchQuery
+	query.FieldName = "Col_Text"             // Set the field to match
+	query.Text = "hangzhou shanghai beijing" // Set the value to match
+	// query.MinShouldMatch = "50%" // Set the minimum terms that must be matched
+
 	searchQuery := search.NewSearchQuery()
 	searchQuery.SetQuery(query)
 	searchQuery.SetOffset(0) // Set the offset to 0
 	searchQuery.SetLimit(20) // Set the limit to 20, which means a maximum of 20 data entries will be returned.
+
 	searchRequest.SetSearchQuery(searchQuery)
 	searchResponse, err := client.Search(searchRequest)
-	if err != nil { // Judge the exception
-		fmt.Printf("%#v", err)
+	if err != nil { // Handle exceptions
+		fmt.Printf("Error in basic MatchQuery: %#v\n", err)
 		return
 	}
+
 	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the return result is complete
 	fmt.Println("TotalCount: ", searchResponse.TotalCount)     // Total number of matched rows
 	fmt.Println("RowCount: ", len(searchResponse.Rows))        // The number of rows returned
+
 	for _, row := range searchResponse.Rows {
 		jsonBody, err := json.Marshal(row)
 		if err != nil {
@@ -1302,6 +1310,116 @@ func BoolQuery(client *tablestore.TableStoreClient, tableName string, indexName 
 		fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the return result is complete
 		fmt.Println("RowCount: ", len(searchResponse.Rows))
 	}
+}
+
+// DisMaxQuerySample demonstrates the usage of DisMaxQuery
+func DisMaxQuerySample(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("=== DisMaxQuery Sample ===")
+
+	// Example 1: Basic DisMaxQuery with multiple MatchQuery clauses
+	searchRequest := &tablestore.SearchRequest{}
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+
+	// Create a DisMaxQuery with multiple sub-queries
+	disMaxQuery := &search.DisMaxQuery{
+		TieBreaker: proto.Float32(0.3),
+		Weight:     proto.Float32(1.2),
+	}
+
+	// Add MatchQuery for Col_Text field
+	matchQuery1 := &search.MatchQuery{
+		FieldName: "Col_Text",
+		Text:      "hangzhou",
+	}
+
+	// Add another MatchQuery for Col_Text field
+	matchQuery2 := &search.MatchQuery{
+		FieldName: "Col_Text",
+		Text:      "shanghai",
+	}
+
+	// Add queries to DisMaxQuery
+	disMaxQuery.Queries = append(disMaxQuery.Queries, matchQuery1, matchQuery2)
+
+	searchQuery := search.NewSearchQuery()
+	searchQuery.SetQuery(disMaxQuery)
+	searchQuery.SetOffset(0)
+	searchQuery.SetLimit(20)
+	searchQuery.SetGetTotalCount(true)
+
+	searchRequest.SetSearchQuery(searchQuery)
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAllFromIndex: true,
+	})
+
+	// Execute the search
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("Failed to execute DisMaxQuery: %s\n", err)
+		return
+	}
+
+	fmt.Printf("DisMaxQuery executed successfully. Total count: %d\n", searchResponse.TotalCount)
+	fmt.Printf("Returned %d documents:\n", len(searchResponse.SearchHits))
+
+	// Print the results
+	for i, hit := range searchResponse.SearchHits {
+		fmt.Printf("Document %d (Score: %f):\n", i+1, *hit.Score)
+		if hit.Row != nil {
+			for _, pk := range hit.Row.PrimaryKey.PrimaryKeys {
+				fmt.Printf("  PK - %s: %v\n", pk.ColumnName, pk.Value)
+			}
+			for _, col := range hit.Row.Columns {
+				fmt.Printf("  Column - %s: %v\n", col.ColumnName, col.Value)
+			}
+		}
+		fmt.Println()
+	}
+
+	// Example 2: DisMaxQuery with different field queries
+	fmt.Println("=== DisMaxQuery with Different Fields ===")
+
+	disMaxQuery2 := &search.DisMaxQuery{
+		TieBreaker: proto.Float32(0.7),
+	}
+
+	// Query on Col_Text field
+	textQuery := &search.MatchQuery{
+		FieldName: "Col_Text",
+		Text:      "important document",
+	}
+
+	// Query on Col_Keyword field
+	keywordQuery := &search.TermQuery{
+		FieldName: "Col_Keyword",
+		Term:      "special",
+	}
+
+	disMaxQuery2.Queries = append(disMaxQuery2.Queries, textQuery, keywordQuery)
+
+	searchQuery2 := search.NewSearchQuery()
+	searchQuery2.SetQuery(disMaxQuery2)
+	searchQuery2.SetLimit(10)
+
+	searchRequest2 := &tablestore.SearchRequest{}
+	searchRequest2.SetTableName(tableName)
+	searchRequest2.SetIndexName(indexName)
+	searchRequest2.SetSearchQuery(searchQuery2)
+	searchRequest2.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAllFromIndex: true,
+	})
+
+	searchResponse2, err := client.Search(searchRequest2)
+	if err != nil {
+		fmt.Printf("Failed to execute DisMaxQuery with different fields: %s\n", err)
+		return
+	}
+
+	fmt.Printf("DisMaxQuery with different fields executed successfully. Total count: %d\n", searchResponse2.TotalCount)
+	fmt.Printf("Returned %d documents\n", len(searchResponse2.SearchHits))
+
+	fmt.Println("=== DisMaxQuery Sample Finished ===")
 }
 
 /**

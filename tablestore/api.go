@@ -88,6 +88,12 @@ const (
 	updateTimeseriesAnalyticalStore   = "/UpdateTimeseriesAnalyticalStore"
 	createTimeseriesLastpointIndex    = "/CreateTimeseriesLastpointIndex"
 	deleteTimeseriesLastpointIndex    = "/DeleteTimeseriesLastpointIndex"
+
+	createGlobalTableUri   = "/CreateGlobalTable"
+	bindGlobalTableUri     = "/BindGlobalTable"
+	unbindGlobalTableUri   = "/UnbindGlobalTable"
+	describeGlobalTableUri = "/DescribeGlobalTable"
+	updateGlobalTableRwUri = "/UpdateGlobalTable"
 )
 
 // RowsSerializeType is used for tests only.
@@ -542,7 +548,7 @@ func (internalClient *internalClient) getPartitionFailedNextPause(count uint, en
 		return 0
 	}
 
-	newInterval := internalClient.computeNewRetryInterval(lastInterval)
+	newInterval := internalClient.computeNewRetryInterval(count)
 	return newInterval
 }
 
@@ -561,20 +567,22 @@ func (internalClient *internalClient) getNextPause(err error, count uint, end ti
 			strings.Contains(err.Error(), "connection reset by peer") {
 			// server already close this connection, no need to delay
 			return 1
-		} else if strings.Contains(err.Error(), "connection refused") {
+		} else if strings.Contains(err.Error(), "connection refused") ||
+			strings.Contains(err.Error(), "i/o timeout") ||
+			strings.Contains(err.Error(), "cannot assign requested address") {
 			retry = true
 		} else if nErr, ok := err.(net.Error); ok {
 			retry = nErr.Temporary()
 		}
 	}
 	if retry {
-		newInterval := internalClient.computeNewRetryInterval(lastInterval)
+		newInterval := internalClient.computeNewRetryInterval(count)
 		return newInterval
 	}
 	return 0
 }
 
-func (internalClient *internalClient) computeNewRetryInterval(lastInterval int64) int64 {
+func (internalClient *internalClient) computeNewRetryInterval(count uint) int64 {
 	defaultRetryInterval := internalClient.config.DefaultRetryInterval / time.Millisecond
 	if defaultRetryInterval <= 0 {
 		defaultRetryInterval = DefaultRetryInterval
@@ -583,13 +591,23 @@ func (internalClient *internalClient) computeNewRetryInterval(lastInterval int64
 	if maxRetryInterval <= 0 {
 		maxRetryInterval = MaxRetryInterval
 	}
+
+	// 防止位移溢出，设置合理的最大位移count值
+	const maxShiftCount = 32
+	if count > maxShiftCount {
+		count = maxShiftCount
+	}
+
+	ceilDelay := int64(defaultRetryInterval) << count
+	// 检查是否溢出或者超过最大重试间隔
+	if ceilDelay <= 0 || ceilDelay > int64(maxRetryInterval) {
+		ceilDelay = int64(maxRetryInterval)
+	}
 	// lock/unlock when accessing the rand from a goroutine
 	internalClient.mu.Lock()
-	value := lastInterval*2 + internalClient.random.Int63n(int64(defaultRetryInterval)-1) + 1
+	value := internalClient.random.Int63n(ceilDelay) + 1
 	internalClient.mu.Unlock()
-	if value > int64(maxRetryInterval) {
-		value = int64(maxRetryInterval)
-	}
+
 	return value
 }
 
@@ -672,6 +690,10 @@ func (internalClient *internalClient) doRequest(url string, uri string, body []b
 		return nil, err, ""
 	}
 	akInfo := internalClient.credentialsProvider.GetCredentials()
+	if isCredentialsV4(akInfo) {
+		akInfoV4 := akInfo.(common.CredentialsV4)
+		akInfo = akInfoV4.GetSnapshot()
+	}
 	/* set headers */
 	hreq.Header.Set("User-Agent", userAgent)
 

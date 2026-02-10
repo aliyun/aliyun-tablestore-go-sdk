@@ -1977,7 +1977,7 @@ func (s *TableStoreSuite) TestUnit(c *C) {
 
 	errorCode = STORAGE_TIMEOUT
 	value = tsClient.getNextPause(&OtsError{Code: errorCode, Message: errorCode}, 1, time.Now().Add(time.Second*1), MaxRetryInterval, getRowUri)
-	c.Check(value == MaxRetryInterval, Equals, true)
+	c.Check(value <= MaxRetryInterval, Equals, true)
 
 	// stream api
 	errorCode = STORAGE_TIMEOUT
@@ -2717,7 +2717,7 @@ func (s *TableStoreSuite) TestSQL(c *C) {
 
 func (s *TableStoreSuite) TestSQLWithSearch(c *C) {
 	resp, err := client.SQLQuery(&SQLQueryRequest{
-		Query: fmt.Sprintf("create table if not exists %s (a bigint not null, b double not null, c mediumtext not null, e bool not null, primary key (`a`));", sqlTableNameWithSearch),
+		Query: fmt.Sprintf("create table if not exists `%s` (a bigint not null, b double not null, c mediumtext not null, e bool not null, primary key (`a`));", sqlTableNameWithSearch),
 	})
 	c.Assert(err, IsNil)
 	c.Assert(resp.StmtType, Equals, SQL_CREATE_TABLE)
@@ -2893,4 +2893,86 @@ func (s *TableStoreSuite) TestUserSetTraceIDAlwaysRetry(c *C) {
 	tsClient.config.RetryTimes = 10
 
 	log.Println("TestUserSetTraceIDAlwaysRetry finished")
+}
+
+func (s *TableStoreSuite) TestComputeNewRetryInterval(c *C) {
+	log.Println("TestComputeNewRetryInterval started")
+	currentGetHttpClientFunc = func() IHttpClient {
+		return &mockHttpClient{}
+	}
+	{
+
+		tempClient := NewClientWithConfig("test", "a", "b", "c", "d", NewDefaultTableStoreConfig())
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(0)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > DefaultRetryInterval {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, DefaultRetryInterval)
+			}
+		}
+
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(1)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > DefaultRetryInterval*2 {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, DefaultRetryInterval*2)
+			}
+		}
+
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(100)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > MaxRetryInterval {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, MaxRetryInterval)
+			}
+		}
+	}
+
+	{
+		tempClient := NewClientWithConfig("test", "a", "b", "c", "d", &TableStoreConfig{
+			DefaultRetryInterval: 0,
+			MaxRetryInterval:     0,
+		})
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(0)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > DefaultRetryInterval {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, DefaultRetryInterval)
+			}
+		}
+
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(1)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > DefaultRetryInterval*2 {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, DefaultRetryInterval*2)
+			}
+		}
+
+		for i := 0; i < 100; i++ {
+			interval := tempClient.internalClient.computeNewRetryInterval(100)
+			if interval <= 0 {
+				c.Errorf("computeNewRetryInterval() = %v, want > 0", interval)
+			}
+			if interval > MaxRetryInterval {
+				c.Errorf("computeNewRetryInterval() = %v, want < %v", interval, MaxRetryInterval)
+			}
+		}
+
+	}
+	currentGetHttpClientFunc = func() IHttpClient {
+		return &TableStoreHttpClient{}
+	}
+
+	log.Println("TestComputeNewRetryInterval finished")
 }

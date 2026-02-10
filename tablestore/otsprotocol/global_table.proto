@@ -1,0 +1,153 @@
+syntax = "proto2";
+package otsprotocol;
+
+enum SyncMode {
+  SYNC_MODE_ROW = 1;
+  SYNC_MODE_COLUMN = 2;
+}
+
+enum GlobalTableStatus {
+  G_INIT = 1;
+  G_RE_CONF = 2;
+  G_ACTIVE = 3;
+}
+
+enum PhyTableStatus {
+  PHY_PENDING = 1;
+  PHY_INIT = 2;
+  PHY_SYNCDATA = 3;
+  PHY_READY = 4;
+  PHY_ACTIVE = 5;
+  PHY_UNBINDING = 6;
+  PHY_UNBOUND = 7;
+}
+
+enum SyncStage {
+  SYNC_INIT = 1;
+  SYNC_FULL = 2;
+  SYNC_INCR = 3;
+}
+
+enum ServeMode {
+  //HOT_STANDBY = 1;
+  PRIMARY_SECONDARY = 2;
+  PEER_TO_PEER = 3;
+}
+
+message Response {
+  optional string request_id = 1;
+  optional string msg = 2;
+  required ResultCode code = 3;
+}
+
+enum ResultCode {
+  OK = 1;
+  INVALID_PARAM = 2;
+  SERVER_ERROR = 3;
+}
+
+message BaseTable {
+  required string regionId = 1;
+  required string instanceName = 2;
+  required string tableName = 3;
+}
+
+message Placement {
+  required string regionId = 1;
+  required string instanceName = 2;
+  required bool writable = 3 [default = false];
+}
+
+message Removal {
+  required string regionId = 1;
+  required string instanceName = 2;
+}
+
+message CreateGlobalTableRequest {
+  required BaseTable baseTable = 2;
+  repeated Placement placements = 3;
+  required SyncMode syncMode = 4;
+  optional ServeMode serveMode = 5;
+}
+
+message CreateGlobalTableResponse {
+  required string globalTableId = 2;
+  required GlobalTableStatus status = 3;
+  optional ServeMode serveMode = 4;
+}
+
+message BindGlobalTableRequest{
+  required string globalTableId = 2;
+  required string globalTableName = 3;
+  repeated Placement placements = 4;
+}
+
+message BindGlobalTableResponse {
+  required string globalTableId = 2;
+  required GlobalTableStatus status = 3;
+}
+
+message UnbindGlobalTableRequest {
+  required string globalTableId = 2;
+  required string globalTableName = 3;
+  repeated Removal removals = 4;
+}
+
+message UnbindGlobalTableResponse {
+  required string globalTableId = 2;
+  required GlobalTableStatus status = 3;
+}
+
+message DescribeGlobalTableRequest {
+  optional string globalTableId = 1;
+  required string globalTableName = 2;
+  optional PhyTable phyTable = 3;
+  optional bool returnRpo = 4;
+}
+
+message DescribeGlobalTableResponse {
+  required string globalTableId = 2;
+  required GlobalTableStatus status = 3;
+  repeated PhyTable phyTables = 4;
+  optional ServeMode serveMode = 5;
+}
+
+message PhyTable {
+  required string regionId = 1;
+  required string instanceName = 2;
+  required string tableName = 3;
+  required bool writable = 4;
+
+  optional PhyTableStatus status = 5;
+  optional int64 statusTimestamp = 6;
+  optional string tableId = 7;
+//  optional int32 tableHashKey = 8;
+//  optional string endpoint = 9;
+  optional SyncStage stage = 10;
+//  optional int64 metaVersion = 11;
+  optional bool isFailed = 12;
+  optional string message = 13;
+  optional string role = 14;
+  optional int64 rpoNanos = 15;
+}
+
+
+message UpdateGlobalTableRequest {
+  required string globalTableId = 1;
+  required string globalTableName = 2;
+  optional UpdatePhyTable phyTable = 3;
+}
+
+message UpdatePhyTable {
+  required string regionId = 1;
+  required string instanceName = 2;
+  required string tableName = 3;
+
+  optional bool writable = 4;
+  // set phy table is eligible for primary, only need at PRIMARY_SECONDARY serve mode
+  optional bool primaryEligible = 5;
+}
+
+message UpdateGlobalTableResponse {
+}
+

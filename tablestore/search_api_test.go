@@ -541,6 +541,38 @@ func createSearchIndex1(c *C) {
 	}
 	schemas = append(schemas, field20, field21)
 
+	field22 := &FieldSchema{
+		FieldName:        proto.String("Col_Long1_Missing"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field23 := &FieldSchema{
+		FieldName:        proto.String("Col_Long2_Missing"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field24 := &FieldSchema{
+		FieldName:        proto.String("Col_Long3_Missing"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field25 := &FieldSchema{
+		FieldName:        proto.String("Col_Long4_Missing"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(true),
+	}
+	field26 := &FieldSchema{
+		FieldName:        proto.String("Col_Long5_Missing_NoDV"),
+		FieldType:        FieldType_LONG,
+		Index:            proto.Bool(true),
+		EnableSortAndAgg: proto.Bool(false),
+	}
+	schemas = append(schemas, field22, field23, field24, field25, field26)
+
 	request.IndexSchema = &IndexSchema{
 		FieldSchemas: schemas,
 	}
@@ -803,6 +835,12 @@ func writeData1(c *C) {
 			putRowChange.AddColumn("Col_GeoPoint_Missing", geoPointValue)
 			putRowChange.AddColumn("Col_Text_Missing", textValue)
 			putRowChange.AddColumn("Col_Nested_Missing", nestedMissingValue)
+		} else {
+			if i%2 == 0 {
+				putRowChange.AddColumn("Col_Long1_Missing", longValue)
+			} else if i%2 == 1 {
+				putRowChange.AddColumn("Col_Long2_Missing", longValue)
+			}
 		}
 
 		putRowChange.SetCondition(RowExistenceExpectation_IGNORE)
@@ -969,6 +1007,136 @@ func (s *SearchSuite) SetUpSuite(c *C) {
 	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName1, searchAPITestIndexName1, 60)
 	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableName2, searchAPITestIndexName2, 60)
 	WaitDataSyncByMatchAllQuery(c, client, 10, searchAPITestTableNameWithoutNested, searchAPITestIndexNameWithoutNested, 60)
+}
+
+func (s *SearchSuite) TestQueryFieldSortWithMissingFieldsInvalidParameter(c *C) {
+	{
+		sort := &search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName:     "Col_Long_Missing",
+					Order:         search.SortOrder_ASC.Enum(),
+					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Long3_Missing", "Col_Long4_Missing"},
+				},
+			},
+		}
+		searchRequest := &SearchRequest{
+			TableName: searchAPITestTableName1,
+			IndexName: searchAPITestIndexName1,
+			SearchQuery: search.NewSearchQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetLimit(2).
+				SetSort(sort),
+			ColumnsToGet: &ColumnsToGet{
+				Columns: []string{"Col_Long_Missing", "Col_Long1_Missing", "Col_Long2_Missing"},
+			},
+		}
+		_, err := client.Search(searchRequest)
+		assert.NotNil(c, err)
+		assert.Contains(c, err.Error(), "OTSParameterInvalid [missing_fields] field nums has exceeded the limit. limit: 3 current: 4")
+	}
+	{
+		// without doc values
+		sort := &search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName:     "Col_Long_Missing",
+					Order:         search.SortOrder_ASC.Enum(),
+					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Long5_Missing_NoDV"},
+				},
+			},
+		}
+		searchRequest := &SearchRequest{
+			TableName: searchAPITestTableName1,
+			IndexName: searchAPITestIndexName1,
+			SearchQuery: search.NewSearchQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetLimit(2).
+				SetSort(sort),
+			ColumnsToGet: &ColumnsToGet{
+				ReturnAllFromIndex: true,
+			},
+		}
+		_, err := client.Search(searchRequest)
+		assert.NotNil(c, err)
+		assert.Contains(c, err.Error(), "OTSParameterInvalid [field_sort.missingfield] field:Col_Long5_Missing_NoDV must enable enable_sort_and_agg, but enable_sort_and_agg is not enable")
+	}
+	{
+		// type mismatch
+		sort := &search.Sort{
+			Sorters: []search.Sorter{
+				&search.FieldSort{
+					FieldName:     "Col_Long_Missing",
+					Order:         search.SortOrder_ASC.Enum(),
+					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Double_Missing"},
+				},
+			},
+		}
+		searchRequest := &SearchRequest{
+			TableName: searchAPITestTableName1,
+			IndexName: searchAPITestIndexName1,
+			SearchQuery: search.NewSearchQuery().
+				SetQuery(&search.MatchAllQuery{}).
+				SetLimit(2).
+				SetSort(sort),
+			ColumnsToGet: &ColumnsToGet{
+				ReturnAllFromIndex: true,
+			},
+		}
+		_, err := client.Search(searchRequest)
+		assert.NotNil(c, err)
+		assert.Contains(c, err.Error(), "OTSParameterInvalid The field [Col_Double_Missing] type is inconsistent with the field [Col_Long_Missing] type in [field_sort]")
+	}
+}
+
+func (s *SearchSuite) TestQueryFieldSortWithMissingFields(c *C) {
+	sort := &search.Sort{
+		Sorters: []search.Sorter{
+			&search.FieldSort{
+				FieldName:     "Col_Long_Missing",
+				Order:         search.SortOrder_ASC.Enum(),
+				MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing"},
+			},
+		},
+	}
+
+	searchQuery := search.NewSearchQuery().
+		SetQuery(&search.MatchAllQuery{}).
+		SetLimit(2).
+		SetSort(sort)
+
+	searchRequest := &SearchRequest{
+		TableName: searchAPITestTableName1,
+		IndexName: searchAPITestIndexName1,
+		ColumnsToGet: &ColumnsToGet{
+			Columns: []string{"Col_Long_Missing", "Col_Long1_Missing", "Col_Long2_Missing"},
+		},
+	}
+
+	var token []byte
+	var totalCount = 0
+	curSortValue := int64(0)
+
+	for {
+		searchRequest.SearchQuery = searchQuery
+		searchResponse, err := client.Search(searchRequest)
+		assert.Nil(c, err)
+		totalCount += len(searchResponse.Rows)
+		for _, row := range searchResponse.Rows {
+			assert.Equal(c, 1, len(row.Columns))
+			assert.Equal(c, curSortValue, row.Columns[0].Value.(int64), curSortValue)
+			curSortValue++
+		}
+
+		token = searchResponse.NextToken
+		if token == nil || len(token) == 0 {
+			break
+		} else {
+			searchQuery.Token = token
+		}
+	}
+	assert.Equal(c, totalCount, 10)
+	c.Log("test multi missing fields, total rows: ", totalCount)
 }
 
 func (s *SearchSuite) TestQuerySortDisableDefaultPkSorter(c *C) {

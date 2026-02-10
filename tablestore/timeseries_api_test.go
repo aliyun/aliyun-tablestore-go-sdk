@@ -2,17 +2,18 @@ package tablestore
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
-	"github.com/golang/protobuf/proto"
-	. "gopkg.in/check.v1"
 	"math"
 	"math/rand"
 	"runtime"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
+	"github.com/golang/protobuf/proto"
+	. "gopkg.in/check.v1"
 )
 
 type TimeseriesSuite struct{}
@@ -71,6 +72,17 @@ func PrepareTimeseriesTable(timeseriesTableName string) error {
 
 	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	return err
+}
+
+func WaitTimeseriesMetaSync(c *C, queryTimeseriesMetaRequest *QueryTimeseriesMetaRequest, metaCount int) {
+	for i := 0; i < 30; i++ { // wait for meta sync
+		queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+		c.Assert(err, Equals, nil)
+		if len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) == metaCount {
+			break
+		}
+		time.Sleep(5 * time.Second)
+	}
 }
 
 func (s *TimeseriesSuite) TestNewTimeseriesClientWithConfig(c *C) {
@@ -133,7 +145,7 @@ func (s *TimeseriesSuite) TestDeleteAndCreateTimeseriesTable(c *C) {
 		fmt.Println("	[Info]: Delete timeseries ", timeseriesTable, " succeed !")
 	}
 
-	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 	// Delete non-existent table: return 'table not exist' error.
 	deleteTimeseriesReq := NewDeleteTimeseriesTableRequest(curTimeseriesTableName)
 	_, err = timeseriesClient.DeleteTimeseriesTable(deleteTimeseriesReq)
@@ -189,7 +201,10 @@ func (s *TimeseriesSuite) TestListTimeseriesTable(c *C) {
 func (s *TimeseriesSuite) TestUpdateAndDescribeTimeseriesTable(c *C) {
 	fmt.Println("[Info]: TestUpdateAndDescribeTimeseriesTable start !")
 
-	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
+
+	err := PrepareTimeseriesTable(curTimeseriesTableName)
+	c.Assert(err, Equals, nil)
 
 	// Describe table information
 	describeTimeseriesTableReq := NewDescribeTimeseriesTableRequset(curTimeseriesTableName)
@@ -227,7 +242,7 @@ func (s *TimeseriesSuite) TestPutAndGetTimeseriesData_ProtoBuffer(c *C) {
 func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 	fmt.Println("[Info]: TestPutAndGetTimeseriesData start !")
 
-	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 	timeseriesClient.DeleteTimeseriesTable(NewDeleteTimeseriesTableRequest(curTimeseriesTableName))
 	err := PrepareTimeseriesTable(curTimeseriesTableName)
 	if err != nil {
@@ -413,10 +428,11 @@ func (s *TimeseriesSuite) testPutAndGetTimeseriesData(c *C) {
 func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	fmt.Println("[Info]: TestQueryTimeseriesMeta start !")
 
-	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(timeNow))
+	curTimeseriesTableName := timeseriesTableNamePrefix + timeseriesTableName + strconv.Itoa(int(time.Now().UnixNano()))
 
 	// Create a timeseries table for testing the QueryTimeseriesMeta interface
-	PrepareTimeseriesTable(curTimeseriesTableName)
+	err := PrepareTimeseriesTable(curTimeseriesTableName)
+	c.Assert(err, Equals, nil)
 
 	time.Sleep(30 * time.Second)
 
@@ -485,6 +501,7 @@ func (s *TimeseriesSuite) TestQueryTimeseriesMeta(c *C) {
 	measurementMetaQueryCondition := NewMeasurementQueryCondition(OP_GREATER_EQUAL, "")
 	queryTimeseriesMetaReq := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaReq.SetCondition(measurementMetaQueryCondition)
+	WaitTimeseriesMetaSync(c, queryTimeseriesMetaReq, 3)
 	QueryTimeseriesMetaResp, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaReq)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(QueryTimeseriesMetaResp.GetTimeseriesMetas()), Equals, 3)
@@ -592,7 +609,7 @@ func (s *TimeseriesSuite) TestUpdateTimeseriesMeta(c *C) {
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaRequest.SetLimit(-1)
 	queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
-
+	WaitTimeseriesMetaSync(c, queryTimeseriesMetaRequest, 1)
 	queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 1)
@@ -714,7 +731,7 @@ func (s *TimeseriesSuite) TestDeleteTimeseriesMeta(c *C) {
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest(curTimeseriesTableName)
 	queryTimeseriesMetaRequest.SetLimit(-1)
 	queryTimeseriesMetaRequest.SetCondition(measurementQueryCondition)
-
+	WaitTimeseriesMetaSync(c, queryTimeseriesMetaRequest, 100)
 	queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(queryTimeseriesMetaResponse.GetTimeseriesMetas()), Equals, 100)
@@ -1085,20 +1102,11 @@ func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
 	c.Assert(err, Equals, nil)
 	c.Assert(len(updateTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
 
-	// wait for meta sync
-	time.Sleep(30 * time.Second)
-
 	// query meta
 	queryTimeseriesMetaRequest := NewQueryTimeseriesMetaRequest("test_custom_primary_keys_meta")
 	queryTimeseriesMetaRequest.SetLimit(-1)
-	for i := 0; i < 5; i++ { // wait for meta sync
-		queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
-		c.Assert(err, Equals, nil)
-		if len(queryTimeseriesMetaResponse.GetTimeseriesMetas()) == 1 {
-			break
-		}
-		time.Sleep(5 * time.Second)
-	}
+	time.Sleep(30 * time.Second)
+	WaitTimeseriesMetaSync(c, queryTimeseriesMetaRequest, 1)
 	queryTimeseriesMetaResponse, err := timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	metas := queryTimeseriesMetaResponse.GetTimeseriesMetas()
@@ -1116,15 +1124,12 @@ func (s *TimeseriesSuite) TestCustomPrimaryKeysMeta(c *C) {
 	deleteTimeseriesMetaResponse, err := timeseriesClient.DeleteTimeseriesMeta(deleteTimeseriesMetaRequest)
 	c.Assert(err, Equals, nil)
 	c.Assert(len(deleteTimeseriesMetaResponse.GetFailedRowResults()), Equals, 0)
-	for i := 0; i < 5; i++ { // wait for meta sync
-		time.Sleep(30 * time.Second)
-		queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
-		c.Assert(err, Equals, nil)
-		metas = queryTimeseriesMetaResponse.GetTimeseriesMetas()
-		if len(metas) == 0 {
-			break
-		}
-	}
+
+	// after delete, query meta should return empty
+	WaitTimeseriesMetaSync(c, queryTimeseriesMetaRequest, 0)
+	queryTimeseriesMetaResponse, err = timeseriesClient.QueryTimeseriesMeta(queryTimeseriesMetaRequest)
+	c.Assert(err, Equals, nil)
+	metas = queryTimeseriesMetaResponse.GetTimeseriesMetas()
 	c.Assert(len(metas), Equals, 0)
 }
 

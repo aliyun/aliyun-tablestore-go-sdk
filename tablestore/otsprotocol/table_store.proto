@@ -58,6 +58,9 @@ message TableMeta {
     repeated PrimaryKeySchema primary_key = 2;
     repeated DefinedColumnSchema defined_column = 3;
     repeated IndexMeta index_meta = 4;
+    optional string table_id = 5;
+    optional string global_table_id = 6;
+    optional string global_table_source_id = 7;
 }
 
 /**
@@ -398,6 +401,8 @@ message RowInBatchWriteRowRequest {
     required bytes row_change = 2; // encoded as InplaceRowChangeSet
     required Condition condition = 3;
     optional ReturnContent return_content = 4;
+    optional int64 row_version = 5;
+    optional bytes source_id = 6;
 }
 
 message TableInBatchWriteRowRequest {

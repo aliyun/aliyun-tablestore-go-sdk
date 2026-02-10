@@ -48,6 +48,14 @@ func main() {
 	// globalindex
 	sample.CreateTableWithGlobalIndexSample(client, "globalindex1")
 
+	// global table
+	// base table needs: 1. TTL=-1; 2. MaxVersion=1; 3. UpdateFullRow=false; 4. DeviationCellVersionInSec=MaxInt32;
+	sample.CreateGlobalTableSample(
+		client,
+		tablestore.BaseTable{RegionId: testConfig.Region, InstanceName: instanceName, TableName: "sample_globaltable1"},
+		tablestore.Placement{RegionId: testConfig.OtsGlobalTablePlacementRegion, InstanceName: testConfig.OtsGlobalTablePlacementInstanceName},
+	)
+
 	//SearchIndex
 	sample.CreateSearchIndexWithVirtualField(client, "virtual_sample_table", "virtual_sample_index")
 

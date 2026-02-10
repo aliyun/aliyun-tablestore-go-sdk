@@ -2,16 +2,19 @@ package search
 
 import (
 	"encoding/json"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/golang/protobuf/proto"
 )
 
 type BoolQuery struct {
-	MustQueries        []Query `json:"-"`
-	MustNotQueries     []Query `json:"-"`
-	FilterQueries      []Query `json:"-"`
-	ShouldQueries      []Query `json:"-"`
-	MinimumShouldMatch *int32
+	MustQueries        []Query  `json:"-"`
+	MustNotQueries     []Query  `json:"-"`
+	FilterQueries      []Query  `json:"-"`
+	ShouldQueries      []Query  `json:"-"`
+	MinimumShouldMatch *int32   // Deprecated: Do not use. Use MinShouldMatch instead.
+	Weight             *float32 // Weight is the weight of the query.
+	MinShouldMatch     *string  // MinShouldMatch is the minimum should match value. It's a string that can represent either an absolute number or a percentage. This field replaces the deprecated MinimumShouldMatch.
 
 	// for json marshal and unmarshal
 	MustQueriesAlias    []queryAlias `json:"MustQueries"`
@@ -71,6 +74,10 @@ func (q *BoolQuery) MarshalJSON() ([]byte, error) {
 		bqAlias.ShouldQueriesAlias = mqs
 	}
 
+	bqAlias.Weight = q.Weight
+	bqAlias.MinimumShouldMatch = q.MinimumShouldMatch
+	bqAlias.MinShouldMatch = q.MinShouldMatch
+
 	data, err := json.Marshal(bqAlias)
 	return data, err
 }
@@ -114,6 +121,9 @@ func (q *BoolQuery) UnmarshalJSON(data []byte) (err error) {
 		}
 		q.ShouldQueries = mqs
 	}
+	q.MinimumShouldMatch = bqAlias.MinimumShouldMatch
+	q.Weight = bqAlias.Weight
+	q.MinShouldMatch = bqAlias.MinShouldMatch
 	return
 }
 
@@ -169,6 +179,12 @@ func (q *BoolQuery) Serialize() ([]byte, error) {
 	}
 	if q.MinimumShouldMatch != nil {
 		query.MinimumShouldMatch = q.MinimumShouldMatch
+	}
+	if q.Weight != nil {
+		query.Weight = q.Weight
+	}
+	if q.MinShouldMatch != nil {
+		query.NewMinimumShouldMatch = q.MinShouldMatch
 	}
 	data, err := proto.Marshal(query)
 	return data, err

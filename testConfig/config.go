@@ -6,4 +6,8 @@ var (
 	OtsAccessId  = ""
 	OtsAccessKey = ""
 	Region       = ""
+
+	OtsGlobalTablePlacementEndpoint     = ""
+	OtsGlobalTablePlacementInstanceName = ""
+	OtsGlobalTablePlacementRegion       = ""
 )

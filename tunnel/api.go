@@ -179,6 +179,10 @@ func (api *TunnelApi) doRequestInternal(url string, uri string, body []byte, res
 		return nil, err, ""
 	}
 	akInfo := api.credentialsProvider.GetCredentials()
+	if isCredentialsV4(akInfo) {
+		akInfoV4 := akInfo.(common.CredentialsV4)
+		akInfo = akInfoV4.GetSnapshot()
+	}
 	/* set headers */
 	hreq.Header.Set("User-Agent", userAgent)
 
@@ -617,6 +621,8 @@ func shouldRetry(err error) bool {
 	if err == io.EOF || err == io.ErrUnexpectedEOF ||
 		strings.Contains(err.Error(), io.EOF.Error()) || //retry on special net error contains EOF or reset
 		strings.Contains(err.Error(), "server closed idle connection") ||
+		strings.Contains(err.Error(), "i/o timeout") ||
+		strings.Contains(err.Error(), "cannot assign requested address") ||
 		strings.Contains(err.Error(), "connection refused") ||
 		strings.Contains(err.Error(), "connection reset by peer") ||
 		strings.Contains(err.Error(), "Connection reset by peer") {

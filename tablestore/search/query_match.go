@@ -35,10 +35,12 @@ func (o *QueryOperator) ProtoBuffer() (*otsprotocol.QueryOperator, error) {
 }
 
 type MatchQuery struct {
-	FieldName          string
-	Text               string
-	MinimumShouldMatch *int32
-	Operator           *QueryOperator
+	FieldName          string         // FieldName is the name of the field to be queried.
+	Text               string         // Text is the text to be matched.
+	MinimumShouldMatch *int32         // Deprecated: Do not use. Use MinShouldMatch instead.
+	Operator           *QueryOperator // Operator is the operator to be used in the query.
+	Weight             *float32       // Weight is the weight of the query.
+	MinShouldMatch     *string        // MinShouldMatch is the minimum should match value. It's a string that can represent either an absolute number or a percentage. This field replaces the deprecated MinimumShouldMatch.
 }
 
 func (q *MatchQuery) Type() QueryType {
@@ -51,6 +53,12 @@ func (q *MatchQuery) Serialize() ([]byte, error) {
 	query.Text = &q.Text
 	if q.MinimumShouldMatch != nil {
 		query.MinimumShouldMatch = q.MinimumShouldMatch
+	}
+	if q.Weight != nil {
+		query.Weight = q.Weight
+	}
+	if q.MinShouldMatch != nil {
+		query.NewMinimumShouldMatch = q.MinShouldMatch
 	}
 	if q.Operator != nil {
 		pbOperator, err := q.Operator.ProtoBuffer()
