@@ -10,6 +10,7 @@ type KnnVectorQuery struct {
 	TopK               *int32
 	Float32QueryVector []float32
 	Filter             Query
+	Weight             *float32
 	MinScore           *float32
 	NumCandidates      *int32
 }
@@ -23,6 +24,7 @@ func (q *KnnVectorQuery) Serialize() ([]byte, error) {
 	query.FieldName = proto.String(q.FieldName)
 	query.TopK = q.TopK
 	query.Float32QueryVector = q.Float32QueryVector
+	query.Weight = q.Weight
 	query.MinScore = q.MinScore
 	query.NumCandidates = q.NumCandidates
 

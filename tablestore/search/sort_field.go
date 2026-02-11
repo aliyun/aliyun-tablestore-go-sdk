@@ -33,7 +33,7 @@ type FieldSort struct {
 	NestedFilter *NestedFilter
 	MissingValue interface{} // When some rows of the sorting field have no fill values, the sorting behavior supports three methods: 1. Set to FirstWhenMissing, which places rows with missing sort field values at the front; 2. Set to LastWhenMissing, which places rows with missing sort field values at the back; 3. Customize a value, which uses a specified value for sorting when the sort field value is missing.
 	// Deprecated: use `MissingFields` instead
-	MissingField  *string
+	MissingField *string
 	MissingFields []string
 }
 

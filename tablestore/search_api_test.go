@@ -542,33 +542,33 @@ func createSearchIndex1(c *C) {
 	schemas = append(schemas, field20, field21)
 
 	field22 := &FieldSchema{
-		FieldName:        proto.String("Col_Long1_Missing"),
-		FieldType:        FieldType_LONG,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Long1_Missing"),
+		FieldType: FieldType_LONG,
+		Index: proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field23 := &FieldSchema{
-		FieldName:        proto.String("Col_Long2_Missing"),
-		FieldType:        FieldType_LONG,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Long2_Missing"),
+		FieldType: FieldType_LONG,
+		Index: proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field24 := &FieldSchema{
-		FieldName:        proto.String("Col_Long3_Missing"),
-		FieldType:        FieldType_LONG,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Long3_Missing"),
+		FieldType: FieldType_LONG,
+		Index: proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field25 := &FieldSchema{
-		FieldName:        proto.String("Col_Long4_Missing"),
-		FieldType:        FieldType_LONG,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Long4_Missing"),
+		FieldType: FieldType_LONG,
+		Index: proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(true),
 	}
 	field26 := &FieldSchema{
-		FieldName:        proto.String("Col_Long5_Missing_NoDV"),
-		FieldType:        FieldType_LONG,
-		Index:            proto.Bool(true),
+		FieldName: proto.String("Col_Long5_Missing_NoDV"),
+		FieldType: FieldType_LONG,
+		Index: proto.Bool(true),
 		EnableSortAndAgg: proto.Bool(false),
 	}
 	schemas = append(schemas, field22, field23, field24, field25, field26)
@@ -836,9 +836,9 @@ func writeData1(c *C) {
 			putRowChange.AddColumn("Col_Text_Missing", textValue)
 			putRowChange.AddColumn("Col_Nested_Missing", nestedMissingValue)
 		} else {
-			if i%2 == 0 {
+			if i % 2 == 0 {
 				putRowChange.AddColumn("Col_Long1_Missing", longValue)
-			} else if i%2 == 1 {
+			} else if i % 2 == 1 {
 				putRowChange.AddColumn("Col_Long2_Missing", longValue)
 			}
 		}
@@ -1014,8 +1014,8 @@ func (s *SearchSuite) TestQueryFieldSortWithMissingFieldsInvalidParameter(c *C) 
 		sort := &search.Sort{
 			Sorters: []search.Sorter{
 				&search.FieldSort{
-					FieldName:     "Col_Long_Missing",
-					Order:         search.SortOrder_ASC.Enum(),
+					FieldName:    "Col_Long_Missing",
+					Order: search.SortOrder_ASC.Enum(),
 					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Long3_Missing", "Col_Long4_Missing"},
 				},
 			},
@@ -1040,8 +1040,8 @@ func (s *SearchSuite) TestQueryFieldSortWithMissingFieldsInvalidParameter(c *C) 
 		sort := &search.Sort{
 			Sorters: []search.Sorter{
 				&search.FieldSort{
-					FieldName:     "Col_Long_Missing",
-					Order:         search.SortOrder_ASC.Enum(),
+					FieldName:    "Col_Long_Missing",
+					Order: search.SortOrder_ASC.Enum(),
 					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Long5_Missing_NoDV"},
 				},
 			},
@@ -1066,8 +1066,8 @@ func (s *SearchSuite) TestQueryFieldSortWithMissingFieldsInvalidParameter(c *C) 
 		sort := &search.Sort{
 			Sorters: []search.Sorter{
 				&search.FieldSort{
-					FieldName:     "Col_Long_Missing",
-					Order:         search.SortOrder_ASC.Enum(),
+					FieldName:    "Col_Long_Missing",
+					Order: search.SortOrder_ASC.Enum(),
 					MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing", "Col_Double_Missing"},
 				},
 			},
@@ -1093,8 +1093,8 @@ func (s *SearchSuite) TestQueryFieldSortWithMissingFields(c *C) {
 	sort := &search.Sort{
 		Sorters: []search.Sorter{
 			&search.FieldSort{
-				FieldName:     "Col_Long_Missing",
-				Order:         search.SortOrder_ASC.Enum(),
+				FieldName:    "Col_Long_Missing",
+				Order: search.SortOrder_ASC.Enum(),
 				MissingFields: []string{"Col_Long1_Missing", "Col_Long2_Missing"},
 			},
 		},

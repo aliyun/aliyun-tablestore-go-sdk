@@ -252,6 +252,7 @@ message KnnVectorQuery {
     optional int32 top_k = 2;
     repeated float float32_query_vector = 4;
     optional Query filter = 5;
+    optional float weight = 6;
     optional float min_score = 7;
     optional int32 num_candidates = 8;
 }
