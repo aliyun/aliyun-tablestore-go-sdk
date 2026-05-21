@@ -967,6 +967,51 @@ func MatchPhraseQuery(client *tablestore.TableStoreClient, tableName string, ind
 }
 
 /**
+ * Query the values in the Col_Text column of the table that match "hangzhou shanghai" with weight and slop parameters.
+ * Weight is used to set the weight of the query for scoring.
+ * Slop is used to set the maximum number of positions allowed between matching tokens for phrases.
+ */
+func MatchPhraseQueryWithWeightAndSlop(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	searchRequest := &tablestore.SearchRequest{}
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+
+	weight := float32(2.0)
+	slop := int32(2)
+	query := &search.MatchPhraseQuery{} // Set the query type to MatchPhraseQuery
+	query.FieldName = "Col_Text"        // Set the field to match
+	query.Text = "hangzhou shanghai"    // Set the value to match
+	query.Weight = &weight              // Set the weight of the query
+	query.Slop = &slop                  // Set the slop value, allowing up to 2 positions between tokens
+
+	searchQuery := search.NewSearchQuery()
+	searchQuery.SetQuery(query)
+	searchQuery.SetOffset(0) // Set the offset to 0
+	searchQuery.SetLimit(20) // Set the limit to 20, which means a maximum of 20 data entries will be returned.
+	searchRequest.SetSearchQuery(searchQuery)
+
+	// Set to return all columns
+	searchRequest.SetColumnsToGet(&tablestore.ColumnsToGet{
+		ReturnAll: true,
+	})
+
+	searchResponse, err := client.Search(searchRequest)
+	if err != nil {
+		fmt.Printf("%#v", err)
+		return
+	}
+	fmt.Println("IsAllSuccess: ", searchResponse.IsAllSuccess) // Check if the returned result is complete
+	fmt.Println("RowCount: ", len(searchResponse.Rows))
+	for _, row := range searchResponse.Rows {
+		jsonBody, err := json.Marshal(row)
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println("Row: ", string(jsonBody))
+	}
+}
+
+/**
  * Query the data in the Col_Keyword column of the table that exactly matches "hangzhou".
  */
 func TermQuery(client *tablestore.TableStoreClient, tableName string, indexName string) {

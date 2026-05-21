@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/sql/dataprotocol"
-	"time"
 )
 
 type SQLStatementType int32
@@ -19,6 +20,9 @@ const (
 	SQL_DESCRIBE_TABLE SQLStatementType = 4
 	SQL_DROP_TABLE     SQLStatementType = 5
 	SQL_ALTER_TABLE    SQLStatementType = 6
+	SQL_INSERT         SQLStatementType = 7
+	SQL_UPDATE         SQLStatementType = 8
+	SQL_DELETE         SQLStatementType = 9
 )
 
 func (t *SQLStatementType) String() string {
@@ -38,6 +42,12 @@ func (t *SQLStatementType) String() string {
 		return "SQL_DROP_TABLE"
 	case SQL_ALTER_TABLE:
 		return "SQL_ALTER_TABLE"
+	case SQL_INSERT:
+		return "SQL_INSERT"
+	case SQL_UPDATE:
+		return "SQL_UPDATE"
+	case SQL_DELETE:
+		return "SQL_DELETE"
 	default:
 		return "UNKNOWN"
 	}
@@ -230,6 +240,12 @@ func formatSQLStmtTypeFromPB(typ otsprotocol.SQLStatementType) SQLStatementType 
 		return SQL_DROP_TABLE
 	case otsprotocol.SQLStatementType_SQL_ALTER_TABLE:
 		return SQL_ALTER_TABLE
+	case otsprotocol.SQLStatementType_SQL_INSERT:
+		return SQL_INSERT
+	case otsprotocol.SQLStatementType_SQL_UPDATE:
+		return SQL_UPDATE
+	case otsprotocol.SQLStatementType_SQL_DELETE:
+		return SQL_DELETE
 	default:
 		return SQLStatementType(-1)
 	}

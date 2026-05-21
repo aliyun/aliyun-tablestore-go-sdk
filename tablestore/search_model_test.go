@@ -1866,3 +1866,133 @@ func Test_buildSearchHit(t *testing.T) {
 		})
 	}
 }
+
+func TestTextSimilarity_PbConvert(t *testing.T) {
+	tests := []struct {
+		name           string
+		pbFieldSchemas []*otsprotocol.FieldSchema
+		goFieldSchemas []*FieldSchema
+	}{
+		{
+			name: "text_field_with_bm25",
+			pbFieldSchemas: []*otsprotocol.FieldSchema{
+				{
+					FieldName:      proto.String("col_text"),
+					FieldType:      otsprotocol.FieldType_TEXT.Enum(),
+					Index:          proto.Bool(true),
+					Store:          proto.Bool(false),
+					TextSimilarity: otsprotocol.TextSimilarity_BM25.Enum(),
+				},
+			},
+			goFieldSchemas: []*FieldSchema{
+				{
+					FieldName:      proto.String("col_text"),
+					FieldType:      FieldType_TEXT,
+					Index:          proto.Bool(true),
+					Store:          proto.Bool(false),
+					TextSimilarity: TextSimilarity_BM25.Enum(),
+				},
+			},
+		},
+		{
+			name: "text_field_with_short_text",
+			pbFieldSchemas: []*otsprotocol.FieldSchema{
+				{
+					FieldName:      proto.String("col_text"),
+					FieldType:      otsprotocol.FieldType_TEXT.Enum(),
+					Index:          proto.Bool(true),
+					Store:          proto.Bool(false),
+					TextSimilarity: otsprotocol.TextSimilarity_SHORT_TEXT.Enum(),
+				},
+			},
+			goFieldSchemas: []*FieldSchema{
+				{
+					FieldName:      proto.String("col_text"),
+					FieldType:      FieldType_TEXT,
+					Index:          proto.Bool(true),
+					Store:          proto.Bool(false),
+					TextSimilarity: TextSimilarity_SHORT_TEXT.Enum(),
+				},
+			},
+		},
+		{
+			name: "text_field_without_text_similarity",
+			pbFieldSchemas: []*otsprotocol.FieldSchema{
+				{
+					FieldName: proto.String("col_text"),
+					FieldType: otsprotocol.FieldType_TEXT.Enum(),
+					Index:     proto.Bool(true),
+					Store:     proto.Bool(false),
+				},
+			},
+			goFieldSchemas: []*FieldSchema{
+				{
+					FieldName: proto.String("col_text"),
+					FieldType: FieldType_TEXT,
+					Index:     proto.Bool(true),
+					Store:     proto.Bool(false),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run("[SCHEMA2PB]"+tt.name, func(t *testing.T) {
+			fieldSchemas := parseFieldSchemaFromPb(tt.pbFieldSchemas)
+			assert.Equal(t, tt.goFieldSchemas, fieldSchemas)
+		})
+		t.Run("[PB2SCHEMA]"+tt.name, func(t *testing.T) {
+			fieldSchemas := convertFieldSchemaToPBFieldSchema(tt.goFieldSchemas)
+			assert.Equal(t, tt.pbFieldSchemas, fieldSchemas)
+		})
+	}
+}
+
+func TestTextSimilarity_ModelToPb_DefaultValue(t *testing.T) {
+	textSimilarity := TextSimilarity("anything")
+
+	modelSchema := []*FieldSchema{
+		{
+			FieldName:      proto.String("col_text"),
+			FieldType:      FieldType_TEXT,
+			Index:          proto.Bool(true),
+			Store:          proto.Bool(false),
+			TextSimilarity: textSimilarity.Enum(),
+		},
+	}
+	expectedPbSchema := []*otsprotocol.FieldSchema{
+		{
+			FieldName:      proto.String("col_text"),
+			FieldType:      otsprotocol.FieldType_TEXT.Enum(),
+			Index:          proto.Bool(true),
+			Store:          proto.Bool(false),
+			TextSimilarity: otsprotocol.TextSimilarity_BM25.Enum(),
+		},
+	}
+
+	pbSchema := convertFieldSchemaToPBFieldSchema(modelSchema)
+	assert.Equal(t, expectedPbSchema, pbSchema)
+}
+
+func TestTextSimilarityFieldUnmarshal(t *testing.T) {
+	modelSchema := []*FieldSchema{
+		{
+			FieldName:      proto.String("col_text_bm25"),
+			FieldType:      FieldType_TEXT,
+			Index:          proto.Bool(true),
+			Store:          proto.Bool(false),
+			TextSimilarity: TextSimilarity_BM25.Enum(),
+		},
+		{
+			FieldName:      proto.String("col_text_short"),
+			FieldType:      FieldType_TEXT,
+			Index:          proto.Bool(true),
+			Store:          proto.Bool(false),
+			TextSimilarity: TextSimilarity_SHORT_TEXT.Enum(),
+		},
+	}
+	marshal, err := json.Marshal(modelSchema)
+	assert.Nil(t, err)
+	var jsonSchema []*FieldSchema
+	assert.Nil(t, json.Unmarshal(marshal, &jsonSchema))
+	assert.Equal(t, modelSchema, jsonSchema)
+}

@@ -764,6 +764,7 @@ func (s *TimeseriesSuite) TestCreateAnalyticalStoreWithTimeseriesTable(c *C) {
 	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
 	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(true)
 	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	c.Assert(err, Equals, nil)
 	// describe table
@@ -921,6 +922,7 @@ func (s *TimeseriesSuite) TestUpdateAnalyticalStore(c *C) {
 	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
 	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(true)
 	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	c.Assert(err, Equals, nil)
 	describeAnalyticalStoreRequest := NewDescribeTimeseriesAnalyticalStoreRequest("test_update_analytical_store", "default_analytical_store")
@@ -948,6 +950,7 @@ func (s *TimeseriesSuite) TestDescribeIndexSyncPhase(c *C) {
 	meta.SetTimeseriesTableOptions(&TimeseriesTableOptions{-1})
 	createTimeseriesTableRequest := NewCreateTimeseriesTableRequest()
 	createTimeseriesTableRequest.SetTimeseriesTableMeta(meta)
+	createTimeseriesTableRequest.SetEnableAnalyticalStore(true)
 	_, err := timeseriesClient.CreateTimeseriesTable(createTimeseriesTableRequest)
 	c.Assert(err, Equals, nil)
 

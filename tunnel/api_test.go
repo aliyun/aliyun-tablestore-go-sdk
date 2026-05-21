@@ -4,8 +4,11 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"math/rand"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
+	"strconv"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -42,16 +45,17 @@ func TestNewTunnelApi(t *testing.T) {
 	testClient := tablestore.NewClientWithConfig(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, "", nil)
 	api := NewTunnelApi(testConfig.OtsEndpoint, testConfig.InstanceName, testConfig.OtsAccessId, testConfig.OtsAccessKey, nil)
 
-	_, err := testClient.CreateTable(getCreateTableRequest())
+	curTestTableName := generateTableName(getCurrentFuncName())
+	_, err := testClient.CreateTable(getCreateTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	_, err = api.CreateTunnel(getCreateTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	_, err = testClient.DeleteTable(getDeleteTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
 	log.Println("TestNewTunnelApi finished")
@@ -67,16 +71,17 @@ func TestNewTunnelApiWithCredentialsProvider(t *testing.T) {
 	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil)
 	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, provider, nil)
 
-	_, err := testClient.CreateTable(getCreateTableRequest())
+	curTestTableName := generateTableName(getCurrentFuncName())
+	_, err := testClient.CreateTable(getCreateTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	_, err = api.CreateTunnel(getCreateTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	_, err = testClient.DeleteTable(getDeleteTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
 	log.Println("TestNewTunnelApiWithCredentialsProvider finished")
@@ -93,16 +98,17 @@ func TestNewTunnelApiWithV4Credentials(t *testing.T) {
 	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
 	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
 
-	_, err := testClient.CreateTable(getCreateTableRequest())
+	curTestTableName := generateTableName(getCurrentFuncName())
+	_, err := testClient.CreateTable(getCreateTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	_, err = api.CreateTunnel(getCreateTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest(curTestTableName))
 	c.Equal(err, nil)
 
-	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	_, err = testClient.DeleteTable(getDeleteTableRequest(curTestTableName))
 	c.Equal(err, nil)
 
 	log.Println("TestNewTunnelApiWithV4Credentials finished")
@@ -119,19 +125,21 @@ func TestNewTunnelApiWithV4CredentialsAndEmptyRegion(t *testing.T) {
 	testClient := tablestore.NewClientWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
 	api := NewTunnelApiWithCredentialsProvider(testConfig.OtsEndpoint, testConfig.InstanceName, v4Credentials, nil)
 
-	_, err := testClient.CreateTable(getCreateTableRequest())
+	// 获取当前函数名
+	curTestTableName := generateTableName(getCurrentFuncName())
+	_, err := testClient.CreateTable(getCreateTableRequest(curTestTableName))
 	c.NotNil(err)
 	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
 
-	_, err = api.CreateTunnel(getCreateTunnelRequest())
+	_, err = api.CreateTunnel(getCreateTunnelRequest(curTestTableName))
 	c.NotNil(err)
 	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
 
-	_, err = api.DeleteTunnel(getDeleteTunnelRequest())
+	_, err = api.DeleteTunnel(getDeleteTunnelRequest(curTestTableName))
 	c.NotNil(err)
 	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
 
-	_, err = testClient.DeleteTable(getDeleteTableRequest())
+	_, err = testClient.DeleteTable(getDeleteTableRequest(curTestTableName))
 	c.NotNil(err)
 	c.Equal(err.Error(), errMissMustHeader("x-ots-signregion").Error())
 
@@ -426,11 +434,29 @@ func mockServer() *httptest.Server {
 	return httptest.NewServer(handler)
 }
 
-func getCreateTableRequest() *tablestore.CreateTableRequest {
+func getCurrentFuncName() string {
+	pc := make([]uintptr, 1)
+	runtime.Callers(2, pc) // skip=2 跳过Callers和getCurrentFuncName
+	f := runtime.FuncForPC(pc[0])
+	return f.Name()
+}
+
+func generateTableName(randomSeed string) string {
+	// 将 randomSeed 转换为 int64 作为种子
+	seed, _ := strconv.ParseInt(randomSeed, 10, 64)
+	if seed == 0 {
+		seed = time.Now().UnixNano()
+	}
+	rand.Seed(seed)
+	randomNumber := rand.Intn(1000000)
+	return fmt.Sprintf("%s_%d", testTableName, randomNumber)
+}
+
+func getCreateTableRequest(tableName string) *tablestore.CreateTableRequest {
 	createtableRequest := new(tablestore.CreateTableRequest)
 
 	tableMeta := new(tablestore.TableMeta)
-	tableMeta.TableName = testTableName
+	tableMeta.TableName = tableName
 	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
 	tableMeta.AddPrimaryKeyColumn("pk2", tablestore.PrimaryKeyType_INTEGER)
 	tableMeta.AddPrimaryKeyColumn("pk3", tablestore.PrimaryKeyType_BINARY)
@@ -447,24 +473,24 @@ func getCreateTableRequest() *tablestore.CreateTableRequest {
 	return createtableRequest
 }
 
-func getDeleteTableRequest() *tablestore.DeleteTableRequest {
+func getDeleteTableRequest(tableName string) *tablestore.DeleteTableRequest {
 	deleteRequest := new(tablestore.DeleteTableRequest)
-	deleteRequest.TableName = testTableName
+	deleteRequest.TableName = tableName
 	return deleteRequest
 }
 
-func getCreateTunnelRequest() *CreateTunnelRequest {
+func getCreateTunnelRequest(tableName string) *CreateTunnelRequest {
 	req := &CreateTunnelRequest{
-		TableName:  testTableName,
+		TableName:  tableName,
 		TunnelName: testTunnelName,
 		Type:       TunnelTypeStream,
 	}
 	return req
 }
 
-func getDeleteTunnelRequest() *DeleteTunnelRequest {
+func getDeleteTunnelRequest(tableName string) *DeleteTunnelRequest {
 	deleteTunnelRequest := &DeleteTunnelRequest{
-		TableName:  testTableName,
+		TableName:  tableName,
 		TunnelName: testTunnelName,
 	}
 	return deleteTunnelRequest

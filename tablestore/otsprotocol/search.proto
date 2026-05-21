@@ -43,6 +43,8 @@ message MatchQuery {
 message MatchPhraseQuery {
     optional string field_name = 1;
     optional string text = 2;
+    optional float weight = 3;
+    optional int32 slop = 4;
 }
 
 message MatchAllQuery {
@@ -491,6 +493,11 @@ message FuzzyAnalyzerParameter {
     optional int32 max_chars = 2;
 }
 
+enum TextSimilarity {
+    BM25 = 1;
+    SHORT_TEXT = 2;
+}
+
 message FieldSchema {
     optional string field_name = 1;
     optional FieldType field_type = 2;
@@ -508,6 +515,7 @@ message FieldSchema {
     optional bool enable_highlighting = 14;
     optional VectorOptions vector_options = 15;
     optional JsonType json_type = 16;
+    optional TextSimilarity text_similarity = 17;
 }
 
 enum JsonType {

@@ -207,6 +207,9 @@ func convertFieldSchemaToPBFieldSchema(fieldSchemas []*FieldSchema) []*otsprotoc
 		if value.JsonType != nil {
 			field.JsonType = convertToPBJsonType(value.JsonType)
 		}
+		if value.TextSimilarity != nil {
+			field.TextSimilarity = convertToPBTextSimilarity(value.TextSimilarity)
+		}
 
 		schemas = append(schemas, field)
 	}
@@ -320,6 +323,9 @@ func parseFieldSchemaFromPb(pbFieldSchemas []*otsprotocol.FieldSchema) []*FieldS
 		}
 		if value.JsonType != nil {
 			field.JsonType, _ = parseJsonTypeFromPB(value.JsonType)
+		}
+		if value.TextSimilarity != nil {
+			field.TextSimilarity, _ = parseTextSimilarityFromPB(value.TextSimilarity)
 		}
 		schemas = append(schemas, field)
 	}
@@ -651,6 +657,42 @@ func parseJsonTypeFromPB(pbJsonType *otsprotocol.JsonType) (*JsonType, error) {
 	}
 }
 
+type TextSimilarity string
+
+const (
+	TextSimilarity_BM25       TextSimilarity = "BM25"
+	TextSimilarity_SHORT_TEXT TextSimilarity = "SHORT_TEXT"
+)
+
+func (x TextSimilarity) Enum() *TextSimilarity {
+	p := new(TextSimilarity)
+	*p = x
+	return p
+}
+
+func convertToPBTextSimilarity(textSimilarity *TextSimilarity) *otsprotocol.TextSimilarity {
+	switch *textSimilarity {
+	case TextSimilarity_BM25:
+		return otsprotocol.TextSimilarity_BM25.Enum()
+	case TextSimilarity_SHORT_TEXT:
+		return otsprotocol.TextSimilarity_SHORT_TEXT.Enum()
+	default:
+		return otsprotocol.TextSimilarity_BM25.Enum()
+	}
+}
+
+func parseTextSimilarityFromPB(pbTextSimilarity *otsprotocol.TextSimilarity) (*TextSimilarity, error) {
+	switch *pbTextSimilarity {
+	case otsprotocol.TextSimilarity_BM25:
+		return TextSimilarity_BM25.Enum(), nil
+	case otsprotocol.TextSimilarity_SHORT_TEXT:
+		return TextSimilarity_SHORT_TEXT.Enum(), nil
+	default:
+		textSimilarity := TextSimilarity("unknown")
+		return &textSimilarity, errors.New("unknown proto text similarity " + pbTextSimilarity.String())
+	}
+}
+
 type FieldSchema struct {
 	FieldName          *string
 	FieldType          FieldType
@@ -668,6 +710,7 @@ type FieldSchema struct {
 	DateFormats        []string
 	VectorOptions      *VectorOptions
 	JsonType           *JsonType
+	TextSimilarity     *TextSimilarity
 }
 
 func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
@@ -694,6 +737,7 @@ func (r *FieldSchema) UnmarshalJSON(data []byte) (err error) {
 	r.DateFormats = copyFS.DateFormats
 	r.VectorOptions = copyFS.VectorOptions
 	r.JsonType = copyFS.JsonType
+	r.TextSimilarity = copyFS.TextSimilarity
 
 	apJson, err := json.Marshal(r.AnalyzerParameter)
 	if err != nil {

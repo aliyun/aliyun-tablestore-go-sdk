@@ -769,5 +769,6 @@ message SQLQueryResponse {
     optional SQLPayloadVersion version = 3;
     optional SQLStatementType type = 4;
     repeated SearchConsumedCapacity search_consumes = 5;
+    optional int64 affected_rows = 6;
     optional string next_search_token = 8;
 }

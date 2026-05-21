@@ -2420,6 +2420,7 @@ func (client *TableStoreClient) SQLQuery(req *SQLQueryRequest) (*SQLQueryRespons
 	}
 	response.SQLQueryConsumed.SearchConsumes = searchConsumes
 	response.NextSearchToken = pbResp.NextSearchToken
+	response.AffectedRows = pbResp.GetAffectedRows()
 
 	return response, nil
 }
