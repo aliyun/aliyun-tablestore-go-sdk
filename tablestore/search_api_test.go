@@ -3092,3 +3092,126 @@ func (s *SearchSuite) TestSearchQueryWithSearchTag(c *C) {
 	c.Check(resp.SearchHits, NotNil)
 	c.Check(resp.SearchHits[0].Row, NotNil)
 }
+
+func (s *SearchSuite) TestSuffixQueryWithFuzzyKeyword(c *C) {
+	tableName := tableNamePrefix + "suffix_test_table"
+	indexName := "suffix_test_index"
+
+	deleteSearchIndex(tableName, indexName)
+	deleteTable(tableName)
+	time.Sleep(3 * time.Second)
+
+	defer func() {
+		deleteSearchIndex(tableName, indexName)
+		time.Sleep(time.Second)
+		deleteTable(tableName)
+	}()
+
+	tableMeta := &TableMeta{
+		TableName: tableName,
+	}
+	tableMeta.AddPrimaryKeyColumn("pk", PrimaryKeyType_STRING)
+	tableOption := &TableOption{
+		TimeToAlive: -1,
+		MaxVersion:  1,
+	}
+	reservedThroughput := &ReservedThroughput{
+		Readcap:  0,
+		Writecap: 0,
+	}
+	createTableReq := &CreateTableRequest{
+		TableMeta:          tableMeta,
+		TableOption:        tableOption,
+		ReservedThroughput: reservedThroughput,
+	}
+	_, err := client.CreateTable(createTableReq)
+	c.Assert(err, IsNil)
+
+	createIndexReq := &CreateSearchIndexRequest{
+		TableName:  tableName,
+		IndexName:  indexName,
+		IndexSchema: &IndexSchema{
+			FieldSchemas: []*FieldSchema{
+				{
+					FieldName:        proto.String("col_fuzzy"),
+					FieldType:        FieldType_FUZZY_KEYWORD,
+					Index:            proto.Bool(true),
+					EnableSortAndAgg: proto.Bool(true),
+				},
+				{
+					FieldName:        proto.String("col_keyword"),
+					FieldType:        FieldType_KEYWORD,
+					Index:            proto.Bool(true),
+					EnableSortAndAgg: proto.Bool(true),
+				},
+			},
+		},
+	}
+	_, err = client.CreateSearchIndex(createIndexReq)
+	c.Assert(err, IsNil)
+
+	testData := []struct {
+		pk         string
+		colFuzzy   string
+		colKeyword string
+	}{
+		{"pk1", "shanghai", "shanghai"},
+		{"pk2", "beijing", "beijing"},
+		{"pk3", "hangzhou", "hangzhou"},
+		{"pk4", "guangzhou", "guangzhou"},
+		{"pk5", "shenzhen", "shenzhen"},
+	}
+
+	for _, data := range testData {
+		pk := new(PrimaryKey)
+		pk.AddPrimaryKeyColumn("pk", data.pk)
+		change := &PutRowChange{
+			TableName:  tableName,
+			PrimaryKey: pk,
+			Condition:  &RowCondition{RowExistenceExpectation: RowExistenceExpectation_IGNORE},
+		}
+		change.AddColumn("col_fuzzy", data.colFuzzy)
+		change.AddColumn("col_keyword", data.colKeyword)
+		_, err := client.PutRow(&PutRowRequest{change, ExtraRequestInfo{}})
+		c.Assert(err, IsNil)
+	}
+
+	WaitDataSyncByMatchAllQuery(c, client, int64(len(testData)), tableName, indexName, 180)
+
+	searchRequest := &SearchRequest{}
+	searchRequest.SetTableName(tableName)
+	searchRequest.SetIndexName(indexName)
+
+	searchQuery := search.NewSearchQuery()
+	searchQuery.SetQuery(&search.SuffixQuery{
+		FieldName: "col_fuzzy",
+		Suffix:    "zhou",
+	})
+	searchQuery.SetLimit(10)
+	searchQuery.SetGetTotalCount(true)
+	searchRequest.SetSearchQuery(searchQuery)
+	searchRequest.SetColumnsToGet(&ColumnsToGet{ReturnAll: true})
+
+	resp, err := client.Search(searchRequest)
+	c.Assert(err, IsNil)
+	c.Assert(resp.TotalCount, Equals, int64(2))
+
+	searchRequest2 := &SearchRequest{}
+	searchRequest2.SetTableName(tableName)
+	searchRequest2.SetIndexName(indexName)
+
+	searchQuery2 := search.NewSearchQuery()
+	searchQuery2.SetQuery(&search.SuffixQuery{
+		FieldName: "col_fuzzy",
+		Suffix:    "zhou",
+		Weight:    proto.Float32(2.0),
+	})
+	searchQuery2.SetLimit(10)
+	searchQuery2.SetGetTotalCount(true)
+	searchRequest2.SetSearchQuery(searchQuery2)
+	searchRequest2.SetColumnsToGet(&ColumnsToGet{ReturnAll: true})
+
+	resp2, err := client.Search(searchRequest2)
+	c.Assert(err, IsNil)
+	c.Assert(resp2.TotalCount, Equals, int64(2))
+}

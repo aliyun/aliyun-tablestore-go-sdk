@@ -2,13 +2,14 @@ package tunnel
 
 import (
 	"errors"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"github.com/golang/mock/gomock"
 	. "github.com/smartystreets/goconvey/convey"
 	"go.uber.org/zap"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 var (
@@ -357,7 +358,7 @@ func TestChannelConn_NotifyStatus_ProcessRecords(t *testing.T) {
 	bypassApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: "token", ResponseInfo: ResponseInfo{"traceId"}}, nil).AnyTimes()
 
 	failApi := NewMocktunnelDataApi(mockCtrl)
-	failApi.EXPECT().ReadRecords(request).Return(nil, errors.New("abc")).Times(1)
+	failApi.EXPECT().ReadRecords(request).Return(nil, errors.New("abc")).AnyTimes()
 
 	finishApi := NewMocktunnelDataApi(mockCtrl)
 	finishApi.EXPECT().ReadRecords(request).Return(&ReadRecordResponse{NextToken: FinishTag, ResponseInfo: ResponseInfo{"traceId"}}, nil).Times(1)

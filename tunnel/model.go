@@ -2,10 +2,11 @@ package tunnel
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
 )
 
 type TunnelType string
@@ -69,6 +70,7 @@ type ListTunnelResponse struct {
 type DescribeTunnelRequest struct {
 	TableName  string
 	TunnelName string
+	TunnelId   string
 	// The following fields are for internal use only.
 	OnlyPhysical bool
 }
@@ -192,6 +194,7 @@ const (
 type DeleteTunnelRequest struct {
 	TableName  string
 	TunnelName string
+	TunnelId   string
 	// The following fields are for internal use only.
 	OnlyPhysical bool
 }

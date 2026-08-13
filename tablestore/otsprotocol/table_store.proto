@@ -199,6 +199,7 @@ message DescribeTableResponse {
     repeated bytes shard_splits = 6;
     optional SSEDetails sse_details = 7;
     repeated IndexMeta index_metas = 8;
+    optional int64 creation_time = 9; // Table creation time, in microseconds
     optional DescribeTableInnerInfo inner_info = 12;
 }
 /* ########################################################################################################### */

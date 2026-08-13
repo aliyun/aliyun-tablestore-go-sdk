@@ -30,6 +30,7 @@ const (
 	QueryType_ExistsQuery         QueryType = 16
 	QueryType_KnnVectorQuery      QueryType = 17
 	QueryType_FunctionsScoreQuery QueryType = 18
+	QueryType_SuffixQuery         QueryType = 19
 	QueryType_DisMaxQuery         QueryType = 20
 )
 
@@ -71,6 +72,8 @@ func (q QueryType) String() string {
 		return "KnnVectorQuery"
 	case QueryType_FunctionsScoreQuery:
 		return "FunctionsScoreQuery"
+	case QueryType_SuffixQuery:
+		return "SuffixQuery"
 	case QueryType_DisMaxQuery:
 		return "DisMaxQuery"
 	}
@@ -153,6 +156,10 @@ func UnmarshalQuery(name string, data json.RawMessage) (Query, error) {
 		q := &FunctionsScoreQuery{}
 		err = json.Unmarshal(data, q)
 		return q, err
+	case "SuffixQuery":
+		q := &SuffixQuery{}
+		err = json.Unmarshal(data, q)
+		return q, err
 	case "DisMaxQuery":
 		q := &DisMaxQuery{}
 		err = json.Unmarshal(data, q)
@@ -200,6 +207,8 @@ func ToQueryType(q string) QueryType {
 		return QueryType_KnnVectorQuery
 	case "FunctionsScoreQuery":
 		return QueryType_FunctionsScoreQuery
+	case "SuffixQuery":
+		return QueryType_SuffixQuery
 	case "DisMaxQuery":
 		return QueryType_DisMaxQuery
 	}
@@ -252,6 +261,8 @@ func (q QueryType) ToPB() *otsprotocol.QueryType {
 		return otsprotocol.QueryType_KNN_VECTOR_QUERY.Enum()
 	case QueryType_FunctionsScoreQuery:
 		return otsprotocol.QueryType_FUNCTIONS_SCORE_QUERY.Enum()
+	case QueryType_SuffixQuery:
+		return otsprotocol.QueryType_SUFFIX_QUERY.Enum()
 	case QueryType_DisMaxQuery:
 		return otsprotocol.QueryType_DIS_MAX_QUERY.Enum()
 	default:

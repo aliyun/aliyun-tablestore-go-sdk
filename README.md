@@ -16,6 +16,17 @@
 > - 执行命令`go get github.com/aliyun/aliyun-tablestore-go-sdk`获取远程代码包。
 > - 在您的代码中使用`import "github.com/aliyun/aliyun-tablestore-go-sdk"`引入TableStore Go SDK的包。
 
+## HTTP代理
+通过固定代理地址创建客户端：
+
+```go
+config := tablestore.NewDefaultTableStoreConfig()
+config.ProxyHost = "http://user:password@proxy.example.com:8080"
+client := tablestore.NewClientWithConfig(endpoint, instanceName, accessKeyID, accessKeySecret, securityToken, config)
+```
+
+设置`ProxyFromEnvironment`可读取`HTTP_PROXY`、`HTTPS_PROXY`和`NO_PROXY`环境变量。`ProxyHost`与环境代理同时设置时，`ProxyHost`优先；设置`Transport`时，代理行为完全由自定义Transport控制。
+
 ## 贡献代码
  - 我们非常欢迎大家为TableStore Go# SDK以及其他阿里云SDK贡献代码
 

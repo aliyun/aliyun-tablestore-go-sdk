@@ -379,17 +379,18 @@ type IndexSchema struct {
 type FieldType int32
 
 const (
-	FieldType_LONG      FieldType = 1
-	FieldType_DOUBLE    FieldType = 2
-	FieldType_BOOLEAN   FieldType = 3
-	FieldType_KEYWORD   FieldType = 4
-	FieldType_TEXT      FieldType = 5
-	FieldType_NESTED    FieldType = 6
-	FieldType_GEO_POINT FieldType = 7
-	FieldType_DATE      FieldType = 8
-	FieldType_VECTOR    FieldType = 9
-	FieldType_IP        FieldType = 11
-	FieldType_JSON      FieldType = 12
+	FieldType_LONG          FieldType = 1
+	FieldType_DOUBLE        FieldType = 2
+	FieldType_BOOLEAN       FieldType = 3
+	FieldType_KEYWORD       FieldType = 4
+	FieldType_TEXT          FieldType = 5
+	FieldType_NESTED        FieldType = 6
+	FieldType_GEO_POINT     FieldType = 7
+	FieldType_DATE          FieldType = 8
+	FieldType_VECTOR        FieldType = 9
+	FieldType_FUZZY_KEYWORD FieldType = 10
+	FieldType_IP            FieldType = 11
+	FieldType_JSON          FieldType = 12
 )
 
 func (ft FieldType) String() string {
@@ -412,6 +413,8 @@ func (ft FieldType) String() string {
 		return "DATE"
 	case FieldType_VECTOR:
 		return "VECTOR"
+	case FieldType_FUZZY_KEYWORD:
+		return "FUZZY_KEYWORD"
 	case FieldType_IP:
 		return "IP"
 	case FieldType_JSON:
@@ -441,6 +444,8 @@ func ToFieldType(fieldType string) (FieldType, error) {
 		return FieldType_DATE, nil
 	case "VECTOR":
 		return FieldType_VECTOR, nil
+	case "FUZZY_KEYWORD":
+		return FieldType_FUZZY_KEYWORD, nil
 	case "IP":
 		return FieldType_IP, nil
 	case "JSON":
@@ -906,6 +911,8 @@ type ParallelScanResponse struct {
 	Rows      []*Row
 	NextToken []byte
 
+	ConsumedCapacityUnit *ConsumedCapacityUnit
+	ReservedThroughput   *ReservedThroughput
 	ResponseInfo
 }
 

@@ -5,6 +5,7 @@ go 1.13
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/cenkalti/backoff v2.2.1+incompatible
+	github.com/elazarl/goproxy v0.0.0-20191011121108-aa519ddbe484
 	github.com/golang/mock v1.3.1
 	github.com/golang/protobuf v1.3.2
 	github.com/google/flatbuffers v23.5.26+incompatible

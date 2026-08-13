@@ -23,6 +23,7 @@ enum QueryType {
     EXISTS_QUERY = 16;
     KNN_VECTOR_QUERY = 17;
     FUNCTIONS_SCORE_QUERY = 18;
+    SUFFIX_QUERY = 19;
     DIS_MAX_QUERY = 20;
 }
 
@@ -71,6 +72,12 @@ message RangeQuery {
 message PrefixQuery {
     optional string field_name = 1;
     optional string prefix = 2;
+}
+
+message SuffixQuery {
+    optional string field_name = 1;
+    optional string suffix = 2;
+    optional float weight = 3;
 }
 
 message WildcardQuery {
@@ -459,6 +466,7 @@ enum FieldType {
   GEO_POINT = 7;
   DATE = 8;
   VECTOR = 9;
+  FUZZY_KEYWORD = 10;
   IP = 11;
   JSON = 12;
 }
@@ -1020,4 +1028,6 @@ message ParallelScanRequest {
 message ParallelScanResponse {
     repeated bytes rows = 1;
     optional bytes next_token = 2;
+    optional ConsumedCapacity consumed = 3;
+    optional ConsumedCapacity reserved_consumed = 4;
 }

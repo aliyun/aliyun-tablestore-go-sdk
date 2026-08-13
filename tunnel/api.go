@@ -291,6 +291,7 @@ func (api *TunnelApi) DeleteTunnel(req *DeleteTunnelRequest) (*DeleteTunnelRespo
 	deleteTunnelRequest := &protocol.DeleteTunnelRequest{
 		TableName:    &req.TableName,
 		TunnelName:   &req.TunnelName,
+		TunnelId:     &req.TunnelId,
 		OnlyPhysical: &req.OnlyPhysical,
 	}
 	deleteTunnelResponse := new(protocol.DeleteTunnelResponse)
@@ -338,6 +339,7 @@ func (api *TunnelApi) DescribeTunnel(req *DescribeTunnelRequest) (*DescribeTunne
 	describeTunnelRequest := &protocol.DescribeTunnelRequest{
 		TableName:    &req.TableName,
 		TunnelName:   &req.TunnelName,
+		TunnelId:     &req.TunnelId,
 		OnlyPhysical: &req.OnlyPhysical,
 	}
 	describeTunnelResponse := new(protocol.DescribeTunnelResponse)

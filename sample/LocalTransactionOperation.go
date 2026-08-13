@@ -2,8 +2,10 @@ package sample
 
 import (
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore"
+	"github.com/golang/protobuf/proto"
 )
 
 func PutRowWithTxnSample(client *tablestore.TableStoreClient, tableName string) {
@@ -25,6 +27,7 @@ func PutRowWithTxnSample(client *tablestore.TableStoreClient, tableName string) 
 	createtableRequest.TableMeta = tableMeta
 	createtableRequest.TableOption = tableOption
 	createtableRequest.ReservedThroughput = reservedThroughput
+	createtableRequest.EnableLocalTxn = proto.Bool(true)
 
 	_, err := client.CreateTable(createtableRequest)
 	if err != nil {
@@ -68,7 +71,7 @@ func PutRowWithTxnSample(client *tablestore.TableStoreClient, tableName string) 
 
 	getRowPk := new(tablestore.PrimaryKey)
 	getRowPk.AddPrimaryKeyColumn("userid", userName)
-	getRowPk.AddPrimaryKeyColumn("pk2", int64(3))
+	getRowPk.AddPrimaryKeyColumn("pk2", int64(2))
 	getRowRequest := new(tablestore.GetRowRequest)
 
 	criteria := new(tablestore.SingleRowQueryCriteria)

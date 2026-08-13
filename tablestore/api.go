@@ -12,6 +12,7 @@ import (
 	"math/rand"
 	"net"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -148,18 +149,7 @@ func NewClientWithCredentialsProvider(endPoint, instanceName string, provider co
 		config = NewDefaultTableStoreConfig()
 	}
 	tableStoreClient.config = config
-	var tableStoreTransportProxy http.RoundTripper
-	if config.Transport != nil {
-		tableStoreTransportProxy = config.Transport
-	} else {
-		tableStoreTransportProxy = &http.Transport{
-			MaxIdleConnsPerHost: config.MaxIdleConnections,
-			IdleConnTimeout:     config.IdleConnTimeout,
-			Dial: (&net.Dialer{
-				Timeout: config.HTTPTimeout.ConnectionTimeout,
-			}).Dial,
-		}
-	}
+	tableStoreTransportProxy := resolveTableStoreTransport(config)
 
 	tableStoreClient.httpClient = currentGetHttpClientFunc()
 
@@ -212,18 +202,7 @@ func NewTimeseriesClientWithCredentialsProvider(endPoint, instanceName string, p
 		timeseriesConfiguration = NewTimeseriesConfiguration()
 	}
 	timeseriesClient.timeseriesConfiguration = timeseriesConfiguration
-	var tableStoreTransportProxy http.RoundTripper
-	if config.Transport != nil {
-		tableStoreTransportProxy = config.Transport
-	} else {
-		tableStoreTransportProxy = &http.Transport{
-			MaxIdleConnsPerHost: config.MaxIdleConnections,
-			IdleConnTimeout:     config.IdleConnTimeout,
-			Dial: (&net.Dialer{
-				Timeout: config.HTTPTimeout.ConnectionTimeout,
-			}).Dial,
-		}
-	}
+	tableStoreTransportProxy := resolveTableStoreTransport(config)
 
 	timeseriesClient.httpClient = currentGetHttpClientFunc()
 
@@ -239,6 +218,29 @@ func NewTimeseriesClientWithCredentialsProvider(endPoint, instanceName string, p
 	timeseriesMetaCache, _ := lruCache.New(timeseriesClient.timeseriesConfiguration.metaCacheMaxDataSize)
 	timeseriesClient.SetTimeseriesMetaCache(timeseriesMetaCache)
 	return timeseriesClient
+}
+
+func resolveTableStoreTransport(config *TableStoreConfig) http.RoundTripper {
+	if config.Transport != nil {
+		return config.Transport
+	}
+
+	transport := &http.Transport{
+		MaxIdleConnsPerHost: config.MaxIdleConnections,
+		IdleConnTimeout:     config.IdleConnTimeout,
+		Dial: (&net.Dialer{
+			Timeout: config.HTTPTimeout.ConnectionTimeout,
+		}).Dial,
+	}
+	if config.ProxyFromEnvironment {
+		transport.Proxy = http.ProxyFromEnvironment
+	}
+	if config.ProxyHost != "" {
+		if proxyURL, err := url.Parse(config.ProxyHost); err == nil {
+			transport.Proxy = http.ProxyURL(proxyURL)
+		}
+	}
+	return transport
 }
 
 func NewClientWithExternalHeader(endPoint, instanceName, accessKeyId, accessKeySecret string, securityToken string, config *TableStoreConfig, header map[string]string) *TableStoreClient {
@@ -1682,6 +1684,8 @@ func (tableStoreClient *TableStoreClient) DescribeTable(request *DescribeTableRe
 			ClusterName: resp.GetInnerInfo().GetClusterName(),
 		}
 	}
+
+	response.CreationTime = resp.GetCreationTime()
 
 	return response, nil
 }

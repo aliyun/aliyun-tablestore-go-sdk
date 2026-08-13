@@ -83,12 +83,16 @@ type HTTPTimeout struct {
 }
 
 type TableStoreConfig struct {
-	RetryTimes           uint
-	MaxRetryTime         time.Duration
-	HTTPTimeout          HTTPTimeout
-	MaxIdleConnections   int
-	IdleConnTimeout      time.Duration
-	Transport            http.RoundTripper
+	RetryTimes         uint
+	MaxRetryTime       time.Duration
+	HTTPTimeout        HTTPTimeout
+	MaxIdleConnections int
+	IdleConnTimeout    time.Duration
+	Transport          http.RoundTripper
+	// ProxyHost specifies a fixed proxy URL. It takes precedence over ProxyFromEnvironment.
+	ProxyHost string
+	// ProxyFromEnvironment uses HTTP_PROXY, HTTPS_PROXY, and NO_PROXY.
+	ProxyFromEnvironment bool
 	DefaultRetryInterval time.Duration
 	MaxRetryInterval     time.Duration
 }
@@ -206,6 +210,7 @@ type DescribeTableResponse struct {
 	IndexMetas             []*IndexMeta
 	SSEDetails             *SSEDetails
 	DescribeTableInnerInfo *DescribeTableInnerInfo
+	CreationTime           int64 // Table creation time, in microseconds
 	ResponseInfo
 }
 

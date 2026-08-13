@@ -3,9 +3,10 @@ package tunnel
 import (
 	"context"
 	"fmt"
-	"go.uber.org/zap"
 	"sync/atomic"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 var (
@@ -60,15 +61,16 @@ func newTunnelWorker(tunnelId string, api *TunnelApi, conf *TunnelWorkerConfig) 
 	}
 	if cloneConf.ChannelDialer == nil {
 		dialer := &channelDialer{
-			api: api,
-			lg:  lg,
-			bc:  cloneConf.BackoffConfig,
+			api:             api,
+			lg:              lg,
+			bc:              cloneConf.BackoffConfig,
+			syncReadRecords: cloneConf.SyncReadRecords,
 		}
 		if cloneConf.MaxChannelParallel != 0 {
 			dialer.channelParallelChan = make(chan bool, cloneConf.MaxChannelParallel)
 			dialer.needManualRelease = cloneConf.NeedManualRelease
+			dialer.syncReadRecords = true //syncReadRecords need to be true when MaxChannelParallel is greater than 0
 		}
-		dialer.syncReadRecords = cloneConf.SyncReadRecords
 		cloneConf.ChannelDialer = dialer
 	}
 	return &tunnelWorker{

@@ -1,13 +1,14 @@
 package tunnel
 
 import (
-	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
-	"github.com/cenkalti/backoff"
-	"go.uber.org/zap"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/tunnel/protocol"
+	"github.com/cenkalti/backoff"
+	"go.uber.org/zap"
 )
 
 var (
@@ -311,6 +312,7 @@ func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struc
 	if c.streamChannel {
 		bkoff = ExponentialBackoff(c.bc.baseDelay, c.bc.MaxDelay, 0, c.bc.factor, c.bc.jitter)
 	}
+	var needBackoff bool
 	var needBinaryRecords bool
 	if processor, ok := c.p.(*defaultProcessor); ok {
 		needBinaryRecords = processor.needBinaryRecords
@@ -368,6 +370,9 @@ func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struc
 				if bkoff != nil {
 					if streamFullData(resp.RecordCount, resp.Size, resp.MayMoreRecord) {
 						bkoff.Reset()
+						needBackoff = false
+					} else {
+						needBackoff = true
 					}
 				}
 				c.token = resp.NextToken
@@ -391,7 +396,7 @@ func (c *channelConn) readRecordsPipe(outCh chan *pipeResult, closeCh chan struc
 		case <-closeCh:
 			return
 		}
-		if bkoff != nil {
+		if bkoff != nil && needBackoff {
 			time.Sleep(bkoff.NextBackOff())
 		}
 	}

@@ -1995,6 +1995,7 @@ type DescribeTableResponse struct {
 	ShardSplits               [][]byte                   `protobuf:"bytes,6,rep,name=shard_splits,json=shardSplits" json:"shard_splits,omitempty"`
 	SseDetails                *SSEDetails                `protobuf:"bytes,7,opt,name=sse_details,json=sseDetails" json:"sse_details,omitempty"`
 	IndexMetas                []*IndexMeta               `protobuf:"bytes,8,rep,name=index_metas,json=indexMetas" json:"index_metas,omitempty"`
+	CreationTime              *int64                     `protobuf:"varint,9,opt,name=creation_time,json=creationTime" json:"creation_time,omitempty"`
 	InnerInfo                 *DescribeTableInnerInfo    `protobuf:"bytes,12,opt,name=inner_info,json=innerInfo" json:"inner_info,omitempty"`
 	XXX_NoUnkeyedLiteral      struct{}                   `json:"-"`
 	XXX_unrecognized          []byte                     `json:"-"`
@@ -2080,6 +2081,13 @@ func (m *DescribeTableResponse) GetIndexMetas() []*IndexMeta {
 		return m.IndexMetas
 	}
 	return nil
+}
+
+func (m *DescribeTableResponse) GetCreationTime() int64 {
+	if m != nil && m.CreationTime != nil {
+		return *m.CreationTime
+	}
+	return 0
 }
 
 func (m *DescribeTableResponse) GetInnerInfo() *DescribeTableInnerInfo {

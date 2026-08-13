@@ -5,10 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
-	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
-	"github.com/golang/protobuf/proto"
-	. "gopkg.in/check.v1"
 	"io"
 	"log"
 	"math/rand"
@@ -19,6 +15,11 @@ import (
 	"syscall"
 	"testing"
 	"time"
+
+	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/testConfig"
+	"github.com/golang/protobuf/proto"
+	. "gopkg.in/check.v1"
 )
 
 // Hook up gocheck into the "go test" runner.
@@ -589,6 +590,78 @@ func (s *TableStoreSuite) TestUpdateAndDescribeTable(c *C) {
 		c.Assert(strings.Contains(err.Error(), "contain updateFullRow"), Equals, true)
 	}
 	log.Println("TestUpdateAndDescribeTable finished")
+}
+
+// TestDescribeTableCreationTime 验证 DescribeTable 返回建表时间 creationTime(微秒)
+func (s *TableStoreSuite) TestDescribeTableCreationTime(c *C) {
+	log.Println("TestDescribeTableCreationTime started")
+
+	tableName := tableNamePrefix + "creationtime"
+	c.Assert(PrepareTable(tableName), IsNil)
+	defer checkAndDeleteTable(tableName)
+
+	descResp, err := client.DescribeTable(&DescribeTableRequest{TableName: tableName})
+	c.Assert(err, IsNil)
+	c.Assert(descResp, NotNil)
+
+	// creation_time 是微秒级时间戳，新建表后应当是正值且落在"当前时刻附近"(±10min，容忍机器与服务端时钟偏差)
+	c.Assert(descResp.CreationTime > 0, Equals, true)
+	nowUs := time.Now().UnixNano() / int64(time.Microsecond)
+	skewUs := int64(10 * time.Minute / time.Microsecond)
+	c.Assert(descResp.CreationTime > nowUs-skewUs, Equals, true)
+	c.Assert(descResp.CreationTime < nowUs+skewUs, Equals, true)
+
+	log.Println("TestDescribeTableCreationTime creationTime(us) = ", descResp.CreationTime)
+	log.Println("TestDescribeTableCreationTime finished")
+}
+
+// TestCreateTableNameLengthLimit 验证表名长度上限为 maxTableNameLength(255):
+// 256 字符被客户端拒绝，255 字符可正常建表
+func (s *TableStoreSuite) TestCreateTableNameLengthLimit(c *C) {
+	log.Println("TestCreateTableNameLengthLimit started")
+
+	repeatName := func(n int) string {
+		b := make([]byte, n)
+		for i := range b {
+			b[i] = 'a'
+		}
+		return string(b)
+	}
+
+	buildReq := func(name string) *CreateTableRequest {
+		req := new(CreateTableRequest)
+		tableMeta := new(TableMeta)
+		tableMeta.TableName = name
+		tableMeta.AddPrimaryKeyColumn("pk1", PrimaryKeyType_STRING)
+		tableOption := new(TableOption)
+		tableOption.TimeToAlive = -1
+		tableOption.MaxVersion = 1
+		req.TableMeta = tableMeta
+		req.TableOption = tableOption
+		req.ReservedThroughput = new(ReservedThroughput)
+		return req
+	}
+
+	// 超过上限(256)：客户端直接拒绝，返回 errTableNameTooLong
+	tooLong := repeatName(maxTableNameLength + 1)
+	c.Assert(len(tooLong), Equals, 256)
+	_, err := client.CreateTable(buildReq(tooLong))
+	c.Assert(err, NotNil)
+	c.Assert(err.Error(), Equals, errTableNameTooLong(tooLong).Error())
+
+	// 恰好等于上限(255)：可正常建表
+	atLimit := repeatName(maxTableNameLength)
+	c.Assert(len(atLimit), Equals, 255)
+	checkAndDeleteTable(atLimit)
+	defer checkAndDeleteTable(atLimit)
+	_, err = client.CreateTable(buildReq(atLimit))
+	c.Assert(err, IsNil)
+
+	descResp, err := client.DescribeTable(&DescribeTableRequest{TableName: atLimit})
+	c.Assert(err, IsNil)
+	c.Assert(descResp.TableMeta.TableName, Equals, atLimit)
+
+	log.Println("TestCreateTableNameLengthLimit finished")
 }
 
 func (s *TableStoreSuite) TestTableWithKeyAutoIncrement(c *C) {
@@ -1808,7 +1881,7 @@ func (s *TableStoreSuite) TestPutRowsWorkload(c *C) {
 }
 
 func (s *TableStoreSuite) TestFailureCase(c *C) {
-	tableName := randStringRunes(200)
+	tableName := randStringRunes(maxTableNameLength + 1)
 	createtableRequest := new(CreateTableRequest)
 	tableMeta := new(TableMeta)
 	tableMeta.TableName = tableName

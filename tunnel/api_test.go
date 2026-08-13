@@ -304,6 +304,52 @@ func TestDoRequest_AddExternalHeader(t *testing.T) {
 	c.True(traceId != requestId)
 }
 
+func TestDescribeTunnelRequestWithTunnelId(t *testing.T) {
+	c := assert.New(t)
+	const tunnelId = "tunnel-id"
+	var describedTunnelId string
+
+	handler := http.NewServeMux()
+	handler.HandleFunc(describeTunnelUri, func(w http.ResponseWriter, r *http.Request) {
+		body, err := ioutil.ReadAll(r.Body)
+		c.Nil(err)
+		var req protocol.DescribeTunnelRequest
+		err = proto.Unmarshal(body, &req)
+		c.Nil(err)
+		describedTunnelId = req.GetTunnelId()
+
+		tunnelType := protocol.TunnelType_name[int32(protocol.TunnelType_Stream)]
+		tableName := "table"
+		tunnelName := "tunnel"
+		instanceName := "instance"
+		streamId := "stream"
+		stage := "stage"
+		resp := &protocol.DescribeTunnelResponse{Tunnel: &protocol.TunnelInfo{
+			TunnelId:     req.TunnelId,
+			TunnelName:   &tunnelName,
+			TunnelType:   &tunnelType,
+			TableName:    &tableName,
+			InstanceName: &instanceName,
+			StreamId:     &streamId,
+			Stage:        &stage,
+		}}
+		buf, err := proto.Marshal(resp)
+		c.Nil(err)
+		w.Header().Set(xOtsRequestId, requestId)
+		_, err = w.Write(buf)
+		c.Nil(err)
+	})
+
+	ts := httptest.NewServer(handler)
+	defer ts.Close()
+	api := NewTunnelApi(ts.URL, "testInstance", "testAkId", "testAkSec", nil)
+
+	resp, err := api.DescribeTunnel(&DescribeTunnelRequest{TunnelId: tunnelId})
+	c.Nil(err)
+	c.Equal(tunnelId, describedTunnelId)
+	c.Equal(tunnelId, resp.Tunnel.TunnelId)
+}
+
 func mockServer() *httptest.Server {
 	handler := http.NewServeMux()
 	handler.HandleFunc(readRecordsAlwaysFailUri, func(w http.ResponseWriter, r *http.Request) {

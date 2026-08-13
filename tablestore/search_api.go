@@ -272,5 +272,19 @@ func (TableStoreClient *TableStoreClient) ParallelScan(request *ParallelScanRequ
 		response.NextToken = resp.NextToken
 	}
 
+	if resp.Consumed != nil && resp.Consumed.CapacityUnit != nil {
+		response.ConsumedCapacityUnit = &ConsumedCapacityUnit{
+			Read:  resp.Consumed.CapacityUnit.GetRead(),
+			Write: resp.Consumed.CapacityUnit.GetWrite(),
+		}
+	}
+
+	if resp.ReservedConsumed != nil && resp.ReservedConsumed.CapacityUnit != nil {
+		response.ReservedThroughput = &ReservedThroughput{
+			Readcap:  int(resp.ReservedConsumed.CapacityUnit.GetRead()),
+			Writecap: int(resp.ReservedConsumed.CapacityUnit.GetWrite()),
+		}
+	}
+
 	return response, nil
 }

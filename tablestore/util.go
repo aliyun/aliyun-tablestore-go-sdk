@@ -17,7 +17,7 @@ import (
 )
 
 const (
-	maxTableNameLength  = 100
+	maxTableNameLength  = 255
 	maxPrimaryKeyLength = 255
 	maxPrimaryKeyNum    = 10
 	maxMultiDeleteRows  = 100

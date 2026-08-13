@@ -1272,6 +1272,48 @@ func TestIpField_PbConvert(t *testing.T) {
 	assert.Equal(t, modelFieldSchemas, parseFieldSchemaFromPb(pbFieldSchemas))
 }
 
+func TestFuzzyKeywordField(t *testing.T) {
+	ft, err := ToFieldType("FUZZY_KEYWORD")
+	assert.NoError(t, err)
+	assert.Equal(t, FieldType_FUZZY_KEYWORD, ft)
+
+	var parsed FieldType
+	assert.NoError(t, json.Unmarshal([]byte(`"FUZZY_KEYWORD"`), &parsed))
+	assert.Equal(t, FieldType_FUZZY_KEYWORD, parsed)
+
+	fs := &FieldSchema{
+		FieldName: proto.String("col_fuzzy"),
+		FieldType: FieldType_FUZZY_KEYWORD,
+		Index:     proto.Bool(true),
+	}
+	data, err := json.Marshal(fs)
+	assert.NoError(t, err)
+	assert.Contains(t, string(data), `"FieldType":"FUZZY_KEYWORD"`)
+
+	roundTripped := &FieldSchema{}
+	assert.NoError(t, json.Unmarshal(data, roundTripped))
+	assert.Equal(t, FieldType_FUZZY_KEYWORD, roundTripped.FieldType)
+
+	pbFieldSchemas := []*otsprotocol.FieldSchema{
+		{
+			FieldName: proto.String("col_fuzzy"),
+			FieldType: otsprotocol.FieldType_FUZZY_KEYWORD.Enum(),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+	modelFieldSchemas := []*FieldSchema{
+		{
+			FieldName: proto.String("col_fuzzy"),
+			FieldType: FieldType_FUZZY_KEYWORD,
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+	assert.Equal(t, pbFieldSchemas, convertFieldSchemaToPBFieldSchema(modelFieldSchemas))
+	assert.Equal(t, modelFieldSchemas, parseFieldSchemaFromPb(pbFieldSchemas))
+}
+
 func TestJsonField_PbConvert(t *testing.T) {
 	tests := []struct {
 		name           string
