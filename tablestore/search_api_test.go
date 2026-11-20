@@ -2967,6 +2967,51 @@ func (s *SearchSuite) TestUpdateSearchIndexTTL(c *C) {
 	}
 }
 
+func (s *SearchSuite) TestUpdateSearchIndexAddFieldSchema(c *C) {
+	tableName := "go_sdk_test_update_add_field_schema"
+	indexName := "go_sdk_test_index"
+	//init
+	{
+		DeleteTableAndAllIndex(c, client, tableName)
+		CreateSearchTableAndDisallowUpdate(c, client, tableName)
+		CreateSearchIndex(c, client, tableName, indexName, nil, getNormalTestIndexSchema(), -1)
+	}
+	//add fields
+	{
+		req := new(UpdateSearchIndexRequest)
+		req.TableName = tableName
+		req.IndexName = indexName
+		req.AddedFieldSchemas = []*FieldSchema{
+			{
+				FieldName: proto.String("col_added_keyword"),
+				FieldType: FieldType_KEYWORD,
+			},
+			{
+				FieldName: proto.String("col_added_flat_object"),
+				FieldType: FieldType_FLAT_OBJECT,
+			},
+		}
+		resp, err := client.UpdateSearchIndex(req)
+		c.Check(err, IsNil)
+		if err != nil {
+			c.Log(fmt.Println(err))
+			return
+		}
+		c.Log("UpdateSearchIndex", resp.ResponseInfo.RequestId)
+
+		respD := DescribeSearchIndex(c, client, tableName, indexName)
+		c.Check(respD, NotNil)
+		addedFields := make(map[string]FieldType)
+		for _, fieldSchema := range respD.Schema.FieldSchemas {
+			if fieldSchema.FieldName != nil {
+				addedFields[*fieldSchema.FieldName] = fieldSchema.FieldType
+			}
+		}
+		c.Check(addedFields["col_added_keyword"], Equals, FieldType_KEYWORD)
+		c.Check(addedFields["col_added_flat_object"], Equals, FieldType_FLAT_OBJECT)
+	}
+}
+
 func (s *SearchSuite) TestUpdateSchemaAndDescribeSearchIndex(c *C) {
 	tableName := "go_sdk_test_table"
 	indexName := "go_sdk_test_index"

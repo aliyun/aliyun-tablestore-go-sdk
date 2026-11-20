@@ -106,6 +106,9 @@ func main() {
 	// update searchIndex schema
 	sample.UpdateSearchIndexSchema(client, "go_sdk_test_table", "go_sdk_test_index", "go_sdk_test_index_reindex")
 
+	// dynamically add fields to an existing searchIndex
+	sample.UpdateSearchIndexAddFieldSchema(client, "add_field_schema_sample_table", "add_field_schema_sample_index")
+
 	// SQL sample
 	sample.SQLQuerySample(client)
 

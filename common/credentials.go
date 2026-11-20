@@ -113,6 +113,7 @@ func (v4Cre *V4Credentials) GetSnapshot() *V4CredentialsSnapshot {
 	return &V4CredentialsSnapshot{
 		AccessKeyID:        v4Cre.GetAccessKeyID(),
 		AccessKeySecret:    v4Cre.GetAccessKeySecret(),
+		V4SigningStsToken:  v4Cre.GetSecurityToken(),
 		Region:             v4Cre.GetRegion(),
 		SigningDate:        dateSnapshot,
 		V4SigningAccessKey: keySnapshot,

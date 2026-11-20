@@ -42,6 +42,16 @@ func (s *CredentialsSuite) TestFinalSigningKeyString(c *C) {
 	log.Println("TestFinalSigningKeyString finished")
 }
 
+func (s *CredentialsSuite) TestGetSnapshotKeepsStsToken(c *C) {
+	log.Println("TestGetSnapshotKeepsStsToken started")
+
+	v4Credentials := &V4Credentials{AccessKeyID: "ak", AccessKeySecret: accessKeySecret, V4SigningStsToken: "sts-token", Region: region, SigningDate: signingDate}
+	snapshot := v4Credentials.GetSnapshot()
+	c.Assert(snapshot.GetSecurityToken(), Equals, "sts-token")
+
+	log.Println("TestGetSnapshotKeepsStsToken finished")
+}
+
 func (s *CredentialsSuite) TestUpdateV4Signature(c *C) {
 	log.Println("TestUpdateV4Signature started")
 

@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash/crc32"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -19,6 +18,7 @@ import (
 	"time"
 
 	"github.com/aliyun/aliyun-tablestore-go-sdk/common"
+	"github.com/aliyun/aliyun-tablestore-go-sdk/internal/otshttp"
 	"github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/otsprotocol"
 	Fieldvalues "github.com/aliyun/aliyun-tablestore-go-sdk/tablestore/timeseries/flatbuffer"
 	"github.com/golang/protobuf/proto"
@@ -621,7 +621,7 @@ func (internalClient *internalClient) postReq(req *http.Request, url string) ([]
 	defer resp.Body.Close()
 
 	reqId := getRequestId(resp)
-	body, err := ioutil.ReadAll(resp.Body)
+	body, err := otshttp.ReadResponseBody(resp)
 	if err != nil {
 		return nil, err, reqId
 	}
@@ -687,10 +687,13 @@ func isIdempotent(action string) bool {
 }
 
 func (internalClient *internalClient) doRequest(url string, uri string, body []byte, resp proto.Message, extraInfo ExtraRequestInfo) ([]byte, error, string) {
+	header := make(http.Header)
+	body = otshttp.EncodeRequest(body, header, internalClient.config.EnableRequestCompression, internalClient.config.EnableResponseCompression)
 	hreq, err := http.NewRequest("POST", url, bytes.NewBuffer(body))
 	if err != nil {
 		return nil, err, ""
 	}
+	hreq.Header = header
 	akInfo := internalClient.credentialsProvider.GetCredentials()
 	if isCredentialsV4(akInfo) {
 		akInfoV4 := akInfo.(common.CredentialsV4)
@@ -2003,73 +2006,194 @@ func (tableStoreClient *TableStoreClient) UpdateRow(request *UpdateRowRequest) (
 	return response, nil
 }
 
-// Batch Get Row
-// @param BatchGetRowRequest
-func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse, error) {
-	req := new(otsprotocol.BatchGetRowRequest)
+type batchGetRowPosition struct {
+	tableName string
+	rowIndex  int
+}
 
-	var tablesInBatch []*otsprotocol.TableInBatchGetRowRequest
+type batchGetRowPlan struct {
+	criteriaByTable map[string]*MultiRowQueryCriteria
+	rowOrder        []batchGetRowPosition
+}
 
-	for _, Criteria := range request.MultiRowQueryCriteria {
-		table := new(otsprotocol.TableInBatchGetRowRequest)
-		table.TableName = proto.String(Criteria.TableName)
-		table.ColumnsToGet = Criteria.ColumnsToGet
+func normalizeBatchGetRowCriteria(request *BatchGetRowRequest) ([]*MultiRowQueryCriteria, error) {
+	if request == nil {
+		return nil, errInvalidInput
+	}
 
-		if Criteria.StartColumn != nil {
-			table.StartColumn = Criteria.StartColumn
-		}
-
-		if Criteria.EndColumn != nil {
-			table.EndColumn = Criteria.EndColumn
-		}
-
-		if Criteria.Filter != nil {
-			table.Filter = Criteria.Filter.Serialize()
-		}
-
-		if Criteria.MaxVersion != 0 {
-			table.MaxVersions = proto.Int32(int32(Criteria.MaxVersion))
-		}
-
-		if Criteria.TimeRange != nil {
-			if Criteria.TimeRange.Specific != 0 {
-				table.TimeRange = &otsprotocol.TimeRange{SpecificTime: proto.Int64(Criteria.TimeRange.Specific)}
-			} else {
-				table.TimeRange = &otsprotocol.TimeRange{StartTime: proto.Int64(Criteria.TimeRange.Start), EndTime: proto.Int64(Criteria.TimeRange.End)}
-			}
-		} else if Criteria.MaxVersion == 0 {
+	criteriaByTable := make(map[string]int, len(request.MultiRowQueryCriteria))
+	normalized := make([]*MultiRowQueryCriteria, 0, len(request.MultiRowQueryCriteria))
+	for _, criteria := range request.MultiRowQueryCriteria {
+		if criteria == nil || criteria.TableName == "" {
 			return nil, errInvalidInput
 		}
+		if index, ok := criteriaByTable[criteria.TableName]; ok {
+			// Match Java SDK behavior: the last criteria for a table replaces the previous one.
+			normalized[index] = criteria
+			continue
+		}
+		criteriaByTable[criteria.TableName] = len(normalized)
+		normalized = append(normalized, criteria)
+	}
+	return normalized, nil
+}
 
-		for _, pk := range Criteria.PrimaryKey {
-			pkWithBytes := pk.Build(false)
-			table.PrimaryKey = append(table.PrimaryKey, pkWithBytes)
+func columnsToGetForRow(criteria *MultiRowQueryCriteria, rowIndex int) []string {
+	if projection, ok := criteria.columnsToGetByRow[rowIndex]; ok {
+		return projection.columnsToGet
+	}
+	return criteria.ColumnsToGet
+}
+
+func validateBatchGetRowProjections(criteria *MultiRowQueryCriteria) error {
+	for rowIndex, projection := range criteria.columnsToGetByRow {
+		if rowIndex < 0 || rowIndex >= len(criteria.PrimaryKey) {
+			continue
+		}
+		if criteria.PrimaryKey[rowIndex] != projection.primaryKey {
+			return fmt.Errorf("%w: BatchGetRow: table %q row %d primary key was replaced after AddRowWithColumnsToGet", errInvalidInput, criteria.TableName, rowIndex)
+		}
+	}
+	return nil
+}
+
+func columnsToGetForTable(criteria *MultiRowQueryCriteria) []string {
+	columns := make([]string, 0, len(criteria.ColumnsToGet))
+	seen := make(map[string]struct{})
+	for rowIndex := range criteria.PrimaryKey {
+		rowColumns := columnsToGetForRow(criteria, rowIndex)
+		if len(rowColumns) == 0 {
+			// An empty columns_to_get means all columns. It also covers every
+			// narrower projection requested by another row in the same table.
+			return nil
+		}
+		for _, column := range rowColumns {
+			if _, ok := seen[column]; ok {
+				continue
+			}
+			seen[column] = struct{}{}
+			columns = append(columns, column)
+		}
+	}
+	return columns
+}
+
+func buildBatchGetRowRequest(request *BatchGetRowRequest) (*otsprotocol.BatchGetRowRequest, *batchGetRowPlan, error) {
+	criteriaList, err := normalizeBatchGetRowCriteria(request)
+	if err != nil {
+		return nil, nil, err
+	}
+	if len(criteriaList) == 0 {
+		return nil, nil, errInvalidInput
+	}
+
+	req := new(otsprotocol.BatchGetRowRequest)
+	plan := &batchGetRowPlan{
+		criteriaByTable: make(map[string]*MultiRowQueryCriteria, len(criteriaList)),
+	}
+	for _, criteria := range criteriaList {
+		if len(criteria.PrimaryKey) == 0 {
+			return nil, nil, errInvalidInput
+		}
+		if err := validateBatchGetRowProjections(criteria); err != nil {
+			return nil, nil, err
+		}
+		table := new(otsprotocol.TableInBatchGetRowRequest)
+		table.TableName = proto.String(criteria.TableName)
+		table.ColumnsToGet = columnsToGetForTable(criteria)
+
+		if criteria.StartColumn != nil {
+			table.StartColumn = criteria.StartColumn
+		}
+		if criteria.EndColumn != nil {
+			table.EndColumn = criteria.EndColumn
+		}
+		if criteria.Filter != nil {
+			table.Filter = criteria.Filter.Serialize()
+		}
+		if criteria.MaxVersion != 0 {
+			table.MaxVersions = proto.Int32(int32(criteria.MaxVersion))
+		}
+		if criteria.TimeRange != nil {
+			if criteria.TimeRange.Specific != 0 {
+				table.TimeRange = &otsprotocol.TimeRange{SpecificTime: proto.Int64(criteria.TimeRange.Specific)}
+			} else {
+				table.TimeRange = &otsprotocol.TimeRange{StartTime: proto.Int64(criteria.TimeRange.Start), EndTime: proto.Int64(criteria.TimeRange.End)}
+			}
+		} else if criteria.MaxVersion == 0 {
+			return nil, nil, errInvalidInput
 		}
 
-		tablesInBatch = append(tablesInBatch, table)
+		for rowIndex, pk := range criteria.PrimaryKey {
+			if pk == nil {
+				return nil, nil, errInvalidInput
+			}
+			table.PrimaryKey = append(table.PrimaryKey, pk.Build(false))
+			plan.rowOrder = append(plan.rowOrder, batchGetRowPosition{tableName: criteria.TableName, rowIndex: rowIndex})
+		}
+
+		req.Tables = append(req.Tables, table)
+		plan.criteriaByTable[criteria.TableName] = criteria
 	}
+	return req, plan, nil
+}
 
-	req.Tables = tablesInBatch
-	resp := new(otsprotocol.BatchGetRowResponse)
-
-	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
-	if err := tableStoreClient.doBatchRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
-		return nil, err
+func filterBatchGetRowColumns(columns []*AttributeColumn, columnsToGet []string) []*AttributeColumn {
+	if len(columnsToGet) == 0 {
+		return columns
 	}
+	selected := make(map[string]struct{}, len(columnsToGet))
+	for _, column := range columnsToGet {
+		selected[column] = struct{}{}
+	}
+	filtered := make([]*AttributeColumn, 0, len(columns))
+	for _, column := range columns {
+		if _, ok := selected[column.ColumnName]; ok {
+			filtered = append(filtered, column)
+		}
+	}
+	return filtered
+}
 
+func invalidBatchGetRowResponse(format string, args ...interface{}) error {
+	return fmt.Errorf("%w: BatchGetRow: %s", ErrInvalidResponse, fmt.Sprintf(format, args...))
+}
+
+func fillBatchGetRowResponse(response *BatchGetRowResponse, resp *otsprotocol.BatchGetRowResponse, plan *batchGetRowPlan) error {
+	tableToRowsResult := make(map[string][]RowResult, len(resp.Tables))
+	seenTables := make(map[string]struct{}, len(resp.Tables))
 	for _, table := range resp.Tables {
+		if table == nil || table.TableName == nil || plan.criteriaByTable[table.GetTableName()] == nil {
+			return invalidBatchGetRowResponse("unexpected table")
+		}
+		if _, ok := seenTables[table.GetTableName()]; ok {
+			return invalidBatchGetRowResponse("duplicate table %q", table.GetTableName())
+		}
+		seenTables[table.GetTableName()] = struct{}{}
+		criteria := plan.criteriaByTable[table.GetTableName()]
+		if len(table.Rows) != len(criteria.PrimaryKey) {
+			return invalidBatchGetRowResponse("table %q returned %d rows, expected %d", table.GetTableName(), len(table.Rows), len(criteria.PrimaryKey))
+		}
 		index := int32(0)
 		for _, row := range table.Rows {
-			rowResult := &RowResult{TableName: *table.TableName, IsSucceed: *row.IsOk, ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
-			index++
-			if *row.IsOk == false {
-				rowResult.Error = Error{Code: *row.Error.Code, Message: *row.Error.Message}
+			if row == nil || row.IsOk == nil {
+				return invalidBatchGetRowResponse("table %q row %d has no status", table.GetTableName(), index)
+			}
+			rowResult := &RowResult{TableName: table.GetTableName(), IsSucceed: row.GetIsOk(), ConsumedCapacityUnit: &ConsumedCapacityUnit{}, Index: index}
+			if !row.GetIsOk() {
+				if row.Error == nil || row.Error.Code == nil {
+					return invalidBatchGetRowResponse("table %q row %d has no error", table.GetTableName(), index)
+				}
+				rowResult.Error = Error{Code: row.Error.GetCode(), Message: row.Error.GetMessage()}
 			} else {
 				// len == 0 means row not exist
 				if len(row.Row) > 0 {
 					rows, err := readRowsWithHeader(bytes.NewReader(row.Row))
 					if err != nil {
-						return nil, err
+						return invalidBatchGetRowResponse("table %q row %d cannot be decoded: %v", table.GetTableName(), index, err)
+					}
+					if len(rows) != 1 {
+						return invalidBatchGetRowResponse("table %q row %d decoded to %d rows", table.GetTableName(), index, len(rows))
 					}
 
 					for _, pk := range rows[0].primaryKey {
@@ -2083,13 +2207,46 @@ func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowReques
 					}
 				}
 
-				rowResult.ConsumedCapacityUnit.Read = *row.Consumed.CapacityUnit.Read
-				rowResult.ConsumedCapacityUnit.Write = *row.Consumed.CapacityUnit.Write
+				if row.Consumed == nil || row.Consumed.CapacityUnit == nil {
+					return invalidBatchGetRowResponse("table %q row %d has no consumed capacity", table.GetTableName(), index)
+				}
+				rowResult.ConsumedCapacityUnit.Read = row.Consumed.CapacityUnit.GetRead()
+				rowResult.ConsumedCapacityUnit.Write = row.Consumed.CapacityUnit.GetWrite()
 			}
+			rowResult.Columns = filterBatchGetRowColumns(rowResult.Columns, columnsToGetForRow(criteria, int(index)))
 
-			response.TableToRowsResult[*table.TableName] = append(response.TableToRowsResult[*table.TableName], *rowResult)
+			tableToRowsResult[table.GetTableName()] = append(tableToRowsResult[table.GetTableName()], *rowResult)
+			index++
 		}
+	}
+	rowResults := make([]RowResult, 0, len(plan.rowOrder))
+	for _, position := range plan.rowOrder {
+		rows := tableToRowsResult[position.tableName]
+		if position.rowIndex >= len(rows) {
+			return invalidBatchGetRowResponse("missing table %q row %d", position.tableName, position.rowIndex)
+		}
+		rowResults = append(rowResults, rows[position.rowIndex])
+	}
+	response.TableToRowsResult = tableToRowsResult
+	response.RowResults = rowResults
+	return nil
+}
 
+// BatchGetRow gets multiple rows. If response decoding fails, the returned
+// response contains only ResponseInfo and the error matches ErrInvalidResponse.
+func (tableStoreClient *TableStoreClient) BatchGetRow(request *BatchGetRowRequest) (*BatchGetRowResponse, error) {
+	req, plan, err := buildBatchGetRowRequest(request)
+	if err != nil {
+		return nil, err
+	}
+	resp := new(otsprotocol.BatchGetRowResponse)
+
+	response := &BatchGetRowResponse{TableToRowsResult: make(map[string][]RowResult)}
+	if err := tableStoreClient.doBatchRequestWithRetry(batchGetRowUri, req, resp, &response.ResponseInfo, request.ExtraRequestInfo); err != nil {
+		return nil, err
+	}
+	if err := fillBatchGetRowResponse(response, resp, plan); err != nil {
+		return response, err
 	}
 	return response, nil
 }

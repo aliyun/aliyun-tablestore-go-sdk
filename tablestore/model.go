@@ -95,6 +95,10 @@ type TableStoreConfig struct {
 	ProxyFromEnvironment bool
 	DefaultRetryInterval time.Duration
 	MaxRetryInterval     time.Duration
+	// EnableRequestCompression compresses non-empty requests with deflate. Default: false.
+	EnableRequestCompression bool
+	// EnableResponseCompression requests deflate responses. Default: false.
+	EnableResponseCompression bool
 }
 
 func NewDefaultTableStoreConfig() *TableStoreConfig {
@@ -706,7 +710,40 @@ func (rowQueryCriteria *RangeRowQueryCriteria) AddColumnToGet(columnName string)
 }
 
 func (rowQueryCriteria *MultiRowQueryCriteria) AddRow(pk *PrimaryKey) {
+	rowQueryCriteria.clearRowProjectionsFrom(len(rowQueryCriteria.PrimaryKey))
 	rowQueryCriteria.PrimaryKey = append(rowQueryCriteria.PrimaryKey, pk)
+}
+
+func (rowQueryCriteria *MultiRowQueryCriteria) clearRowProjectionsFrom(rowIndex int) {
+	for existingIndex := range rowQueryCriteria.columnsToGetByRow {
+		if existingIndex >= rowIndex {
+			delete(rowQueryCriteria.columnsToGetByRow, existingIndex)
+		}
+	}
+}
+
+// AddRowWithColumnsToGet adds a row and specifies the columns to return for
+// that row. These columns take precedence over ColumnsToGet for this row;
+// rows added with AddRow continue to use ColumnsToGet. An empty columnsToGet
+// requests all columns for this row. BatchGetRow sends the union of the
+// effective columns for all rows to the service and filters each row result
+// back to its effective columns.
+func (rowQueryCriteria *MultiRowQueryCriteria) AddRowWithColumnsToGet(pk *PrimaryKey, columnsToGet ...string) {
+	rowIndex := len(rowQueryCriteria.PrimaryKey)
+	rowQueryCriteria.clearRowProjectionsFrom(rowIndex)
+	rowQueryCriteria.PrimaryKey = append(rowQueryCriteria.PrimaryKey, pk)
+	if rowQueryCriteria.columnsToGetByRow == nil {
+		rowQueryCriteria.columnsToGetByRow = make(map[int]multiRowProjection)
+	}
+	rowQueryCriteria.columnsToGetByRow[rowIndex] = multiRowProjection{
+		primaryKey:   pk,
+		columnsToGet: append([]string(nil), columnsToGet...),
+	}
+}
+
+type multiRowProjection struct {
+	primaryKey   *PrimaryKey
+	columnsToGet []string
 }
 
 type GetRowRequest struct {
@@ -723,11 +760,39 @@ type MultiRowQueryCriteria struct {
 	Filter       ColumnFilter
 	StartColumn  *string
 	EndColumn    *string
+
+	columnsToGetByRow map[int]multiRowProjection
 }
 
 type BatchGetRowRequest struct {
 	MultiRowQueryCriteria []*MultiRowQueryCriteria
 	ExtraRequestInfo
+}
+
+// AddMultiRowQueryCriteria adds query criteria for a table. If criteria for
+// the same table already exists, it is replaced so that the request contains
+// at most one entry for each table.
+func (request *BatchGetRowRequest) AddMultiRowQueryCriteria(criteria *MultiRowQueryCriteria) {
+	if criteria == nil {
+		return
+	}
+
+	replaced := false
+	normalized := make([]*MultiRowQueryCriteria, 0, len(request.MultiRowQueryCriteria)+1)
+	for _, current := range request.MultiRowQueryCriteria {
+		if current != nil && current.TableName == criteria.TableName {
+			if !replaced {
+				normalized = append(normalized, criteria)
+				replaced = true
+			}
+			continue
+		}
+		normalized = append(normalized, current)
+	}
+	if !replaced {
+		normalized = append(normalized, criteria)
+	}
+	request.MultiRowQueryCriteria = normalized
 }
 
 type ColumnMap struct {
@@ -767,6 +832,8 @@ type RowChange interface {
 
 type BatchGetRowResponse struct {
 	TableToRowsResult map[string][]RowResult
+	// RowResults contains all row results in the same order as the rows in the request.
+	RowResults []RowResult
 	ResponseInfo
 }
 

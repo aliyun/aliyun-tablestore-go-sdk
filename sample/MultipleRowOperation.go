@@ -43,18 +43,17 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 		pkToGet.AddPrimaryKeyColumn("pk1", "pk1value1")
 		pkToGet.AddPrimaryKeyColumn("pk2", int64(i))
 		pkToGet.AddPrimaryKeyColumn("pk3", []byte("pk3"))
-		mqCriteria.AddRow(pkToGet)
+		mqCriteria.AddRowWithColumnsToGet(pkToGet, "col1")
 	}
 	pkToGet2 := new(tablestore.PrimaryKey)
 	pkToGet2.AddPrimaryKeyColumn("pk1", "pk1value2")
 	pkToGet2.AddPrimaryKeyColumn("pk2", int64(300))
 	pkToGet2.AddPrimaryKeyColumn("pk3", []byte("pk3"))
-	mqCriteria.AddColumnToGet("col1")
-	mqCriteria.AddRow(pkToGet2)
+	mqCriteria.AddRowWithColumnsToGet(pkToGet2, "col2")
 
 	mqCriteria.MaxVersion = 1
 	mqCriteria.TableName = tableName
-	batchGetReq.MultiRowQueryCriteria = append(batchGetReq.MultiRowQueryCriteria, mqCriteria)
+	batchGetReq.AddMultiRowQueryCriteria(mqCriteria)
 
 	/*condition := tablestore.NewSingleColumnCondition("col1", tablestore.CT_GREATER_THAN, int64(0))
 	mqCriteria.Filter = condition*/
@@ -64,7 +63,7 @@ func BatchGetRowSample(client *tablestore.TableStoreClient, tableName string) {
 	if err != nil {
 		fmt.Println("batachget failed with error:", err)
 	} else {
-		for _, row := range batchGetResponse.TableToRowsResult[mqCriteria.TableName] {
+		for _, row := range batchGetResponse.RowResults {
 			if row.PrimaryKey.PrimaryKeys != nil {
 				fmt.Println("get row with key", row.PrimaryKey.PrimaryKeys[0].Value, row.PrimaryKey.PrimaryKeys[1].Value, row.PrimaryKey.PrimaryKeys[2].Value)
 			} else {

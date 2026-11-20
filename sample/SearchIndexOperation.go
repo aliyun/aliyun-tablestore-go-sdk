@@ -3004,6 +3004,77 @@ func UpdateSearchIndexSchema(client *tablestore.TableStoreClient, tableName stri
 	}
 }
 
+/**
+ * Dynamically add fields to an existing index by UpdateSearchIndexRequest.AddedFieldSchemas.
+ * Only adding fields is supported, and the allowed field types are restricted by the server side.
+ */
+func UpdateSearchIndexAddFieldSchema(client *tablestore.TableStoreClient, tableName string, indexName string) {
+	fmt.Println("Begin to create table:", tableName)
+	createtableRequest := new(tablestore.CreateTableRequest)
+	tableMeta := new(tablestore.TableMeta)
+	tableMeta.TableName = tableName
+	tableMeta.AddPrimaryKeyColumn("pk1", tablestore.PrimaryKeyType_STRING)
+	tableOption := new(tablestore.TableOption)
+	tableOption.TimeToAlive = -1
+	tableOption.MaxVersion = 1
+	reservedThroughput := new(tablestore.ReservedThroughput)
+	reservedThroughput.Readcap = 0
+	reservedThroughput.Writecap = 0
+	createtableRequest.TableMeta = tableMeta
+	createtableRequest.TableOption = tableOption
+	createtableRequest.ReservedThroughput = reservedThroughput
+
+	_, err := client.CreateTable(createtableRequest)
+	if err != nil {
+		fmt.Println("Failed to create table with error:", err)
+	} else {
+		fmt.Println("Create table finished")
+	}
+
+	fmt.Println("Begin to create index:", indexName)
+	request := &tablestore.CreateSearchIndexRequest{}
+	request.TableName = tableName
+	request.IndexName = indexName
+	request.IndexSchema = &tablestore.IndexSchema{
+		FieldSchemas: []*tablestore.FieldSchema{
+			{
+				FieldName: proto.String("Col_Keyword"),
+				FieldType: tablestore.FieldType_KEYWORD,
+				Index:     proto.Bool(true),
+			},
+		},
+	}
+	resp, err := client.CreateSearchIndex(request)
+	if err != nil {
+		fmt.Println("error :", err)
+		return
+	}
+	fmt.Println("CreateSearchIndex finished, requestId:", resp.ResponseInfo.RequestId)
+
+	fmt.Println("Begin to add fields to index:", indexName)
+	addReq := new(tablestore.UpdateSearchIndexRequest)
+	addReq.TableName = tableName
+	addReq.IndexName = indexName
+	addReq.AddedFieldSchemas = []*tablestore.FieldSchema{
+		{
+			FieldName: proto.String("Col_Added_Long"),
+			FieldType: tablestore.FieldType_LONG,
+		},
+		{
+			FieldName: proto.String("Col_Added_Flat_Object"),
+			FieldType: tablestore.FieldType_FLAT_OBJECT,
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(false),
+		},
+	}
+	addResp, err := client.UpdateSearchIndex(addReq)
+	if err != nil {
+		fmt.Println("update search index failed with error:", err)
+		return
+	}
+	fmt.Println("UpdateSearchIndex finished, requestId:", addResp.ResponseInfo.RequestId)
+}
+
 func CreateSearchIndexWithJsonField(client *tablestore.TableStoreClient, tableName string, indexName string) {
 	fmt.Println("Begin to create table:", tableName)
 	createtableRequest := new(tablestore.CreateTableRequest)

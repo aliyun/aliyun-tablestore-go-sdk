@@ -27,6 +27,10 @@ var (
 	errNoChecksum              = errors.New("[tablestore] expect checksum")
 	errChecksum                = errors.New("[tablestore] checksum failed")
 	errInvalidInput            = errors.New("[tablestore] invalid input")
+
+	// ErrInvalidResponse indicates that the service returned a response that
+	// does not match the request or cannot be decoded safely.
+	ErrInvalidResponse = errors.New("[tablestore] invalid response")
 )
 
 const (

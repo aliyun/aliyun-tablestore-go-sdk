@@ -1314,6 +1314,53 @@ func TestFuzzyKeywordField(t *testing.T) {
 	assert.Equal(t, modelFieldSchemas, parseFieldSchemaFromPb(pbFieldSchemas))
 }
 
+func TestFlatObjectField(t *testing.T) {
+	ft, err := ToFieldType("FLAT_OBJECT")
+	assert.NoError(t, err)
+	assert.Equal(t, FieldType_FLAT_OBJECT, ft)
+
+	ftLowerCase, err := ToFieldType("flat_object")
+	assert.NoError(t, err)
+	assert.Equal(t, FieldType_FLAT_OBJECT, ftLowerCase)
+
+	var parsed FieldType
+	assert.NoError(t, json.Unmarshal([]byte(`"FLAT_OBJECT"`), &parsed))
+	assert.Equal(t, FieldType_FLAT_OBJECT, parsed)
+	assert.Equal(t, "FLAT_OBJECT", parsed.String())
+
+	fs := &FieldSchema{
+		FieldName: proto.String("col_flat_object"),
+		FieldType: FieldType_FLAT_OBJECT,
+	}
+	data, err := json.Marshal(fs)
+	assert.NoError(t, err)
+	assert.Contains(t, string(data), `"FieldType":"FLAT_OBJECT"`)
+
+	roundTripped := &FieldSchema{}
+	assert.NoError(t, json.Unmarshal(data, roundTripped))
+	assert.Equal(t, FieldType_FLAT_OBJECT, roundTripped.FieldType)
+
+	// FLAT_OBJECT is a scalar field: Index and Store default to true and sub schemas are not serialized.
+	pbFieldSchemas := []*otsprotocol.FieldSchema{
+		{
+			FieldName: proto.String("col_flat_object"),
+			FieldType: otsprotocol.FieldType_FLAT_OBJECT.Enum(),
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+	modelFieldSchemas := []*FieldSchema{
+		{
+			FieldName: proto.String("col_flat_object"),
+			FieldType: FieldType_FLAT_OBJECT,
+			Index:     proto.Bool(true),
+			Store:     proto.Bool(true),
+		},
+	}
+	assert.Equal(t, pbFieldSchemas, convertFieldSchemaToPBFieldSchema(modelFieldSchemas))
+	assert.Equal(t, modelFieldSchemas, parseFieldSchemaFromPb(pbFieldSchemas))
+}
+
 func TestJsonField_PbConvert(t *testing.T) {
 	tests := []struct {
 		name           string

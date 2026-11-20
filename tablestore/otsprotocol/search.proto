@@ -469,6 +469,7 @@ enum FieldType {
   FUZZY_KEYWORD = 10;
   IP = 11;
   JSON = 12;
+  FLAT_OBJECT = 13;
 }
 
 enum DateTimeUnit {
@@ -582,6 +583,7 @@ message UpdateSearchIndexRequest {
     optional string switch_index_name = 3;
     repeated QueryFlowWeight query_flow_weight = 4;
     optional int32 time_to_live = 5;  // unit is seconds
+    repeated FieldSchema added_field_schemas = 6;
 }
 
 message UpdateSearchIndexResponse {

@@ -391,6 +391,7 @@ const (
 	FieldType_FUZZY_KEYWORD FieldType = 10
 	FieldType_IP            FieldType = 11
 	FieldType_JSON          FieldType = 12
+	FieldType_FLAT_OBJECT   FieldType = 13
 )
 
 func (ft FieldType) String() string {
@@ -419,6 +420,8 @@ func (ft FieldType) String() string {
 		return "IP"
 	case FieldType_JSON:
 		return "JSON"
+	case FieldType_FLAT_OBJECT:
+		return "FLAT_OBJECT"
 	default:
 		return string(ft)
 	}
@@ -450,6 +453,8 @@ func ToFieldType(fieldType string) (FieldType, error) {
 		return FieldType_IP, nil
 	case "JSON":
 		return FieldType_JSON, nil
+	case "FLAT_OBJECT":
+		return FieldType_FLAT_OBJECT, nil
 	default:
 		return FieldType_LONG, errors.New("Invalid field type: " + fieldType)
 	}
@@ -883,11 +888,12 @@ type QueryFlowWeight struct {
 }
 
 type UpdateSearchIndexRequest struct {
-	TableName        string
-	IndexName        string
-	SwitchIndexName  *string
-	QueryFlowWeights []*QueryFlowWeight
-	TimeToLive       *int32
+	TableName         string
+	IndexName         string
+	SwitchIndexName   *string
+	QueryFlowWeights  []*QueryFlowWeight
+	TimeToLive        *int32
+	AddedFieldSchemas []*FieldSchema
 	ExtraRequestInfo
 }
 

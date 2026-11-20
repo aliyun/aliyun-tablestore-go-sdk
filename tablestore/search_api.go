@@ -40,6 +40,7 @@ func (tableStoreClient *TableStoreClient) UpdateSearchIndex(request *UpdateSearc
 	req.IndexName = proto.String(request.IndexName)
 	req.QueryFlowWeight = convertToPbQueryFlowWeight(request.QueryFlowWeights)
 	req.TimeToLive = request.TimeToLive
+	req.AddedFieldSchemas = convertFieldSchemaToPBFieldSchema(request.AddedFieldSchemas)
 	req.SwitchIndexName = request.SwitchIndexName
 	resp := new(otsprotocol.UpdateSearchIndexResponse)
 	response := new(UpdateSearchIndexResponse)
